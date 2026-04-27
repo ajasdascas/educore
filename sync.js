@@ -53,17 +53,11 @@ async function deploy() {
             secure: false
         });
 
-        // Next.js con basePath: "/educore" genera out/educore/
-        // Subimos el contenido de out/educore/ a /domains/educore/
-        const outDir = path.join(__dirname, "frontend", "out", "educore");
-        if (fs.existsSync(outDir)) {
-            console.log("Subiendo build estático (out/educore/) a /domains/educore/...");
-            await uploadDir(client, outDir, "/domains/educore");
-        } else {
-            // Fallback: si no existe subcarpeta, subir out/ directamente
-            console.log("Subiendo build estático (out/) a /domains/educore/...");
-            await uploadDir(client, path.join(__dirname, "frontend", "out"), "/domains/educore");
-        }
+        // Subimos out/ a la subcarpeta educore dentro del public_html de onlineu.mx
+        const remoteDir = "/domains/onlineu.mx/public_html/educore";
+        const outDir = path.join(__dirname, "frontend", "out");
+        console.log(`Subiendo build estático (out/) a ${remoteDir}/...`);
+        await uploadDir(client, outDir, remoteDir);
 
         console.log("Subida FTP completada con éxito.");
     } catch (err) {
