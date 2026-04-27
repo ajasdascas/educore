@@ -1,6 +1,7 @@
 package tenants
 
 import (
+	"strconv"
 	"educore/internal/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
@@ -297,5 +298,5 @@ func (h *Handler) Activate(c *fiber.Ctx) error {
 
 // helper
 func itoa(i int) string {
-	return string(rune('0'+i)) // works for 1-9
+	return strconv.Itoa(i)
 }
