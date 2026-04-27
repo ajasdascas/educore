@@ -74,7 +74,7 @@ async function deploy() {
     // Paso 3: GitHub
     try {
         console.log("Realizando commit en GitHub...");
-        execSync("git add -A");
+        execSync("git add frontend backend sync.js package.json .gitignore");
         execSync('git commit -m "Auto update: Deploy a FTP y Github"');
         execSync("git push");
         console.log("Commit y Push en GitHub completados.");

@@ -1,7 +1,7 @@
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig = {
-    output: "export",
+    ...(isProd && { output: "export" }),
     basePath: isProd ? "/educore" : "",
     trailingSlash: true,
     images: {
