@@ -20,7 +20,8 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:8082/api/v1/auth/login", {
+      const { API_URL } = await import("@/lib/api");
+      const res = await fetch(`${API_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
