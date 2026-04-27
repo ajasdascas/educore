@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building, Users, Settings, LogOut, LayoutDashboard } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -59,10 +60,11 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col ml-64">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm sticky top-0 z-10">
-          <h1 className="text-lg font-semibold text-slate-800">Manager Maestro</h1>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm text-slate-500">Super Admin</span>
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shadow-sm sticky top-0 z-10 transition-colors">
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-white">Manager Maestro</h1>
+          <div className="flex items-center space-x-4">
+            <ThemeToggle />
+            <span className="text-sm text-slate-500 dark:text-slate-400">Super Admin</span>
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-semibold text-sm shadow">
               SA
             </div>
