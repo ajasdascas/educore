@@ -1,66 +1,59 @@
 // ============================================================
-// ARCHIVO: components/theme-toggle.tsx
+// ARCHIVO: ThemeToggle.tsx
 // MÓDULO: UI Components
-// QUÉ HACE: Botón para alternar entre modo claro y oscuro con
-//           animación fluida usando framer-motion.
+// QUÉ HACE: Botón para alternar entre 3 modos: Azul (normal),
+//           Claro (light) y Oscuro (dark) con iconos animados.
 // ============================================================
 "use client"
 
 import * as React from "react"
-import { Moon, Sun } from "lucide-react"
+import { Moon, Sun, Monitor } from "lucide-react"
 import { useTheme } from "next-themes"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
+
+const themes = [
+  { key: "blue", label: "Normal", icon: Monitor, color: "text-blue-400" },
+  { key: "light", label: "Claro", icon: Sun, color: "text-amber-400" },
+  { key: "dark", label: "Oscuro", icon: Moon, color: "text-indigo-400" },
+]
 
 export function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
-  // Avoid hydration mismatch
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
+  React.useEffect(() => { setMounted(true) }, [])
 
   if (!mounted) {
-    return (
-      <div className="w-10 h-10 rounded-md border border-input bg-transparent flex items-center justify-center opacity-50">
-        <span className="sr-only">Cargando tema</span>
-      </div>
-    )
+    return <div className="h-9 w-[140px] rounded-lg bg-secondary animate-pulse" />
   }
 
-  const isDark = resolvedTheme === "dark"
+  const currentIndex = themes.findIndex(t => t.key === theme)
+  const current = themes[currentIndex >= 0 ? currentIndex : 0]
+
+  const cycleTheme = () => {
+    const nextIndex = (currentIndex + 1) % themes.length
+    setTheme(themes[nextIndex].key)
+  }
 
   return (
     <button
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="relative w-10 h-10 flex items-center justify-center rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors overflow-hidden"
-      aria-label="Alternar tema"
+      onClick={cycleTheme}
+      className="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card hover:bg-accent text-card-foreground transition-all duration-200 text-sm font-medium"
+      aria-label={`Tema actual: ${current.label}. Click para cambiar.`}
     >
-      <motion.div
-        initial={false}
-        animate={{
-          scale: isDark ? 0 : 1,
-          opacity: isDark ? 0 : 1,
-          rotate: isDark ? -90 : 0,
-        }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="absolute"
-      >
-        <Sun className="h-[1.2rem] w-[1.2rem] text-primary" />
-      </motion.div>
-
-      <motion.div
-        initial={false}
-        animate={{
-          scale: isDark ? 1 : 0,
-          opacity: isDark ? 1 : 0,
-          rotate: isDark ? 0 : 90,
-        }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="absolute"
-      >
-        <Moon className="h-[1.2rem] w-[1.2rem] text-primary" />
-      </motion.div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={current.key}
+          initial={{ scale: 0, rotate: -180, opacity: 0 }}
+          animate={{ scale: 1, rotate: 0, opacity: 1 }}
+          exit={{ scale: 0, rotate: 180, opacity: 0 }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
+          className="flex items-center gap-2"
+        >
+          <current.icon className={`h-4 w-4 ${current.color}`} />
+          <span>{current.label}</span>
+        </motion.div>
+      </AnimatePresence>
     </button>
   )
 }

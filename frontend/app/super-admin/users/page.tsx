@@ -32,74 +32,74 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Usuarios Globales</h2>
-          <p className="text-slate-500 text-sm mt-1">Todos los usuarios registrados en la plataforma</p>
+          <h2 className="text-2xl font-bold text-foreground">Usuarios Globales</h2>
+          <p className="text-muted-foreground text-sm mt-1">Todos los usuarios registrados en la plataforma</p>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Total Usuarios</CardTitle>
-            <Users className="w-4 h-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Usuarios</CardTitle>
+            <Users className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">3</div>
+            <div className="text-2xl font-bold text-foreground">3</div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Super Admins</CardTitle>
-            <Shield className="w-4 h-4 text-purple-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Super Admins</CardTitle>
+            <Shield className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">1</div>
+            <div className="text-2xl font-bold text-foreground">1</div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Activos Hoy</CardTitle>
-            <UserCheck className="w-4 h-4 text-emerald-600" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Activos Hoy</CardTitle>
+            <UserCheck className="w-4 h-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">2</div>
+            <div className="text-2xl font-bold text-foreground">2</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50">
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Usuario</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Rol</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Último Login</th>
+            <tr className="border-b border-border bg-muted/50">
+              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Usuario</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Rol</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estado</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Último Login</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.email} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+              <tr key={user.email} className="border-b border-border hover:bg-muted/30 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center mr-3 text-sm font-semibold">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center mr-3 text-sm font-semibold">
                       {user.name.split(" ").map(n => n[0]).join("")}
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900 text-sm">{user.name}</p>
-                      <p className="text-xs text-slate-400">{user.email}</p>
+                      <p className="font-medium text-foreground text-sm">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4">{roleBadge(user.role)}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    user.status === "Activo" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                    user.status === "Activo" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"
                   }`}>
                     {user.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-500">{user.lastLogin}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">{user.lastLogin}</td>
               </tr>
             ))}
           </tbody>

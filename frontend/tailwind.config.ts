@@ -1,3 +1,9 @@
+// ============================================================
+// ARCHIVO: tailwind.config.ts
+// QUÉ HACE: Configura Tailwind CSS con los colores semánticos
+//           que se definen en globals.css según el tema activo.
+// PARA EL DISEÑADOR: Los colores reales se cambian en globals.css
+// ============================================================
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -15,6 +21,8 @@ const config: Config = {
         border: "var(--border)",
         input: "var(--input)",
         ring: "var(--ring)",
+        success: "var(--success)",
+        warning: "var(--warning)",
         primary: {
           DEFAULT: "var(--primary)",
           foreground: "var(--primary-foreground)",
@@ -25,7 +33,7 @@ const config: Config = {
         },
         destructive: {
           DEFAULT: "var(--destructive)",
-          foreground: "var(--destructive-foreground)",
+          foreground: "var(--destructive-foreground, #ffffff)",
         },
         muted: {
           DEFAULT: "var(--muted)",

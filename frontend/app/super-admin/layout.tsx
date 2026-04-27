@@ -17,14 +17,14 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-10 fixed inset-y-0 left-0">
-        <div className="h-16 flex items-center px-6 border-b border-slate-800 bg-slate-950">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-3">
-            <span className="text-white font-bold text-sm">E</span>
+      <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col shadow-xl z-10 fixed inset-y-0 left-0 border-r border-border">
+        <div className="h-16 flex items-center px-6 border-b border-border bg-sidebar">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mr-3">
+            <span className="text-primary-foreground font-bold text-sm">E</span>
           </div>
-          <span className="text-lg font-bold text-white tracking-tight">EduCore</span>
+          <span className="text-lg font-bold tracking-tight">EduCore</span>
         </div>
 
         <nav className="flex-1 py-4 space-y-1">
@@ -36,21 +36,21 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
                 href={item.href}
                 className={`flex items-center px-6 py-3 transition-colors ${
                   isActive
-                    ? "bg-slate-800 text-white border-l-4 border-blue-500"
-                    : "hover:bg-slate-800 hover:text-white border-l-4 border-transparent"
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-4 border-primary"
+                    : "hover:bg-sidebar-accent/50 text-sidebar-foreground border-l-4 border-transparent"
                 }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 ${isActive ? "text-blue-400" : ""}`} />
+                <item.icon className={`w-5 h-5 mr-3 ${isActive ? "text-primary" : ""}`} />
                 <span className="font-medium text-sm">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-border">
           <Link
             href="/"
-            className="flex items-center w-full px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            className="flex items-center w-full px-4 py-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded transition-colors"
           >
             <LogOut className="w-4 h-4 mr-2" />
             Cerrar Sesión
@@ -60,12 +60,12 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col ml-64">
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 shadow-sm sticky top-0 z-10 transition-colors">
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-white">Manager Maestro</h1>
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-8 shadow-sm sticky top-0 z-10 transition-colors">
+          <h1 className="text-lg font-semibold text-foreground">Manager Maestro</h1>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
-            <span className="text-sm text-slate-500 dark:text-slate-400">Super Admin</span>
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-semibold text-sm shadow">
+            <span className="text-sm text-muted-foreground">Super Admin</span>
+            <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm shadow">
               SA
             </div>
           </div>

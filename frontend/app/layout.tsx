@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="es" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground transition-colors duration-300">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
+        <ThemeProvider attribute="class" defaultTheme="blue" themes={["blue", "light", "dark"]} enableSystem={false} disableTransitionOnChange={false}>
           {children}
         </ThemeProvider>
       </body>

@@ -17,8 +17,8 @@
 - [x] Configuración del repositorio
 - [x] CLAUDE.md y archivos de agente IA
 - [x] docker-compose (PostgreSQL + Redis)
-- [ ] Estructura de carpetas backend
-- [ ] Estructura de carpetas frontend
+- [x] Estructura de carpetas backend
+- [x] Estructura de carpetas frontend
 
 ---
 
@@ -30,11 +30,12 @@
 
 ## 📋 Próximos Pasos (en orden)
 
-1. **Inicializar proyecto Go** — `go mod init educore` en `/backend`
-2. **Inicializar Next.js** — `npx create-next-app@14 frontend --typescript --tailwind --app`
-3. **Levantar Docker** — `docker-compose up -d`
-4. **Primera migración** — Crear tablas `tenants` y `users`
-5. **Módulo Auth** — Login, JWT, refresh token
+1. [x] **Inicializar proyecto Go** — `go mod init educore` en `/backend`
+2. [x] **Levantar Docker** — `docker-compose up -d`
+3. [x] **Primera migración** — Crear esquema completo (14 tablas) con RLS
+4. [x] **Inicializar Next.js** — `npx create-next-app@14 frontend --typescript --tailwind --app`
+5. [ ] **Configurar frontend** — shadcn/ui, dependencias y auth routing
+6. [ ] **Módulo Auth (Backend)** — Login, JWT, refresh token
 
 ---
 
