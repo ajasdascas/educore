@@ -1,0 +1,36 @@
+{
+  "model": "claude-sonnet-4-20250514",
+  "permissions": {
+    "allow": [
+      "Bash(go:*)",
+      "Bash(make:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(git:*)",
+      "Bash(psql:*)",
+      "Bash(redis-cli:*)",
+      "Bash(./scripts/*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "MultiEdit(*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo rm:*)",
+      "Bash(DROP DATABASE:*)"
+    ]
+  },
+  "memory": {
+    "obsidian_vault": "docs/obsidian",
+    "context_file": "docs/obsidian/CONTEXTO_ACTUAL.md",
+    "changes_file": "docs/obsidian/CAMBIOS_RECIENTES.md",
+    "decisions_file": "docs/obsidian/DECISIONES_TECNICAS.md",
+    "auto_update_on_task_complete": true
+  },
+  "git": {
+    "auto_commit": true,
+    "commit_script": "./scripts/auto-commit.sh",
+    "commit_on_module_complete": true
+  }
+}

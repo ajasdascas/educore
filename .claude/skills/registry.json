@@ -1,0 +1,82 @@
+{
+  "version": "1.0",
+  "created_at": "2026-04-27T12:57:00.000000",
+  "last_updated": "2026-04-27T12:57:00.000000",
+  "skills": {
+    "ui-components": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "shadcn + Magic UI + Framer Motion + Tremor patterns"
+    },
+    "go-fiber": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Clean Architecture Go + Fiber patterns"
+    },
+    "database": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "PostgreSQL schema + RLS policies"
+    },
+    "tables-datagrids": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "TanStack Table + data grid patterns"
+    },
+    "pdf-xlsx-docx": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Document generation (boletas, reportes)"
+    },
+    "ciberseguridad-trail-of-bits": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Security audit patterns"
+    },
+    "backend-architect": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Backend architecture patterns"
+    },
+    "context-guardian": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Context management and memory"
+    },
+    "frontend-ux-master": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Frontend UX patterns"
+    },
+    "obsidian-second-brain": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Obsidian vault management"
+    },
+    "skill-creator": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Skill creation tooling"
+    },
+    "system-automation": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "System automation scripts"
+    },
+    "token-save": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Token optimization patterns"
+    },
+    "ultra-concise": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Ultra-concise response patterns"
+    },
+    "skill-animation": {
+      "status": "installed",
+      "version": "1.0",
+      "description": "Animation patterns"
+    }
+  }
+}

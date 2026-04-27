@@ -1,0 +1,47 @@
+package middleware
+
+import (
+	"context"
+	"strings"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TenantResolver(db *pgxpool.Pool) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// 1. Try to get tenant from header X-Tenant-ID
+		tenantID := c.Get("X-Tenant-ID")
+
+		// 2. Try to get tenant from subdomain
+		if tenantID == "" {
+			host := c.Hostname()
+			parts := strings.Split(host, ".")
+			if len(parts) > 1 && parts[0] != "www" && parts[0] != "api" {
+				slug := parts[0]
+				// Lookup tenant ID from DB based on slug
+				var id string
+				err := db.QueryRow(context.Background(), "SELECT id FROM tenants WHERE slug = $1 AND status = 'active'", slug).Scan(&id)
+				if err == nil {
+					tenantID = id
+				}
+			}
+		}
+
+		// Inject tenant into Fiber Context locals
+		if tenantID != "" {
+			c.Locals("tenant_id", tenantID)
+		}
+
+		return c.Next()
+	}
+}
+
+// SetDBTenant context execution logic for RLS
+func SetDBTenant(ctx context.Context, db *pgxpool.Pool, tenantID string) (context.Context, error) {
+	if tenantID == "" {
+		return ctx, nil
+	}
+	_, err := db.Exec(ctx, "SET LOCAL app.current_tenant = $1", tenantID)
+	return ctx, err
+}
