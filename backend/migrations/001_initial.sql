@@ -137,11 +137,12 @@ CREATE TABLE group_students (
 );
 
 CREATE TABLE group_teachers (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id    UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     teacher_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subject_id  UUID REFERENCES subjects(id),
-    PRIMARY KEY (group_id, teacher_id, COALESCE(subject_id, '00000000-0000-0000-0000-000000000000'::UUID))
+    subject_id  UUID REFERENCES subjects(id)
 );
+CREATE UNIQUE INDEX uq_group_teachers ON group_teachers (group_id, teacher_id, COALESCE(subject_id, '00000000-0000-0000-0000-000000000000'::UUID));
 
 CREATE TABLE attendance_records (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

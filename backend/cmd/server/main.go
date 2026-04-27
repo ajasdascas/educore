@@ -7,13 +7,16 @@ import (
 
 	"educore/internal/config"
 	"educore/internal/middleware"
+	"educore/internal/modules/auth"
+	"educore/internal/modules/tenants"
+	superadmin "educore/internal/modules/super_admin"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 )
@@ -32,10 +35,10 @@ func main() {
 	}
 	defer db.Close()
 
-	// 3. Init Redis
+	// 3. Init Redis (optional in dev)
 	redisClient, err := redis.New(ctx, cfg.RedisURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to redis: %v", err)
+		log.Printf("Redis not available: %v — continuing without cache", err)
 	}
 	defer redisClient.Close()
 
@@ -45,36 +48,67 @@ func main() {
 		ErrorHandler: customErrorHandler,
 	})
 
-	// Middlewares globales
+	// Global middlewares
 	app.Use(recover.New())
 	app.Use(requestid.New())
-	app.Use(logger.New(logger.Config{
+	app.Use(fiberlogger.New(fiberlogger.Config{
 		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
 	}))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*", // Cambiar en prod
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Tenant-ID",
+		AllowOrigins:     "http://localhost:3000",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Tenant-ID",
+		AllowCredentials: true,
 	}))
 
-	// Tenant Middleware global (menos para rutas que no lo necesitan)
+	// Tenant middleware
 	app.Use(middleware.TenantResolver(db))
 
-	// Rutas de prueba
+	// Routes
 	api := app.Group("/api/v1")
-	
+
+	// Health check
 	api.Get("/health", func(c *fiber.Ctx) error {
 		tenantID := c.Locals("tenant_id")
 		return response.Success(c, fiber.Map{
 			"status": "ok",
 			"env":    cfg.AppEnv,
 			"tenant": tenantID,
+			"redis":  redisClient.IsAvailable(),
 		}, "API is healthy")
 	})
 
-	// TODO: Registrar rutas de modules (auth, tenants, users)
+	// Auth module (public)
+	authHandler := auth.NewHandler(db, cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshExpiration, redisClient)
+	authHandler.RegisterRoutes(api.Group("/auth"))
 
-	// 5. Iniciar servidor
-	log.Printf("Server starting on port %s", cfg.Port)
+	// Tenants module (protected, SUPER_ADMIN only)
+	tenantHandler := tenants.NewHandler(db)
+	tenantGroup := api.Group("/tenants", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SUPER_ADMIN"))
+	tenantHandler.RegisterRoutes(tenantGroup)
+
+	// Super Admin module
+	superAdminGroup := api.Group("/super-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SUPER_ADMIN"))
+	superAdminHandler := superadmin.NewHandler(db)
+	superAdminHandler.RegisterRoutes(superAdminGroup)
+
+	// School module (SCHOOL_ADMIN)
+	schoolGroup := api.Group("/school", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	_ = schoolGroup
+
+	// Academic module (TEACHER, SCHOOL_ADMIN)
+	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	_ = academicGroup
+
+	// Parent module
+	parentGroup := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("PARENT"))
+	_ = parentGroup
+
+	// Notifications
+	notifGroup := api.Group("/notifications", middleware.Protected(cfg.JWTSecret))
+	_ = notifGroup
+
+	// 5. Start server
+	log.Printf("EduCore API starting on port %s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
