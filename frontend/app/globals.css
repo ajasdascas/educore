@@ -26,39 +26,38 @@
   }
 
   /* ─── TEMA AZUL (POR DEFECTO) ───
-     El look corporativo moderno de EduCore.
-     Fondo claro con acentos azules profesionales. */
+     El look corporativo original de EduCore.
+     Fondos azul oscuro, texto claro. */
   :root {
-    --background: #ffffff;
-    --foreground: #0f172a;
-    --card: #ffffff;
-    --card-foreground: #0f172a;
-    --popover: #ffffff;
-    --popover-foreground: #0f172a;
-    --primary: #2563eb;
+    --background: #0f172a;
+    --foreground: #e2e8f0;
+    --card: #1e293b;
+    --card-foreground: #e2e8f0;
+    --popover: #1e293b;
+    --popover-foreground: #e2e8f0;
+    --primary: #3b82f6;
     --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #0f172a;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    --accent: #f8fafc;
-    --accent-foreground: #0f172a;
+    --secondary: #334155;
+    --secondary-foreground: #e2e8f0;
+    --muted: #334155;
+    --muted-foreground: #94a3b8;
+    --accent: #334155;
+    --accent-foreground: #e2e8f0;
     --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #ffffff;
-    --ring: #2563eb;
+    --border: #334155;
+    --input: #334155;
+    --ring: #3b82f6;
     --radius: 0.625rem;
     --success: #10b981;
     --warning: #f59e0b;
-    --sidebar: #f8fafc;
-    --sidebar-foreground: #0f172a;
-    --sidebar-primary: #2563eb;
+    --sidebar: #0c1222;
+    --sidebar-foreground: #e2e8f0;
+    --sidebar-primary: #3b82f6;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #e2e8f0;
-    --sidebar-accent-foreground: #0f172a;
-    --sidebar-border: #e2e8f0;
-    --sidebar-ring: #2563eb;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #e2e8f0;
+    --sidebar-border: #1e293b;
+    --sidebar-ring: #3b82f6;
   }
 
   /* ─── TEMA CLARO ─── 
