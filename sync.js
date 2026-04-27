@@ -29,6 +29,15 @@ async function deploy() {
     client.ftp.verbose = false;
 
     try {
+        console.log("Construyendo frontend (Next.js Static Export)...");
+        execSync("npm run build", { cwd: path.join(__dirname, "frontend"), stdio: "inherit" });
+        console.log("Build completado.");
+    } catch (err) {
+        console.error("Error construyendo el frontend. Verifica los errores de compilación.");
+        return;
+    }
+
+    try {
         console.log("Conectando al FTP...");
         await client.access({
             host: "onlineu.mx",
@@ -37,8 +46,11 @@ async function deploy() {
             secure: false
         });
 
-        console.log("Conexión FTP exitosa. Subiendo frontend y backend (ignorando node_modules/.next)...");
-        await uploadDir(client, path.join(__dirname, "frontend"), "/domains/educore/frontend");
+        console.log("Conexión FTP exitosa. Subiendo build estático (frontend/out) a la raíz...");
+        // Subimos el contenido de "out" directamente a la raíz de educore
+        await uploadDir(client, path.join(__dirname, "frontend", "out"), "/domains/educore");
+        
+        console.log("Subiendo backend...");
         await uploadDir(client, path.join(__dirname, "backend"), "/domains/educore/backend");
 
         console.log("Subida FTP completada con éxito.");

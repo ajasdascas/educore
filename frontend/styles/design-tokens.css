@@ -1,0 +1,86 @@
+/* ============================================================
+   ARCHIVO: styles/design-tokens.css
+   
+   ¡ATENCIÓN DISEÑADOR! ESTE ES TU ARCHIVO.
+   
+   Aquí están todos los colores, fuentes y tamaños de la aplicación.
+   Si cambias un valor aquí, el cambio se aplica en TODA la app.
+   
+   Instrucciones:
+   - Cambia los valores entre comillas o los números hexadecimales (#...).
+   - NO borres ninguna variable, solo cambia su valor.
+   - NO cambies los nombres (--color-primary, etc.), solo los valores.
+   - Guarda el archivo y el navegador se actualiza automáticamente.
+   ============================================================ */
+
+:root {
+    /* ──────────────────────────────────────────────────────
+       COLORES PRINCIPALES
+       Estos colores definen la identidad visual de EduCore.
+       ────────────────────────────────────────────────────── */
+    --color-primary: #1A3C6E;
+    --color-primary-hover: #16305A;
+    --color-secondary: #E8EDF4;
+    --color-accent: #F59E0B;
+
+    /* ──────────────────────────────────────────────────────
+       COLORES DE FONDO (BACKGROUNDS)
+       ────────────────────────────────────────────────────── */
+    --color-bg-page: #F9FAFB;
+    --color-bg-card: #FFFFFF;
+    --color-bg-sidebar: #1A3C6E;
+    --color-sidebar-text: #FFFFFF;
+    --color-table-hover: #F3F4F6;
+
+    /* ──────────────────────────────────────────────────────
+       COLORES DE TEXTO
+       ────────────────────────────────────────────────────── */
+    --color-text-primary: #111827;
+    --color-text-secondary: #6B7280;
+    --color-text-on-dark: #FFFFFF;
+
+    /* ──────────────────────────────────────────────────────
+       COLORES DE ESTADO
+       ────────────────────────────────────────────────────── */
+    --color-success: #10B981;
+    --color-success-bg: #ECFDF5;
+    --color-success-text: #065F46;
+
+    --color-danger: #EF4444;
+    --color-danger-bg: #FEF2F2;
+    --color-danger-text: #991B1B;
+
+    --color-warning: #F59E0B;
+    --color-warning-bg: #FFFBEB;
+    --color-warning-text: #92400E;
+
+    --color-info: #3B82F6;
+    --color-info-bg: #EFF6FF;
+    --color-info-text: #1E40AF;
+
+    /* ──────────────────────────────────────────────────────
+       TIPOGRAFÍA
+       ────────────────────────────────────────────────────── */
+    --font-main: 'Inter', sans-serif;
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-base: 16px;
+    --text-lg: 18px;
+    --text-xl: 20px;
+    --text-2xl: 24px;
+
+    /* ──────────────────────────────────────────────────────
+       BORDES Y ESQUINAS REDONDEADAS
+       ────────────────────────────────────────────────────── */
+    --radius-button: 8px;
+    --radius-card: 12px;
+    --radius-input: 6px;
+    --color-border: #E5E7EB;
+
+    /* ──────────────────────────────────────────────────────
+       ESPACIADOS
+       ────────────────────────────────────────────────────── */
+    --padding-card: 1.25rem;
+    --gap-default: 1rem;
+    --sidebar-width: 240px;
+}
