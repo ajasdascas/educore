@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-4 sm:space-y-6 max-w-3xl">
       <div>
         <h2 className="text-2xl font-bold text-foreground">Configuración</h2>
         <p className="text-muted-foreground text-sm mt-1">Ajustes generales de la plataforma EduCore</p>
@@ -22,7 +22,7 @@ export default function SettingsPage() {
           <CardTitle className="text-base text-foreground">Información de la Plataforma</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label className="text-muted-foreground text-sm">Nombre de la Plataforma</Label>
               <Input defaultValue="EduCore" className="bg-input border-border text-foreground" />

@@ -20,15 +20,13 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { API_URL } = await import("@/lib/api");
-      const res = await fetch(`${API_URL}/api/v1/auth/login`, {
+      const { apiRequest } = await import("@/lib/api");
+      const data = await apiRequest("/api/v1/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data.success) {
         localStorage.setItem("access_token", data.data.access_token);
         localStorage.setItem("user", JSON.stringify(data.data.user));
         router.push("/super-admin/dashboard");
@@ -36,7 +34,8 @@ export default function LoginPage() {
         setError(data.message || "Credenciales incorrectas.");
       }
     } catch (err) {
-      setError("Error conectando con el servidor.");
+      console.error('Login error:', err);
+      setError("Error conectando con el servidor. Verifica tu conexión e intenta nuevamente.");
     }
     setLoading(false);
   };
