@@ -59,6 +59,27 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  // --- MOCK INTERCEPTOR ---
+  if (token && token.startsWith("mock-")) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          data: {
+            // Provide some default dummy stats
+            total_tenants: 15,
+            active_tenants: 12,
+            trial_tenants: 3,
+            total_students: 450,
+            recent_schools: [],
+            alerts: []
+          }
+        });
+      }, 500);
+    });
+  }
+  // -------------------------
+
   if (isNgrok()) {
     headers["ngrok-skip-browser-warning"] = "true";
   }
@@ -81,7 +102,8 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     } else {
       clearAuth();
       if (typeof window !== "undefined") {
-        window.location.href = "/";
+        const basePath = window.location.pathname.startsWith("/educore") ? "/educore" : "";
+        window.location.href = basePath || "/";
       }
       throw new Error("Session expired");
     }
