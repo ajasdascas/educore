@@ -36,7 +36,7 @@ jobs:
 
     # 5. Deploy to FTP
     - name: 🚀 Deploy to FTP Server
-      uses: SamKirkland/FTP-Deploy-Action@4.3.4
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: onlineu.mx
         username: u550473909
