@@ -24,6 +24,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { authFetch } from "@/lib/auth";
+import { API_URL } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const statusColors = {
@@ -133,7 +134,7 @@ export default function SchoolsPage() {
       if (logoFile) {
         const logoFormData = new FormData();
         logoFormData.append("logo", logoFile);
-        const uploadRes = await fetch(process.env.NEXT_PUBLIC_API_URL + "/api/v1/super-admin/upload", {
+        const uploadRes = await fetch(API_URL + "/api/v1/super-admin/upload", {
           method: "POST",
           body: logoFormData,
           headers: {
