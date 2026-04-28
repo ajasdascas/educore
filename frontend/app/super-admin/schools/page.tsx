@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Building2, Users, Calendar, MoreVertical, Eye, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Building2, Users, Calendar, MoreVertical, Eye, Edit, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -12,54 +12,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Mock data for schools
-const mockSchools = [
-  {
-    id: "1",
-    name: "Colegio San Francisco",
-    slug: "colegio-san-francisco",
-    status: "active",
-    studentsCount: 450,
-    teachersCount: 32,
-    plan: "Premium",
-    createdAt: "2024-01-15",
-    location: "Ciudad de México, CDMX",
-  },
-  {
-    id: "2",
-    name: "Instituto Tecnológico del Valle",
-    slug: "instituto-tecnologico-valle",
-    status: "active",
-    studentsCount: 680,
-    teachersCount: 45,
-    plan: "Enterprise",
-    createdAt: "2023-11-20",
-    location: "Guadalajara, JAL",
-  },
-  {
-    id: "3",
-    name: "Preparatoria Benito Juárez",
-    slug: "preparatoria-benito-juarez",
-    status: "suspended",
-    studentsCount: 320,
-    teachersCount: 28,
-    plan: "Basic",
-    createdAt: "2024-02-10",
-    location: "Monterrey, NL",
-  },
-];
+import { authFetch } from "@/lib/auth";
 
 const statusColors = {
   active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   suspended: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  trial: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
 };
 
 const statusLabels = {
   active: "Activa",
   suspended: "Suspendida",
   pending: "Pendiente",
+  trial: "En Prueba",
 };
 
 const planColors = {
@@ -68,14 +34,55 @@ const planColors = {
   Enterprise: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
 };
 
+interface School {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  total_students: number;
+  total_users: number;
+  plan: string;
+  created_at: string;
+  logo_url: string;
+}
+
 export default function SchoolsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [schools] = useState(mockSchools);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        const response = await authFetch("/api/v1/super-admin/schools");
+        if (response.success) {
+          setSchools(response.data.schools);
+        } else {
+          setError(response.message || "Error al cargar las escuelas");
+        }
+      } catch (err) {
+        setError("Error de conexión con el servidor");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSchools();
+  }, []);
 
   const filteredSchools = schools.filter(school =>
     school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    school.location.toLowerCase().includes(searchTerm.toLowerCase())
+    school.slug.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -90,6 +97,12 @@ export default function SchoolsPage() {
           Nueva Escuela
         </Button>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 text-red-500 rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -126,20 +139,20 @@ export default function SchoolsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {schools.reduce((sum, school) => sum + school.studentsCount, 0).toLocaleString()}
+              {schools.reduce((sum, school) => sum + school.total_students, 0).toLocaleString()}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Total Profesores</CardDescription>
+              <CardDescription>Total Usuarios</CardDescription>
               <Users className="w-4 h-4 text-purple-600" />
             </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {schools.reduce((sum, school) => sum + school.teachersCount, 0).toLocaleString()}
+              {schools.reduce((sum, school) => sum + school.total_users, 0).toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -169,17 +182,13 @@ export default function SchoolsPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <CardTitle className="text-lg">{school.name}</CardTitle>
-                    <Badge className={statusColors[school.status as keyof typeof statusColors]}>
-                      {statusLabels[school.status as keyof typeof statusLabels]}
+                    <Badge className={statusColors[school.status as keyof typeof statusColors] || "bg-gray-100"}>
+                      {statusLabels[school.status as keyof typeof statusLabels] || school.status}
                     </Badge>
-                    <Badge variant="outline" className={planColors[school.plan as keyof typeof planColors]}>
+                    <Badge variant="outline" className={planColors[school.plan as keyof typeof planColors] || ""}>
                       {school.plan}
                     </Badge>
                   </div>
-                  <CardDescription className="flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />
-                    {school.location}
-                  </CardDescription>
                   <div className="text-sm text-muted-foreground">
                     Slug: <code className="bg-muted px-1 rounded text-xs">{school.slug}</code>
                   </div>
@@ -212,18 +221,18 @@ export default function SchoolsPage() {
             <CardContent className="pt-0">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold text-primary">{school.studentsCount}</div>
+                  <div className="text-2xl font-bold text-primary">{school.total_students}</div>
                   <div className="text-xs text-muted-foreground">Estudiantes</div>
                 </div>
                 <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold text-primary">{school.teachersCount}</div>
-                  <div className="text-xs text-muted-foreground">Profesores</div>
+                  <div className="text-2xl font-bold text-primary">{school.total_users}</div>
+                  <div className="text-xs text-muted-foreground">Usuarios</div>
                 </div>
                 <div className="text-center p-3 bg-muted rounded-lg col-span-2 sm:col-span-2">
                   <div className="flex items-center justify-center gap-1">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">
-                      {new Date(school.createdAt).toLocaleDateString('es-ES', {
+                      {new Date(school.created_at).toLocaleDateString('es-ES', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
