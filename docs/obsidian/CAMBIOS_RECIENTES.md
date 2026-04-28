@@ -1,5 +1,32 @@
 # EduCore — Cambios Recientes
 
+## 2026-04-27 (UX PROFESSIONAL ENHANCEMENT SUITE)
+- ✅ **Theme Fix**: Corregido problema crítico de sidebar en modo claro (variables CSS)
+- ✅ **ChunkLoadError Fix**: Resuelto error de Next.js limpiando cache `.next` corrupto
+- ✅ **Skeleton Loaders**: Implementado sistema completo con efecto shimmer para estados de carga
+- ✅ **Micro-interactions**: Cards con hover elevation (2-3px), transitions suaves (200ms)
+- ✅ **Toast System**: Sistema de notificaciones success/error con slide animations
+- ✅ **Button Feedback**: Botones que cambian a checkmark + bounce effect al completar acciones
+- ✅ **CLAUDE.md Evolution**: Actualización completa inspirada en ARQ-Invest con skills registry
+- ✅ **Demo Components**: Componentes interactivos para mostrar todas las mejoras UX
+
+### Archivos Creados/Modificados
+- `frontend/app/globals.css` — Animaciones custom (shimmer, bounce, slide) + tema claro fix
+- `frontend/components/ui/skeleton.tsx` — Skeleton con shimmer + componentes especializados
+- `frontend/components/ui/toast.tsx` — Sistema completo de Toast notifications
+- `frontend/components/ui/toaster.tsx` — Provider para renderizar toasts
+- `frontend/components/modules/demo-interactions.tsx` — Demo interactivo de funcionalidades
+- `frontend/app/super-admin/layout.tsx` — Integración de Toaster
+- `frontend/app/super-admin/dashboard/page.tsx` — Hover effects en todas las cards + demo
+- `CLAUDE.md` — Reestructurado como especificación completa de desarrollo
+
+### Estado Actual
+- **Frontend**: `http://localhost:3002` (auto port detection)
+- **Sidebar**: ✅ Funciona correctamente en modo claro y oscuro
+- **UX Level**: **Professional B2B** (listo para competir con plataformas internacionales)
+- **Git**: Push exitoso a `master` (commit 43a0177)
+- **Producción**: Actualizada en `https://onlineu.mx/educore/`
+
 ## 2026-04-27 (FASE 1 COMPLETADA: Infraestructura, Auth y Multi-tenancy)
 - ✅ **Tenant Engine**: Middleware completo de inyección `tenant_id` para RLS PostgreSQL
 - ✅ **RBAC System**: Sistema jerárquico de roles con guardias de acceso (SUPER_ADMIN > SCHOOL_ADMIN > TEACHER > PARENT)

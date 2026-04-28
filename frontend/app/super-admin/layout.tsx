@@ -87,7 +87,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
 
       {/* Main Content */}
       <main className="flex flex-col lg:ml-64">
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-10 transition-colors">
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-10 transition-colors">
           {/* Left side - Mobile menu button and title */}
           <div className="flex items-center">
             <button
@@ -108,7 +108,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             </div>
           </div>
         </header>
-        <div className="p-4 sm:p-5 lg:p-6 flex-1 overflow-auto">
+        <div className="p-3 sm:p-4 lg:p-5 flex-1 overflow-auto">
           {children}
         </div>
       </main>

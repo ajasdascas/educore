@@ -4,7 +4,7 @@ import { DemoInteractions } from "@/components/modules/demo-interactions"
 
 export default function SuperAdminDashboard() {
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-3 sm:space-y-4">
       {/* Welcome Section */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -12,7 +12,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="card-hover shadow-sm border-border bg-card cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Escuelas Activas</CardTitle>
@@ -46,7 +46,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Additional Stats Row */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="card-hover shadow-sm border-border bg-card cursor-pointer">
           <CardContent className="p-4">
             <div className="text-center">
@@ -82,7 +82,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       {/* Recent Activity Section */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
         <Card className="card-hover shadow-sm border-border bg-card">
           <CardHeader>
             <CardTitle className="text-lg text-foreground">Actividad Reciente</CardTitle>
