@@ -1,5 +1,13 @@
 # EduCore — Cambios Recientes
 
+## 2026-04-27 (INTEGRACIÓN TOTAL Y DESPLIEGUE A PRODUCCIÓN)
+- ✅ **Lógica Backend**: Modificado `super_admin/handler.go` para aceptar todos los campos (Contactos, Fiscal, Módulos, Niveles, Logo, Timezone). Agregado endpoint `/upload`.
+- ✅ **UI/UX Global**: Animaciones estandarizadas en todas las Cards (`hover:-translate-y-1 hover:shadow-lg animate-in`) y Botones (`hover:scale-[1.02] active:scale-95`).
+- ✅ **Landing Page**: Integrada selección de rol (Padre, Estudiante, Profesor, Administrador) previo al login con animaciones de transición.
+- ✅ **Modal Schools**: Formulario completamente rehecho con 5 secciones detalladas, selección múltiple y carga de imágenes.
+- ✅ **Responsive**: Confirmado soporte responsive en `layout.tsx` y vistas.
+- ✅ **Deploy**: Build de producción validado sin errores. Desplegado en FTP.
+
 ## 2026-04-27 (UX PROFESSIONAL ENHANCEMENT SUITE)
 - ✅ **Theme Fix**: Corregido problema crítico de sidebar en modo claro (variables CSS)
 - ✅ **ChunkLoadError Fix**: Resuelto error de Next.js limpiando cache `.next` corrupto

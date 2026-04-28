@@ -39,7 +39,18 @@ export default function LoginPage() {
 
       if (data.success) {
         login(data.data.access_token, data.data.user);
-        router.push(getDashboardPath(data.data.user.role));
+        
+        // Enrutamiento forzado basado en la selección del usuario para testing/demo
+        const roleMapping: Record<string, string> = {
+          padre: "/parent/dashboard",
+          estudiante: "/student/dashboard",
+          profesor: "/teacher/dashboard",
+          director: "/school/dashboard",
+          administrador: "/super-admin/dashboard"
+        };
+        
+        const destination = roleMapping[selectedRole] || getDashboardPath(data.data.user.role);
+        router.push(destination);
       } else {
         setError(data.message || "Credenciales incorrectas.");
       }

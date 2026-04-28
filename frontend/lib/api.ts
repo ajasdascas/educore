@@ -1,13 +1,18 @@
 // URL del backend API
 // Configuración dinámica para diferentes entornos
 const getApiUrl = () => {
-  // Variable de entorno tiene prioridad
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (hostname === "onlineu.mx" || hostname === "www.onlineu.mx") {
+      return "https://pester-dramatize-ocean.ngrok-free.dev";
+    }
+  }
+
   const envApiUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envApiUrl) {
     return envApiUrl;
   }
 
-  // Si estamos en el servidor (SSR), usar localhost
   if (typeof window === "undefined") {
     return "http://localhost:8082";
   }
