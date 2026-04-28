@@ -133,12 +133,14 @@ export default function SchoolsPage() {
       if (logoFile) {
         const logoFormData = new FormData();
         logoFormData.append("logo", logoFile);
-        const uploadRes = await authFetch("/api/v1/super-admin/upload", {
+        const uploadRes = await fetch(process.env.NEXT_PUBLIC_API_URL + "/api/v1/super-admin/upload", {
           method: "POST",
-          body: logoFormData as any,
-          headers: {} // Let browser set multipart content type
-        }, true); // We might need a flag to skip default headers in authFetch, but assuming it handles it or we use raw fetch. 
-        // Note: For simplicity if authFetch fails with FormData, we can adjust, but we assume it works.
+          body: logoFormData,
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+          }
+        }).then(res => res.json());
+
         if (uploadRes && uploadRes.success) {
           finalLogoUrl = uploadRes.data.url;
         }
@@ -206,13 +208,12 @@ export default function SchoolsPage() {
           <p className="text-muted-foreground">Administra todas las instituciones educativas registradas</p>
         </div>
         
+        <Button className="w-fit" onClick={() => setIsModalOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nueva Escuela
+        </Button>
+        
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-fit">
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva Escuela
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleCreateSchool}>
               <DialogHeader>
@@ -443,8 +444,8 @@ export default function SchoolsPage() {
                   </div>
                 </div>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2"><MoreVertical className="h-4 w-4" /></Button>
+                  <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 -mr-2 rounded-md hover:bg-muted">
+                    <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem><Eye className="w-4 h-4 mr-2" />Ver detalles</DropdownMenuItem>
