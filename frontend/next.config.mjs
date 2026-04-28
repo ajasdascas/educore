@@ -1,8 +1,11 @@
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig = {
-    // Temporarily disabled static export for dynamic pages
-    // ...(isProd && { output: "export" }),
+    // Re-enable static export for hosting compatibility
+    ...(isProd && {
+        output: "export",
+        distDir: "out"
+    }),
     basePath: isProd ? "/educore" : "",
     trailingSlash: true,
     images: {

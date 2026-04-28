@@ -34,9 +34,10 @@ jobs:
         cd frontend
         npm run build
         echo "✅ Build completed"
-        ls -la .next/
+        echo "📁 Static export generated:"
+        ls -la out/
         echo "📁 Build size:"
-        du -sh .next/
+        du -sh out/
 
     # 5. Test FTP connection first
     - name: 🔍 Test FTP connection
@@ -52,7 +53,7 @@ jobs:
         server: onlineu.mx
         username: u550473909
         password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: frontend/.next/
+        local-dir: frontend/out/
         server-dir: /domains/educore/
         protocol: ftp
         port: 21
