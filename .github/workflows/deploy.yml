@@ -33,9 +33,20 @@ jobs:
       run: |
         cd frontend
         npm run build
+        echo "✅ Build completed"
+        ls -la .next/
+        echo "📁 Build size:"
+        du -sh .next/
 
-    # 5. Deploy to FTP
-    - name: 🚀 Deploy to FTP Server
+    # 5. Test FTP connection first
+    - name: 🔍 Test FTP connection
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lftp
+        lftp -c "open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
+
+    # 6. Deploy with detailed logging
+    - name: 🚀 Deploy to FTP Server (Verbose)
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: onlineu.mx
@@ -43,6 +54,8 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: frontend/.next/
         server-dir: /domains/educore/
+        log-level: verbose
+        timeout: 60000
         exclude: |
           **/.git*
           **/.git*/**
@@ -50,8 +63,22 @@ jobs:
           **/.DS_Store
           **/Thumbs.db
 
-    # 6. Notify success
+    # 7. Verify deployment
+    - name: 🔍 Verify files were uploaded
+      run: |
+        sudo apt-get install -y lftp
+        echo "📋 Checking uploaded files:"
+        lftp -c "open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; cd /domains/educore/; ls -la; quit"
+
+    # 8. Test website response
+    - name: 🌐 Test website
+      run: |
+        echo "🧪 Testing website response..."
+        curl -I https://onlineu.mx/educore/ || echo "Site not responding yet"
+
+    # 9. Notify success
     - name: ✅ Deploy Success
       run: |
         echo "🎉 Deploy completado exitosamente!"
         echo "🌐 URL: https://onlineu.mx/educore/super-admin/dashboard/"
+        echo "⏰ Timestamp: $(date)"
