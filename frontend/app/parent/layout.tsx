@@ -3,20 +3,33 @@
 import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building, Users, Settings, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  GraduationCap,
+  Calendar,
+  FileText,
+  MessageCircle,
+  Bell,
+  Settings,
+  Menu,
+  X
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/components/providers/AuthProvider";
 
 const navItems = [
-  { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/super-admin/schools", label: "Escuelas", icon: Building },
-  { href: "/super-admin/users", label: "Usuarios Globales", icon: Users },
-  { href: "/super-admin/settings", label: "Configuración", icon: Settings },
+  { href: "/parent/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/parent/children", label: "Mis Hijos", icon: GraduationCap },
+  { href: "/parent/grades", label: "Calificaciones", icon: FileText },
+  { href: "/parent/attendance", label: "Asistencia", icon: Calendar },
+  { href: "/parent/messages", label: "Mensajes", icon: MessageCircle },
+  { href: "/parent/notifications", label: "Notificaciones", icon: Bell },
+  { href: "/parent/settings", label: "Configuración", icon: Settings },
 ];
 
-export default function SuperAdminLayout({ children }: { children: ReactNode }) {
+export default function ParentLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout, loading } = useAuth();
@@ -29,8 +42,8 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
     );
   }
 
-  const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SA";
-  const userRole = user?.role === "SUPER_ADMIN" ? "Super Admin" : user?.role || "";
+  const userInitials = user?.email?.substring(0, 2).toUpperCase() || "P";
+  const userRole = "Padre de Familia";
 
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
@@ -82,16 +95,6 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             );
           })}
         </nav>
-
-        <div className="p-4 border-t border-border">
-          <button
-            onClick={logout}
-            className="flex items-center w-full px-4 py-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded transition-colors"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Cerrar Sesión
-          </button>
-        </div>
       </aside>
 
       <main className="flex flex-col flex-1 min-w-0">
@@ -103,7 +106,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-semibold text-foreground">Manager Maestro</h1>
+            <h1 className="text-lg font-semibold text-foreground">Portal de Padres</h1>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
             <ThemeToggle />

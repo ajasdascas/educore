@@ -10,14 +10,13 @@ const getApiUrl = () => {
     return "http://localhost:8083";
   }
 
-  // En producción, usar el backend deployado
-  // Opción 1: Subdominio dedicado (recomendado)
+  // En producción, usar Railway backend
   if (hostname === "onlineu.mx") {
-    return "https://api.onlineu.mx";
+    return "https://educore-backend-production.up.railway.app";
   }
 
-  // Opción 2: Path en mismo dominio (alternativa)
-  return "https://onlineu.mx/api";
+  // Fallback para cualquier otro dominio
+  return "https://educore-backend-production.up.railway.app";
 };
 
 const API_URL = getApiUrl();

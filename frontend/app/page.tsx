@@ -18,13 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<"role_selection" | "login">("role_selection");
-  const [selectedRole, setSelectedRole] = useState("");
-
-  const handleRoleSelect = (role: string) => {
-    setSelectedRole(role);
-    setStep("login");
-  };
+  const [showDemo, setShowDemo] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,17 +33,9 @@ export default function LoginPage() {
 
       if (data.success) {
         login(data.data.access_token, data.data.user);
-        
-        // Enrutamiento forzado basado en la selección del usuario para testing/demo
-        const roleMapping: Record<string, string> = {
-          padre: "/parent/dashboard",
-          estudiante: "/student/dashboard",
-          profesor: "/teacher/dashboard",
-          director: "/school/dashboard",
-          administrador: "/super-admin/dashboard"
-        };
-        
-        const destination = roleMapping[selectedRole] || getDashboardPath(data.data.user.role);
+
+        // Redirigir basado en el rol real del usuario
+        const destination = getDashboardPath(data.data.user.role);
         router.push(destination);
       } else {
         setError(data.message || "Credenciales incorrectas.");
@@ -76,35 +62,8 @@ export default function LoginPage() {
           <p className="text-slate-400 text-sm mt-1">Plataforma de Administración Escolar</p>
         </CardHeader>
         <CardContent className="p-6 pt-4 animate-in fade-in zoom-in-95 duration-500">
-          {step === "role_selection" ? (
-            <div className="space-y-4">
-              <h2 className="text-center text-white font-medium mb-6">Selecciona tu perfil para ingresar</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Button variant="outline" className="h-24 flex-col gap-2 hover:bg-blue-600 hover:text-white border-slate-700 bg-slate-800 text-slate-300" onClick={() => handleRoleSelect("padre")}>
-                  <Users className="w-8 h-8" />
-                  <span>Padre de Familia</span>
-                </Button>
-                <Button variant="outline" className="h-24 flex-col gap-2 hover:bg-indigo-600 hover:text-white border-slate-700 bg-slate-800 text-slate-300" onClick={() => handleRoleSelect("estudiante")}>
-                  <User className="w-8 h-8" />
-                  <span>Estudiante</span>
-                </Button>
-                <Button variant="outline" className="h-24 flex-col gap-2 hover:bg-purple-600 hover:text-white border-slate-700 bg-slate-800 text-slate-300" onClick={() => handleRoleSelect("profesor")}>
-                  <GraduationCap className="w-8 h-8" />
-                  <span>Profesor</span>
-                </Button>
-                <Button variant="outline" className="h-24 flex-col gap-2 hover:bg-emerald-600 hover:text-white border-slate-700 bg-slate-800 text-slate-300" onClick={() => handleRoleSelect("administrador")}>
-                  <Building2 className="w-8 h-8" />
-                  <span>Administrador</span>
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleLogin} className="space-y-5 animate-in slide-in-from-right-4 duration-500">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-sm text-slate-400 capitalize bg-slate-700/50 px-3 py-1 rounded-full">Perfil: {selectedRole}</span>
-                <button type="button" onClick={() => setStep("role_selection")} className="text-sm text-blue-400 hover:text-blue-300">Cambiar</button>
-              </div>
-              <div className="space-y-2">
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-300 text-sm font-medium">
                 Correo electrónico
               </Label>
@@ -147,11 +106,41 @@ export default function LoginPage() {
               {loading ? "Ingresando..." : "Iniciar Sesión"}
             </Button>
 
+            {/* Demo Info */}
+            <div className="mt-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600/30">
+              <button
+                type="button"
+                onClick={() => setShowDemo(!showDemo)}
+                className="text-xs text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                {showDemo ? '▼' : '▶'} Demo: Tipos de usuario disponibles
+              </button>
+              {showDemo && (
+                <div className="mt-2 text-xs text-slate-400 space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Building2 className="w-3 h-3" />
+                    <span>Super Admin: Gestión global del sistema</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-3 h-3" />
+                    <span>School Admin: Administración de escuela</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <GraduationCap className="w-3 h-3" />
+                    <span>Profesor: Gestión académica</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <User className="w-3 h-3" />
+                    <span>Padre: Seguimiento de hijos</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <p className="text-center text-xs text-slate-500 pt-2">
               Demo: admin@educore.mx / admin123
             </p>
           </form>
-          )}
         </CardContent>
       </Card>
     </main>
