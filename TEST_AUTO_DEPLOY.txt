@@ -1,0 +1,9 @@
+🚀 TESTING AUTOMATED DEPLOY - $(date)
+
+This file tests the automatic CI/CD pipeline.
+Every push to master will now trigger:
+1. Build production frontend
+2. Deploy to onlineu.mx via FTP
+3. Update https://onlineu.mx/educore/super-admin/
+
+🎯 Deploy should complete in ~5 minutes!
