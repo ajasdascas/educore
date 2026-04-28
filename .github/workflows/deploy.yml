@@ -43,7 +43,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y lftp
-        lftp -c "open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
+        lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
 
     # 6. Deploy with detailed logging
     - name: 🚀 Deploy to FTP Server (Verbose)
@@ -54,6 +54,9 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: frontend/.next/
         server-dir: /domains/educore/
+        protocol: ftp
+        port: 21
+        security: loose
         log-level: verbose
         timeout: 60000
         exclude: |
@@ -68,7 +71,7 @@ jobs:
       run: |
         sudo apt-get install -y lftp
         echo "📋 Checking uploaded files:"
-        lftp -c "open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; cd /domains/educore/; ls -la; quit"
+        lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; cd /domains/educore/; ls -la; quit"
 
     # 8. Test website response
     - name: 🌐 Test website
