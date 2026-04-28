@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building, Users, Settings, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
+import { Toaster } from "@/components/ui/toaster";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -107,10 +108,11 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             </div>
           </div>
         </header>
-        <div className="p-4 sm:p-6 lg:p-8 flex-1 overflow-auto">
+        <div className="p-4 sm:p-5 lg:p-6 flex-1 overflow-auto">
           {children}
         </div>
       </main>
+      <Toaster />
     </div>
   );
 }

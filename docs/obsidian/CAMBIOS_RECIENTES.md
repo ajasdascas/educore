@@ -1,5 +1,22 @@
 # EduCore — Cambios Recientes
 
+## 2026-04-27 (FASE 1 COMPLETADA: Infraestructura, Auth y Multi-tenancy)
+- ✅ **Tenant Engine**: Middleware completo de inyección `tenant_id` para RLS PostgreSQL
+- ✅ **RBAC System**: Sistema jerárquico de roles con guardias de acceso (SUPER_ADMIN > SCHOOL_ADMIN > TEACHER > PARENT)
+- ✅ **Session Management**: Control completo de sesiones con refresh tokens, device tracking y expiración
+- ✅ **Email & Invite Service**: Sistema de invitaciones automatizado con templates y cola de emails
+- ✅ **Audit Logging**: Registro completo de acciones críticas filtradas por tenant
+- ✅ **Database Infrastructure**: Migraciones para 4 nuevas tablas con RLS y índices optimizados
+
+### Archivos Creados
+- `backend/internal/middleware/tenant.go` — Middleware de resolución de tenant con RLS
+- `backend/internal/middleware/rbac.go` — Sistema de roles jerárquico
+- `backend/internal/modules/sessions/` — Gestión completa de sesiones de usuario
+- `backend/internal/modules/email/` — Sistema de emails con cola y templates
+- `backend/internal/modules/audit/` — Logging de auditoría por tenant
+- `backend/migrations/004_infrastructure_tables.sql` — Tablas de infraestructura
+- `backend/internal/middleware/auth.go` — Actualizado para compatibilidad RBAC
+
 ## 2026-04-27 (Refactorización Responsive Total)
 - ✅ **Entorno activado**: PostgreSQL, Backend Go/Fiber (puerto 8082) y Frontend Next.js (puerto 3000) funcionando correctamente
 - ✅ **Layout Responsive**: Refactorizado `frontend/app/super-admin/layout.tsx` con sidebar colapsible para móviles
