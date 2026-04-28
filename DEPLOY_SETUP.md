@@ -25,7 +25,7 @@ Para que el deploy automático funcione, necesitas configurar la contraseña FTP
 1. ✅ GitHub detecta el push
 2. 🏗️ Instala Node.js y dependencias
 3. 📦 Hace build de producción (`npm run build`)
-4. 🚀 Sube archivos vía FTP a `/domains/educore/next/`
+4. 🚀 Sube archivos vía FTP a `/domains/onlineu.mx/public_html/educore/`
 5. ✅ Notifica si fue exitoso o falló
 
 ### 📱 Notificaciones

@@ -54,7 +54,7 @@ jobs:
         username: u550473909
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: frontend/out/
-        server-dir: /domains/educore/
+        server-dir: /domains/onlineu.mx/public_html/educore/
         protocol: ftp
         port: 21
         security: loose
@@ -72,7 +72,7 @@ jobs:
       run: |
         sudo apt-get install -y lftp
         echo "📋 Checking uploaded files:"
-        lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; cd /domains/educore/; ls -la; quit"
+        lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; cd /domains/onlineu.mx/public_html/educore/; ls -la; quit"
 
     # 8. Test website response
     - name: 🌐 Test website
