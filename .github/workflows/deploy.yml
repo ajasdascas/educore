@@ -42,7 +42,7 @@ jobs:
         username: u550473909
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: frontend/.next/
-        server-dir: /domains/educore/next/
+        server-dir: /domains/educore/
         exclude: |
           **/.git*
           **/.git*/**
