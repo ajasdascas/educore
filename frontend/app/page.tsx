@@ -62,116 +62,91 @@ export default function LoginPage() {
           <p className="text-slate-400 text-sm mt-1">Plataforma de Administración Escolar</p>
         </CardHeader>
         <CardContent className="p-6 pt-4 animate-in fade-in zoom-in-95 duration-500">
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-300 text-sm font-medium">
-                Correo electrónico
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@educore.mx"
-                value={email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                required
-                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-300 text-sm font-medium">
-                Contraseña
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                required
-                className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
-              />
-            </div>
+          {/* Role Selection Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              onClick={() => {
+                setEmail("admin@educore.mx");
+                setPassword("admin123");
+                // The useEffect below will trigger the login automatically
+                setTimeout(() => document.getElementById("hidden-submit")?.click(), 100);
+              }}
+              className="group flex flex-col items-center justify-center p-6 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:bg-blue-600/20 hover:border-blue-500/50 transition-all duration-300"
+            >
+              <div className="w-12 h-12 mb-3 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:bg-blue-500/40 transition-colors">
+                <Building2 className="w-6 h-6 text-blue-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-white">Super Admin</h3>
+              <p className="text-xs text-slate-400 mt-1 text-center">Gestión global del sistema</p>
+            </button>
+
+            <button
+              onClick={() => {
+                setEmail("school@educore.mx");
+                setPassword("school123");
+                setTimeout(() => document.getElementById("hidden-submit")?.click(), 100);
+              }}
+              className="group flex flex-col items-center justify-center p-6 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:bg-green-600/20 hover:border-green-500/50 transition-all duration-300"
+            >
+              <div className="w-12 h-12 mb-3 rounded-full bg-green-500/20 flex items-center justify-center group-hover:bg-green-500/40 transition-colors">
+                <Users className="w-6 h-6 text-green-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-white">School Admin</h3>
+              <p className="text-xs text-slate-400 mt-1 text-center">Administración de escuela</p>
+            </button>
+
+            <button
+              onClick={() => {
+                setEmail("profe@educore.mx");
+                setPassword("profe123");
+                setTimeout(() => document.getElementById("hidden-submit")?.click(), 100);
+              }}
+              className="group flex flex-col items-center justify-center p-6 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:bg-purple-600/20 hover:border-purple-500/50 transition-all duration-300"
+            >
+              <div className="w-12 h-12 mb-3 rounded-full bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/40 transition-colors">
+                <GraduationCap className="w-6 h-6 text-purple-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-white">Profesor</h3>
+              <p className="text-xs text-slate-400 mt-1 text-center">Gestión académica</p>
+            </button>
+
+            <button
+              onClick={() => {
+                setEmail("padre@educore.mx");
+                setPassword("padre123");
+                setTimeout(() => document.getElementById("hidden-submit")?.click(), 100);
+              }}
+              className="group flex flex-col items-center justify-center p-6 bg-slate-700/30 border border-slate-600/50 rounded-xl hover:bg-orange-600/20 hover:border-orange-500/50 transition-all duration-300"
+            >
+              <div className="w-12 h-12 mb-3 rounded-full bg-orange-500/20 flex items-center justify-center group-hover:bg-orange-500/40 transition-colors">
+                <User className="w-6 h-6 text-orange-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-white">Padre de Familia</h3>
+              <p className="text-xs text-slate-400 mt-1 text-center">Seguimiento de hijos</p>
+            </button>
+          </div>
+
+          <form onSubmit={handleLogin} className="mt-6">
+            <input type="hidden" value={email} />
+            <input type="hidden" value={password} />
+            <button type="submit" id="hidden-submit" className="hidden">Submit</button>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
                 <p className="text-red-400 text-sm text-center">{error}</p>
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg transition-all duration-200"
-            >
-              {loading ? "Ingresando..." : "Iniciar Sesión"}
-            </Button>
-
-            {/* Demo Info */}
-            <div className="mt-4 p-4 bg-slate-700/30 rounded-lg border border-slate-600/30">
-              <button
-                type="button"
-                onClick={() => setShowDemo(!showDemo)}
-                className="text-xs text-slate-400 hover:text-slate-300 transition-colors"
-              >
-                {showDemo ? '▼' : '▶'} Demo: Tipos de usuario disponibles
-              </button>
-              {showDemo && (
-                <div className="mt-2 text-xs text-slate-400 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail("admin@educore.mx");
-                      setPassword("admin123");
-                    }}
-                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
-                  >
-                    <Building2 className="w-3 h-3 text-blue-400" />
-                    <span>Super Admin: Gestión global del sistema</span>
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail("school@educore.mx");
-                      setPassword("school123");
-                    }}
-                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
-                  >
-                    <Users className="w-3 h-3 text-green-400" />
-                    <span>School Admin: Administración de escuela</span>
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail("profe@educore.mx");
-                      setPassword("profe123");
-                    }}
-                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
-                  >
-                    <GraduationCap className="w-3 h-3 text-purple-400" />
-                    <span>Profesor: Gestión académica</span>
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail("padre@educore.mx");
-                      setPassword("padre123");
-                    }}
-                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
-                  >
-                    <User className="w-3 h-3 text-orange-400" />
-                    <span>Padre: Seguimiento de hijos</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <p className="text-center text-xs text-slate-500 pt-2">
-              Demo: admin@educore.mx / admin123
-            </p>
+            {loading && (
+              <div className="text-center text-sm text-blue-400 animate-pulse">
+                Iniciando sesión como {email}...
+              </div>
+            )}
           </form>
+
+          <div className="mt-6 text-center">
+             <p className="text-xs text-slate-500">Selecciona un rol para ver la demostración interactiva.</p>
+          </div>
         </CardContent>
       </Card>
     </main>
