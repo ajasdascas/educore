@@ -12,7 +12,7 @@ type ToasterToast = ToastPrimitives.ToastProps & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
-  action?: ToastPrimitives.ToastActionElement
+  action?: React.ReactElement
   variant?: "default" | "destructive"
 }
 
