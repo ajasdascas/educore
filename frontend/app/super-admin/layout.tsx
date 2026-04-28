@@ -87,19 +87,18 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
       {/* Main Content */}
       <main className="flex flex-col lg:ml-64">
         <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm sticky top-0 z-10 transition-colors">
-          {/* Mobile menu button */}
-          <div className="flex items-center lg:hidden">
+          {/* Left side - Mobile menu button and title */}
+          <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-md hover:bg-muted"
+              className="p-2 rounded-md hover:bg-muted lg:hidden mr-2"
             >
               <Menu className="w-5 h-5" />
             </button>
+            <h1 className="text-lg font-semibold text-foreground">Manager Maestro</h1>
           </div>
 
-          <h1 className="text-lg font-semibold text-foreground hidden sm:block">Manager Maestro</h1>
-          <h1 className="text-base font-semibold text-foreground sm:hidden">EduCore</h1>
-
+          {/* Right side - User info */}
           <div className="flex items-center space-x-2 sm:space-x-4">
             <ThemeToggle />
             <span className="text-sm text-muted-foreground hidden sm:block">Super Admin</span>
