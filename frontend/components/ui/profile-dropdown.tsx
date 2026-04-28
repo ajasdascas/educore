@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { User, Settings, Bell, Shield, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 
@@ -13,6 +14,7 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -31,8 +33,7 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
       icon: User,
       label: "Mi Perfil",
       onClick: () => {
-        // TODO: Navigate to profile page
-        console.log("Navigate to profile");
+        router.push("/super-admin/profile");
         setIsOpen(false);
       }
     },
@@ -40,8 +41,7 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
       icon: Settings,
       label: "Configuración",
       onClick: () => {
-        // TODO: Navigate to settings page
-        console.log("Navigate to settings");
+        router.push("/super-admin/settings");
         setIsOpen(false);
       }
     },
@@ -49,8 +49,7 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
       icon: Bell,
       label: "Notificaciones",
       onClick: () => {
-        // TODO: Navigate to notifications page
-        console.log("Navigate to notifications");
+        router.push("/super-admin/notifications");
         setIsOpen(false);
       }
     },
@@ -58,8 +57,7 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
       icon: Shield,
       label: "Seguridad",
       onClick: () => {
-        // TODO: Navigate to security page
-        console.log("Navigate to security");
+        router.push("/super-admin/security");
         setIsOpen(false);
       }
     },

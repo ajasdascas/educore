@@ -3,7 +3,7 @@
 import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building, Users, Settings, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
+import { Building, Users, Settings, LogOut, LayoutDashboard, Menu, X, Package } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/super-admin/plans", label: "Planes", icon: Package },
   { href: "/super-admin/schools", label: "Escuelas", icon: Building },
   { href: "/super-admin/users", label: "Usuarios Globales", icon: Users },
   { href: "/super-admin/settings", label: "Configuración", icon: Settings },

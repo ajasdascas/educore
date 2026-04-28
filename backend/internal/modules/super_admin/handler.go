@@ -2,6 +2,9 @@ package superadmin
 
 import (
 	"educore/internal/pkg/response"
+	"encoding/json"
+	"os"
+	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,23 +23,40 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schools", h.ListSchools)
 	router.Post("/schools", h.CreateSchool)
 	router.Get("/schools/:id", h.GetSchool)
+	router.Patch("/schools/:id/status", h.UpdateSchoolStatus)
+	router.Get("/schools/:id/users", h.GetSchoolUsers)
 	router.Get("/schools/:id/modules", h.GetSchoolModules)
 	router.Post("/schools/:id/modules/toggle", h.ToggleModule)
 	router.Get("/modules-catalog", h.GetModulesCatalog)
 	router.Post("/upload", h.UploadLogo)
+
+	h.RegisterPlanRoutes(router)
+	h.RegisterUserRoutes(router)
 }
 
 func (h *Handler) Stats(c *fiber.Ctx) error {
 	var totalTenants, activeTenants, trialTenants, totalStudents int
 
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM tenants").Scan(&totalTenants)
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM tenants WHERE status = 'active'").Scan(&activeTenants)
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM tenants WHERE status = 'trial'").Scan(&trialTenants)
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM students").Scan(&totalStudents)
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants").Scan(&totalTenants); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching total tenants")
+	}
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE status = 'active'").Scan(&activeTenants); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching active tenants")
+	}
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE status = 'trial'").Scan(&trialTenants); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching trial tenants")
+	}
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM students").Scan(&totalStudents); err != nil {
+		// No devolvemos error fatal si falla el conteo de alumnos (tabla students podría no existir aún en dev)
+		totalStudents = 0
+	}
 
 	// Recent schools
-	rows, _ := h.db.Query(c.Context(),
+	rows, err := h.db.Query(c.UserContext(),
 		"SELECT id, name, slug, plan, status, created_at FROM tenants ORDER BY created_at DESC LIMIT 5")
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching recent schools")
+	}
 	defer rows.Close()
 
 	var recentSchools []fiber.Map
@@ -66,13 +86,41 @@ func (h *Handler) Stats(c *fiber.Ctx) error {
 func (h *Handler) ListSchools(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
+	search := c.Query("search", "")
+	status := c.Query("status", "")
+	plan := c.Query("plan", "")
 	offset := (page - 1) * limit
 
-	rows, err := h.db.Query(c.Context(),
-		`SELECT t.id, t.slug, t.name, t.logo_url, t.status, t.plan, t.created_at,
+	query := `SELECT t.id, t.slug, t.name, t.logo_url, t.status, t.plan, t.created_at,
 		 (SELECT COUNT(*) FROM students s WHERE s.tenant_id = t.id) as student_count,
 		 (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as user_count
-		 FROM tenants t ORDER BY t.created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+		 FROM tenants t WHERE 1=1`
+
+	args := []interface{}{}
+	argCount := 1
+
+	if search != "" {
+		query += ` AND (t.name ILIKE $` + strconv.Itoa(argCount) + ` OR t.slug ILIKE $` + strconv.Itoa(argCount) + `)`
+		args = append(args, "%"+search+"%")
+		argCount++
+	}
+
+	if status != "" {
+		query += ` AND t.status = $` + strconv.Itoa(argCount)
+		args = append(args, status)
+		argCount++
+	}
+
+	if plan != "" {
+		query += ` AND t.plan = $` + strconv.Itoa(argCount)
+		args = append(args, plan)
+		argCount++
+	}
+
+	query += ` ORDER BY t.created_at DESC LIMIT $` + strconv.Itoa(argCount) + ` OFFSET $` + strconv.Itoa(argCount+1)
+	args = append(args, limit, offset)
+
+	rows, err := h.db.Query(c.UserContext(), query, args...)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching schools")
@@ -109,7 +157,38 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 		schools = []fiber.Map{}
 	}
 
-	return response.Success(c, fiber.Map{"schools": schools, "page": page, "limit": limit}, "Schools retrieved")
+	// Get total count for pagination
+	var total int
+	countQuery := "SELECT COUNT(*) FROM tenants WHERE 1=1"
+	countArgs := []interface{}{}
+	cArgCount := 1
+	if search != "" {
+		countQuery += " AND (name ILIKE $" + strconv.Itoa(cArgCount) + " OR slug ILIKE $" + strconv.Itoa(cArgCount) + ")"
+		countArgs = append(countArgs, "%"+search+"%")
+		cArgCount++
+	}
+	if status != "" {
+		countQuery += " AND status = $" + strconv.Itoa(cArgCount)
+		countArgs = append(countArgs, status)
+		cArgCount++
+	}
+	if plan != "" {
+		countQuery += " AND plan = $" + strconv.Itoa(cArgCount)
+		countArgs = append(countArgs, plan)
+		cArgCount++
+	}
+	if err := h.db.QueryRow(c.UserContext(), countQuery, countArgs...).Scan(&total); err != nil {
+		// Log error if needed, but for now we fallback to schools count
+		total = len(schools)
+	}
+
+	return response.SuccessWithMeta(c, fiber.Map{
+		"schools": schools,
+	}, response.Meta{
+		Page:    page,
+		PerPage: limit,
+		Total:   total,
+	})
 }
 
 type CreateSchoolRequest struct {
@@ -148,22 +227,36 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	// 1. Start transaction
-	tx, err := h.db.Begin(c.Context())
+	// 1. Validate plan exists
+	var planExists bool
+	h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists)
+	if !planExists {
+		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
+	}
+
+	// 2. Check if slug exists
+	var slugExists bool
+	h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)", req.Slug).Scan(&slugExists)
+	if slugExists {
+		return response.Error(c, fiber.StatusConflict, "El subdominio ya está en uso")
+	}
+
+	// 3. Start transaction
+	tx, err := h.db.Begin(c.UserContext())
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not start transaction")
 	}
-	defer tx.Rollback(c.Context())
+	defer tx.Rollback(c.UserContext())
 
 	// 2. Create Tenant with Settings
 	var tenantID string
-	
+
 	settingsJSON := fiber.Map{
-		"levels":         req.Levels,
-		"phone":          req.Phone,
-		"contact_email":  req.ContactEmail,
-		"address":        req.Address,
-		"timezone":       req.Timezone,
+		"levels":        req.Levels,
+		"phone":         req.Phone,
+		"contact_email": req.ContactEmail,
+		"address":       req.Address,
+		"timezone":      req.Timezone,
 		"fiscal_data": fiber.Map{
 			"rfc":           req.RFC,
 			"razon_social":  req.RazonSocial,
@@ -174,9 +267,14 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		"eval_scheme": req.EvalScheme,
 	}
 
-	err = tx.QueryRow(c.Context(),
+	settingsData, err := json.Marshal(settingsJSON)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error serializing settings")
+	}
+
+	err = tx.QueryRow(c.UserContext(),
 		"INSERT INTO tenants (name, slug, logo_url, plan, status, settings) VALUES ($1, $2, $3, $4, 'active', $5) RETURNING id",
-		req.Name, req.Slug, req.LogoURL, req.Plan, settingsJSON).Scan(&tenantID)
+		req.Name, req.Slug, req.LogoURL, req.Plan, settingsData).Scan(&tenantID)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusConflict, "Slug already exists or database error")
@@ -186,7 +284,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	// Default password for new admins: "Escuela2024!" (bcrypt hash)
 	passwordHash := "$2a$10$MJsfnrvcdfz1LtAsrYyiYeKhFbK/LdUbGuKMhfEu0rxfaKjzpVMV." // "admin123" for testing, or use a better default
 
-	_, err = tx.Exec(c.Context(),
+	_, err = tx.Exec(c.UserContext(),
 		`INSERT INTO users (tenant_id, email, password_hash, first_name, role, is_active)
 		 VALUES ($1, $2, $3, $4, 'SCHOOL_ADMIN', true)`,
 		tenantID, req.AdminEmail, passwordHash, req.AdminName)
@@ -196,7 +294,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 
 	// 4. Activate core modules and selected premium modules
-	_, err = tx.Exec(c.Context(),
+	_, err = tx.Exec(c.UserContext(),
 		`INSERT INTO tenant_modules (tenant_id, module_key, is_active)
 		 SELECT $1, key, true FROM modules_catalog WHERE is_core = true`,
 		tenantID)
@@ -206,19 +304,23 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 
 	for _, mod := range req.PremiumModules {
-		_, _ = tx.Exec(c.Context(),
+		if _, err := tx.Exec(c.UserContext(),
 			"INSERT INTO tenant_modules (tenant_id, module_key, is_active) VALUES ($1, $2, true) ON CONFLICT DO NOTHING",
-			tenantID, mod)
+			tenantID, mod); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error activating premium module: "+mod)
+		}
 	}
 
 	// 5. Seed grade levels based on selection
 	for i, level := range req.Levels {
-		_, _ = tx.Exec(c.Context(),
+		if _, err := tx.Exec(c.UserContext(),
 			"INSERT INTO grade_levels (tenant_id, name, level, sort_order) VALUES ($1, $2, $3, $4)",
-			tenantID, level, level, i)
+			tenantID, level, level, i); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error seeding grade level: "+level)
+		}
 	}
 
-	if err := tx.Commit(c.Context()); err != nil {
+	if err := tx.Commit(c.UserContext()); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not commit transaction")
 	}
 
@@ -232,7 +334,7 @@ func (h *Handler) GetSchool(c *fiber.Ctx) error {
 	var logoURL *string
 	var createdAt, updatedAt interface{}
 
-	err := h.db.QueryRow(c.Context(),
+	err := h.db.QueryRow(c.UserContext(),
 		"SELECT slug, name, logo_url, status, plan, created_at, updated_at FROM tenants WHERE id = $1", id).
 		Scan(&slug, &name, &logoURL, &status, &plan, &createdAt, &updatedAt)
 
@@ -241,9 +343,15 @@ func (h *Handler) GetSchool(c *fiber.Ctx) error {
 	}
 
 	var studentCount, teacherCount, parentCount int
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM students WHERE tenant_id = $1", id).Scan(&studentCount)
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'TEACHER'", id).Scan(&teacherCount)
-	h.db.QueryRow(c.Context(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'PARENT'", id).Scan(&parentCount)
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM students WHERE tenant_id = $1", id).Scan(&studentCount); err != nil {
+		studentCount = 0
+	}
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'TEACHER'", id).Scan(&teacherCount); err != nil {
+		teacherCount = 0
+	}
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'PARENT'", id).Scan(&parentCount); err != nil {
+		parentCount = 0
+	}
 
 	logo := ""
 	if logoURL != nil {
@@ -261,7 +369,7 @@ func (h *Handler) GetSchool(c *fiber.Ctx) error {
 func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	rows, err := h.db.Query(c.Context(),
+	rows, err := h.db.Query(c.UserContext(),
 		`SELECT mc.key, mc.name, mc.description, mc.is_core, mc.price_monthly_mxn,
 		 COALESCE(tm.is_active, false) as is_active
 		 FROM modules_catalog mc
@@ -313,33 +421,30 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 
 	// Check if core module
 	var isCore bool
-	h.db.QueryRow(c.Context(), "SELECT is_core FROM modules_catalog WHERE key = $1", req.ModuleKey).Scan(&isCore)
+	if err := h.db.QueryRow(c.UserContext(), "SELECT is_core FROM modules_catalog WHERE key = $1", req.ModuleKey).Scan(&isCore); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Module not found in catalog")
+	}
 	if isCore {
 		return response.Error(c, fiber.StatusForbidden, "Cannot toggle core modules")
 	}
 
-	if req.IsActive {
-		_, err := h.db.Exec(c.Context(),
-			`INSERT INTO tenant_modules (tenant_id, module_key, is_active) VALUES ($1, $2, true)
-			 ON CONFLICT (tenant_id, module_key) DO UPDATE SET is_active = true`,
-			id, req.ModuleKey)
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error activating module")
-		}
-	} else {
-		_, err := h.db.Exec(c.Context(),
-			"UPDATE tenant_modules SET is_active = false WHERE tenant_id = $1 AND module_key = $2",
-			id, req.ModuleKey)
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error deactivating module")
-		}
+	// Toggle logic: if exists and active, deactivate. If not exists or inactive, activate.
+	_, err := h.db.Exec(c.UserContext(),
+		`INSERT INTO tenant_modules (tenant_id, module_key, is_active)
+		 VALUES ($1, $2, true)
+		 ON CONFLICT (tenant_id, module_key)
+		 DO UPDATE SET is_active = NOT tenant_modules.is_active`,
+		id, req.ModuleKey)
+
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error toggling module")
 	}
 
 	return response.Success(c, nil, "Module toggled")
 }
 
 func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
-	rows, err := h.db.Query(c.Context(),
+	rows, err := h.db.Query(c.UserContext(),
 		"SELECT key, name, description, is_core, price_monthly_mxn FROM modules_catalog ORDER BY is_core DESC, name")
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching catalog")
@@ -375,11 +480,22 @@ func (h *Handler) UploadLogo(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "No file uploaded")
 	}
-	
-	// Ensure uploads directory exists (in real prod this would be S3 logic)
-	// We use a mock URL for now that serves locally
+
+	// Ensure uploads directory exists
+	if _, err := os.Stat("./uploads"); os.IsNotExist(err) {
+		os.Mkdir("./uploads", 0755)
+	}
+
 	filename := "logo_" + file.Filename
-	c.SaveFile(file, "./uploads/"+filename)
-	
-	return response.Success(c, fiber.Map{"url": "http://localhost:8082/uploads/" + filename}, "Logo uploaded")
+	if err := c.SaveFile(file, "./uploads/"+filename); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error saving file")
+	}
+
+	protocol := "http"
+	if c.Protocol() == "https" {
+		protocol = "https"
+	}
+	url := protocol + "://" + c.Hostname() + "/uploads/" + filename
+
+	return response.Success(c, fiber.Map{"url": url}, "Logo uploaded")
 }

@@ -1,10 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Building2, Users, Calendar, MoreVertical, Eye, Edit, Trash2, Loader2, Upload } from "lucide-react";
+import { 
+  Plus, 
+  Search, 
+  Building2, 
+  Users, 
+  Calendar, 
+  MoreVertical, 
+  Eye, 
+  Edit, 
+  Trash2, 
+  Loader2, 
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  FilterX
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -25,7 +41,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { authFetch } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 const statusColors = {
   active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
@@ -61,6 +77,12 @@ interface School {
 
 export default function SchoolsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(12);
+  const [total, setTotal] = useState(0);
+  
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -71,7 +93,7 @@ export default function SchoolsPage() {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
-    plan: "Starter",
+    plan: "basic",
     admin_email: "",
     admin_name: "",
     levels: [] as string[],
@@ -91,11 +113,21 @@ export default function SchoolsPage() {
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
 
-  const fetchSchools = async () => {
+  const fetchSchools = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await authFetch("/api/v1/super-admin/schools");
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        search: searchTerm,
+        status: statusFilter === "all" ? "" : statusFilter,
+        plan: planFilter === "all" ? "" : planFilter,
+      });
+
+      const response = await authFetch(`/api/v1/super-admin/schools?${queryParams.toString()}`);
       if (response.success) {
         setSchools(response.data.schools);
+        setTotal(response.meta?.total || 0);
       } else {
         setError(response.message || "Error al cargar las escuelas");
       }
@@ -104,10 +136,31 @@ export default function SchoolsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, searchTerm, statusFilter, planFilter]);
+
+  const [plans, setPlans] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchSchools();
+    const delayDebounceFn = setTimeout(() => {
+      fetchSchools();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchSchools]);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const res = await authFetch("/api/v1/super-admin/plans");
+        if(res.success && res.data) {
+          setPlans(res.data || []);
+        }
+      } catch (error) {
+        console.error("Error fetching plans:", error);
+      }
+    };
+
+    fetchPlans();
   }, []);
 
   const handleLevelToggle = (level: string) => {
@@ -162,7 +215,7 @@ export default function SchoolsPage() {
         setIsModalOpen(false);
         // Reset
         setFormData({
-          name: "", slug: "", plan: "Starter", admin_email: "", admin_name: "",
+          name: "", slug: "", plan: "basic", admin_email: "", admin_name: "",
           levels: [], phone: "", contact_email: "", address: "", timezone: "America/Mexico_City",
           premium_modules: [], rfc: "", razon_social: "", regimen: "", codigo_postal: "",
           school_year: "2026-2027", eval_scheme: "0-10", logo_url: ""
@@ -187,18 +240,7 @@ export default function SchoolsPage() {
     }
   };
 
-  const filteredSchools = schools.filter(school =>
-    school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    school.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -312,9 +354,17 @@ export default function SchoolsPage() {
                       <Select value={formData.plan} onValueChange={(val: string) => setFormData({ ...formData, plan: val })}>
                         <SelectTrigger><SelectValue placeholder="Selecciona un plan" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Starter">Starter</SelectItem>
-                          <SelectItem value="Pro">Pro</SelectItem>
-                          <SelectItem value="Enterprise">Enterprise</SelectItem>
+                          {plans.length > 0 ? (
+                            plans.map(plan => (
+                              <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                            ))
+                          ) : (
+                            <>
+                              <SelectItem value="basic">Básico</SelectItem>
+                              <SelectItem value="professional">Profesional</SelectItem>
+                              <SelectItem value="enterprise">Enterprise</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -417,80 +467,176 @@ export default function SchoolsPage() {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <Card>
-        <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Buscar escuelas..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+        <CardHeader className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input 
+                placeholder="Buscar por nombre o slug..." 
+                value={searchTerm} 
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }} 
+                className="pl-10" 
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setPage(1); }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="active">Activas</SelectItem>
+                  <SelectItem value="trial">En Prueba</SelectItem>
+                  <SelectItem value="suspended">Suspendidas</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={planFilter} onValueChange={(val) => { setPlanFilter(val); setPage(1); }}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los planes</SelectItem>
+                  {plans.map(plan => (
+                    <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(searchTerm || statusFilter !== "all" || planFilter !== "all") && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => {
+                    setSearchTerm("");
+                    setStatusFilter("all");
+                    setPlanFilter("all");
+                    setPage(1);
+                  }}
+                  title="Limpiar filtros"
+                >
+                  <FilterX className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
       </Card>
 
       {/* Schools List */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredSchools.map((school) => (
-          <Card key={school.id} className="flex flex-col">
-            <CardHeader className="flex-1">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  {school.logo_url ? (
-                    <img src={school.logo_url} alt="Logo" className="w-10 h-10 rounded-md object-contain bg-white" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center text-muted-foreground font-bold">{school.name.charAt(0)}</div>
-                  )}
-                  <div>
-                    <CardTitle className="text-lg line-clamp-1">{school.name}</CardTitle>
-                    <div className="text-sm text-muted-foreground mt-1">Slug: {school.slug}</div>
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="h-[200px] animate-pulse bg-muted/50" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {schools.map((school) => (
+              <Card key={school.id} className="flex flex-col group hover:border-primary/50 transition-colors">
+                <CardHeader className="flex-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {school.logo_url ? (
+                        <img src={school.logo_url} alt="Logo" className="w-10 h-10 rounded-md object-contain bg-white border" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold">{school.name.charAt(0)}</div>
+                      )}
+                      <div>
+                        <CardTitle className="text-lg line-clamp-1">{school.name}</CardTitle>
+                        <div className="text-sm text-muted-foreground mt-1">Slug: {school.slug}</div>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 -mr-2 rounded-md hover:bg-muted">
+                        <MoreVertical className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`/super-admin/schools/${school.id}`}>
+                            <Eye className="w-4 h-4 mr-2" />Ver detalles
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 -mr-2 rounded-md hover:bg-muted">
-                    <MoreVertical className="h-4 w-4" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem><Eye className="w-4 h-4 mr-2" />Ver detalles</DropdownMenuItem>
-                    <DropdownMenuItem><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <Badge className={statusColors[school.status as keyof typeof statusColors] || "bg-gray-100"}>
-                  {statusLabels[school.status as keyof typeof statusLabels] || school.status}
-                </Badge>
-                <Badge variant="outline" className={planColors[school.plan as keyof typeof planColors] || ""}>
-                  {school.plan}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="border-t pt-4 bg-muted/20">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div>
-                  <div className="text-xl font-bold text-primary">{school.total_students}</div>
-                  <div className="text-xs text-muted-foreground">Estudiantes</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-primary">{school.total_users}</div>
-                  <div className="text-xs text-muted-foreground">Usuarios</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  <div className="flex gap-2 mt-4">
+                    <Badge className={statusColors[school.status as keyof typeof statusColors] || "bg-gray-100"}>
+                      {statusLabels[school.status as keyof typeof statusLabels] || school.status}
+                    </Badge>
+                    <Badge variant="outline" className={planColors[school.plan as keyof typeof planColors] || ""}>
+                      {school.plan}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <Link href={`/super-admin/schools/${school.id}`} className="block">
+                  <CardContent className="border-t pt-4 bg-muted/20 hover:bg-muted/40 transition-colors">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div>
+                        <div className="text-xl font-bold text-primary">{school.total_students}</div>
+                        <div className="text-xs text-muted-foreground">Estudiantes</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold text-primary">{school.total_users}</div>
+                        <div className="text-xs text-muted-foreground">Usuarios</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Link>
+              </Card>
+            ))}
+          </div>
 
-      {filteredSchools.length === 0 && (
-        <Card className="col-span-full">
-          <CardContent className="py-12 text-center">
-            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No se encontraron escuelas</h3>
-            <p className="text-muted-foreground mb-4">No hay escuelas registradas que coincidan.</p>
-            <Button variant="outline" onClick={() => setIsModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />Crear primera escuela
-            </Button>
-          </CardContent>
-        </Card>
+          {schools.length === 0 && (
+            <Card className="col-span-full">
+              <CardContent className="py-12 text-center">
+                <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No se encontraron escuelas</h3>
+                <p className="text-muted-foreground mb-4">Ajusta los filtros o busca otro término.</p>
+                <Button variant="outline" onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                  setPlanFilter("all");
+                }}>
+                  Limpiar Filtros
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-sm font-medium">
+                Página {page} de {totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
