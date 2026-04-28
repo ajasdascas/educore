@@ -1,69 +1,148 @@
 # EduCore — Contexto Actual del Proyecto
-> 🤖 Este archivo es la fuente de verdad para el agente IA.
-> Actualizar este archivo al iniciar y terminar cada sesión de desarrollo.
+> 🤖 Este archivo es la fuente de verdad para CUALQUIER IA o editor.
+> Leer PRIMERO antes de tocar código. Actualizar al terminar cada sesión.
 
 ---
 
 ## 📍 Estado Actual
 
-**Fecha última actualización:** 2026-04-27
+**Fecha última actualización:** 2026-04-27T16:55 CST
 **Semana de desarrollo:** Semana 1
-**Fase:** Configuración inicial
+**Fase:** Infraestructura + Auth + Multi-tenancy (Estabilización)
 
 ---
 
 ## ✅ Completado
 
-- [x] Configuración del repositorio
-- [x] CLAUDE.md y archivos de agente IA
-- [x] docker-compose (PostgreSQL + Redis)
-- [x] Estructura de carpetas backend
-- [x] Estructura de carpetas frontend
-
----
-
-## 🚧 En Progreso
-
-- Módulo 1: Infraestructura + Auth + Multi-tenancy
-
----
-
-## 📋 Próximos Pasos (en orden)
-
-1. [x] **Inicializar proyecto Go** — `go mod init educore` en `/backend`
-2. [x] **Levantar Docker** — `docker-compose up -d`
-3. [x] **Primera migración** — Crear esquema completo (14 tablas) con RLS
-4. [x] **Inicializar Next.js** — `npx create-next-app@14 frontend --typescript --tailwind --app`
-5. [ ] **Configurar frontend** — shadcn/ui, dependencias y auth routing
-6. [ ] **Módulo Auth (Backend)** — Login, JWT, refresh token
+- [x] Repositorio Git + GitHub (`ajasdascas/educore`, rama `master`)
+- [x] Docker Compose: PostgreSQL 16 + Redis 7 + pgAdmin (profile: tools)
+- [x] Backend Go/Fiber completo en `/backend` (puerto **8082**)
+  - [x] Arquitectura: Handlers, Services (implícitos), PKG (internal utilities)
+  - [x] Middleware: Auth (JWT), Tenant Resolver (RLS), Recovery, CORS
+  - [x] Event Bus centralizado en `internal/events` para desacoplamiento
+  - [x] Módulo Auth: login, refresh, logout, forgot-password, reset-password, accept-invitation
+  - [x] Módulo Tenants: CRUD, suspend, activate (SUPER_ADMIN only)
+  - [x] Módulo Super Admin: stats, schools CRUD, modules catalog, toggle modules
+- [x] Base de datos: 14 tablas principales con RLS y triggers de `updated_at`
+  - Tablas: `tenants`, `tenant_modules`, `users`, `grade_levels`, `groups`, `subjects`, `students`, `teacher_profiles`, `parent_student`, `group_students`, `group_teachers`, `attendance_records`, `grade_records`, `notifications`
+  - Catálogo de módulos inicializado en `modules_catalog`
+- [x] Frontend Next.js 14 en `/frontend` (puerto **3000**)
+  - [x] Tailwind CSS + shadcn/ui components
+  - [x] 3 temas: blue (default), light, dark — via `next-themes`
+  - [x] Login page (`/`) con auth contra backend
+  - [x] Super Admin layout con sidebar + theme toggle
+  - [x] Páginas: dashboard, schools, users, settings (shells funcionales)
+- [x] Deploy estático a Hostinger vía FTP (`node sync.js`)
+- [x] Producción accesible en `https://onlineu.mx/educore/`
+- [x] Túnel ngrok para exponer backend local a producción
 
 ---
 
 ## 🌐 URLs del Proyecto
 
-- Backend local: `http://localhost:8080`
-- Frontend local: `http://localhost:3000`
-- PostgreSQL: `localhost:5432/educore_dev`
-- Redis: `localhost:6379`
-- Documentación API: `http://localhost:8080/swagger`
+| Entorno | URL |
+|---|---|
+| Frontend local | `http://localhost:3000` |
+| Backend local | `http://localhost:8082` |
+| Backend público (ngrok) | `https://pester-dramatize-ocean.ngrok-free.dev` |
+| Producción | `https://onlineu.mx/educore/` |
+| PostgreSQL | `localhost:5432/educore_dev` (user: `educore`, pass: `educore_dev_password`) |
+| Redis | `localhost:6379` |
+| GitHub | `https://github.com/ajasdascas/educore` |
+| pgAdmin | `localhost:5050` (docker-compose --profile tools) |
 
 ---
 
-## 👤 Variables de Entorno Necesarias
+## 🏗️ Arquitectura
 
-Ver `.env.example` en la raíz del proyecto.
+```
+EduCore/
+├── backend/              # Go 1.22+ + Fiber v2
+│   ├── cmd/server/       # main.go (port 8082)
+│   ├── internal/
+│   │   ├── config/       # Config struct + .env loader
+│   │   ├── events/       # event_bus.go (Singleton Event Bus)
+│   │   ├── middleware/    # auth.go, tenant.go (RLS), recovery.go
+│   │   ├── modules/
+│   │   │   ├── auth/     # login, refresh, recovery, invitation
+│   │   │   ├── tenants/  # CRUD, status management
+│   │   │   ├── super_admin/ # dashboard stats, module management
+│   │   │   └── users/    # (pendiente)
+│   │   └── pkg/
+│   │       ├── database/ # pgxpool wrapper
+│   │       ├── jwt/      # generate/validate tokens
+│   │       ├── redis/    # redis client wrapper
+│   │       └── response/ # standard JSON responses
+│   ├── migrations/       # 001_up.sql, 002_add_modules_settings.sql, 003_seed_super_admin.sql
+│   └── scripts/          # genhash.go, seed.go
+├── frontend/             # Next.js 14 + TypeScript + Tailwind + shadcn
+│   ├── app/
+│   │   ├── layout.tsx    # Root + ThemeProvider
+│   │   ├── page.tsx      # Login
+│   │   └── super-admin/  # Admin views
+│   ├── components/ui/    # shadcn + theme-toggle/provider
+│   ├── lib/
+│   │   ├── utils.ts      # tailwind-merge + clsx
+│   │   └── api.ts        # Dynamic API_URL resolver
+│   └── next.config.mjs   # Static export config
+├── sync.js               # CI/CD script (Build + FTP + Git)
+├── ftp-explore.js        # Debugging FTP structure
+└── Makefile              # dev, stop, migrate, seed, build, save
+```
 
 ---
 
-## ⚠️ Problemas Conocidos
+## 🔑 Credenciales de Test
 
-_Ninguno por ahora_
+| Campo | Valor |
+|---|---|
+| Super Admin email | `admin@educore.mx` |
+| Super Admin pass | `admin123` |
 
 ---
 
-## 📝 Notas para el Agente
+## ⚙️ Cómo Levantar (orden importante)
 
-- El proyecto usa Go 1.22+ con módulos
-- PostgreSQL local sin SSL en desarrollo
-- Las migraciones van en `backend/migrations/` con formato `001_nombre.sql`
-- Los tests de integración necesitan PostgreSQL corriendo
+1. `docker-compose up -d`
+2. `cd backend && go run ./cmd/server/main.go`
+3. `cd frontend && npm run dev`
+4. (Opcional) `ngrok http 8082`
+
+---
+
+## 🚀 Deploy a Producción
+
+```bash
+node sync.js
+```
+
+---
+
+## ⚠️ Problemas Conocidos / Notas
+
+1. **ngrok URL**: Cambia en cada reinicio. Actualizar `frontend/lib/api.ts`.
+2. **Event Bus**: Los módulos se comunican vía eventos para evitar dependencias circulares.
+3. **RLS**: Se activa en cada request vía `SET LOCAL app.current_tenant = ...` en el middleware de tenant.
+4. **Base de Datos**: Usa PostgreSQL 16 con extensiones `pgcrypto` y `pg_trgm`.
+
+---
+
+## 📋 Próximos Pasos
+
+1. [ ] Implementar `GET /api/v1/super-admin/stats` real en backend.
+2. [ ] Conectar dashboard frontend a stats reales.
+3. [ ] CRUD completo de Escuelas en el Super Admin.
+4. [ ] Iniciar Módulo School Admin (gestión académica).
+5. [ ] Configurar envío de correos real vía Resend.
+
+---
+
+## 📝 Convenciones de Código
+
+- **Backend**: Handlers en `internal/modules/<modulo>/handler.go`.
+- **Frontend**: Componentes shadcn, Tailwind con variables CSS semánticas.
+- **Eventos**: Publicar eventos para acciones cross-module (ej: `tenant.created`).
+- **Auth**: JWT HS256, access token (15min), refresh token (7d cookie httpOnly).
+- **Temas**: Colores definidos en `globals.css` como CSS variables, mapeados en `tailwind.config.ts`
+- **API responses**: `{ success: bool, message: string, data: any }` o `{ success: false, error: string }`
+- **Multi-tenant**: Header `X-Tenant-ID` o subdomain → RLS via `SET LOCAL app.current_tenant`

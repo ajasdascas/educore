@@ -22,10 +22,19 @@ func Protected(secret string) fiber.Handler {
 			return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired token")
 		}
 
+		// Store user data as map for compatibility with new RBAC system
+		user := map[string]interface{}{
+			"user_id":   claims.UserID,
+			"role":      claims.Role,
+			"email":     claims.Email,
+			"tenant_id": claims.TenantID,
+		}
+
+		c.Locals("user", user)
 		c.Locals("user_id", claims.UserID)
 		c.Locals("user_role", claims.Role)
 		c.Locals("user_email", claims.Email)
-		
+
 		if claims.TenantID != "" {
 			// Override tenant with JWT tenant for security
 			c.Locals("tenant_id", claims.TenantID)
