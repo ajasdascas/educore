@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Building, Users, Settings, LogOut, LayoutDashboard, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { Toaster } from "@/components/ui/toaster";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -17,23 +18,33 @@ const navItems = [
 export default function SuperAdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, logout, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Cargando...</div>
+      </div>
+    );
+  }
+
+  const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SA";
+  const userRole = user?.role === "SUPER_ADMIN" ? "Super Admin" : user?.role || "";
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile menu overlay */}
+    <div className="min-h-screen bg-background flex flex-col lg:flex-row">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-30 w-64 bg-sidebar text-sidebar-foreground flex flex-col shadow-xl border-r border-border
         transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:inset-0
+        lg:translate-x-0 lg:static lg:shadow-none lg:shrink-0
       `}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-border bg-sidebar">
           <div className="flex items-center">
@@ -42,8 +53,6 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             </div>
             <span className="text-lg font-bold tracking-tight">EduCore</span>
           </div>
-
-          {/* Close button for mobile */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden p-1 rounded-md hover:bg-sidebar-accent"
@@ -66,7 +75,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
                     : "hover:bg-sidebar-accent/50 text-sidebar-foreground border-l-4 border-transparent"
                 }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 ${isActive ? "text-primary" : ""}`} />
+                <item.icon className="w-5 h-5 mr-3" />
                 <span className="font-medium text-sm">{item.label}</span>
               </Link>
             );
@@ -74,21 +83,18 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
         </nav>
 
         <div className="p-4 border-t border-border">
-          <Link
-            href="/"
+          <button
+            onClick={logout}
             className="flex items-center w-full px-4 py-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 rounded transition-colors"
-            onClick={() => setSidebarOpen(false)}
           >
             <LogOut className="w-4 h-4 mr-2" />
             Cerrar Sesión
-          </Link>
+          </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex flex-col lg:ml-64">
+      <main className="flex flex-col flex-1 min-w-0">
         <header className="h-16 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-10 transition-colors">
-          {/* Left side - Mobile menu button and title */}
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -98,13 +104,11 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
             </button>
             <h1 className="text-lg font-semibold text-foreground">Manager Maestro</h1>
           </div>
-
-          {/* Right side - User info */}
           <div className="flex items-center space-x-2 sm:space-x-4">
             <ThemeToggle />
-            <span className="text-sm text-muted-foreground hidden sm:block">Super Admin</span>
+            <span className="text-sm text-muted-foreground hidden sm:block">{userRole}</span>
             <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-semibold text-sm shadow">
-              SA
+              {userInitials}
             </div>
           </div>
         </header>

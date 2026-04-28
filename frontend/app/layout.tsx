@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/ui/theme-provider/ThemeProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -26,9 +27,12 @@ export default function RootLayout({
     <html lang="es" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="blue" themes={["blue", "light", "dark"]} enableSystem={false} disableTransitionOnChange={false}>
-          {children}
+          <AuthProvider>
+            {children}
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
   );
 }
+

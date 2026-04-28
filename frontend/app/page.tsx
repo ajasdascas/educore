@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { apiRequest } from "@/lib/api";
+import { getDashboardPath } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -20,29 +24,25 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { apiRequest } = await import("@/lib/api");
       const data = await apiRequest("/api/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
 
       if (data.success) {
-        localStorage.setItem("access_token", data.data.access_token);
-        localStorage.setItem("user", JSON.stringify(data.data.user));
-        router.push("/super-admin/dashboard");
+        login(data.data.access_token, data.data.user);
+        router.push(getDashboardPath(data.data.user.role));
       } else {
         setError(data.message || "Credenciales incorrectas.");
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      setError("Error conectando con el servidor. Verifica tu conexión e intenta nuevamente.");
+    } catch {
+      setError("Error conectando con el servidor.");
     }
     setLoading(false);
   };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl" />
@@ -67,7 +67,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="admin@educore.mx"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 required
                 className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
               />
@@ -81,7 +81,7 @@ export default function LoginPage() {
                 type="password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 required
                 className="bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500/20 h-11"
               />
