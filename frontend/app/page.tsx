@@ -116,23 +116,54 @@ export default function LoginPage() {
                 {showDemo ? '▼' : '▶'} Demo: Tipos de usuario disponibles
               </button>
               {showDemo && (
-                <div className="mt-2 text-xs text-slate-400 space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <Building2 className="w-3 h-3" />
+                <div className="mt-2 text-xs text-slate-400 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("admin@educore.mx");
+                      setPassword("admin123");
+                    }}
+                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
+                  >
+                    <Building2 className="w-3 h-3 text-blue-400" />
                     <span>Super Admin: Gestión global del sistema</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-3 h-3" />
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("school@educore.mx");
+                      setPassword("school123");
+                    }}
+                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
+                  >
+                    <Users className="w-3 h-3 text-green-400" />
                     <span>School Admin: Administración de escuela</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <GraduationCap className="w-3 h-3" />
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("profe@educore.mx");
+                      setPassword("profe123");
+                    }}
+                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
+                  >
+                    <GraduationCap className="w-3 h-3 text-purple-400" />
                     <span>Profesor: Gestión académica</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <User className="w-3 h-3" />
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail("padre@educore.mx");
+                      setPassword("padre123");
+                    }}
+                    className="w-full flex items-center space-x-2 p-2 hover:bg-slate-700/50 rounded transition-colors text-left"
+                  >
+                    <User className="w-3 h-3 text-orange-400" />
                     <span>Padre: Seguimiento de hijos</span>
-                  </div>
+                  </button>
                 </div>
               )}
             </div>

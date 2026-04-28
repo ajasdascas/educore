@@ -135,7 +135,9 @@ export function getDashboardPath(role: string): string {
     case "SCHOOL_ADMIN":
       return "/school-admin/dashboard";
     case "TEACHER":
-      return "/school-admin/dashboard";
+      return "/teacher/dashboard";
+    case "STUDENT":
+      return "/student/dashboard";
     case "PARENT":
       return "/parent/dashboard";
     default:
