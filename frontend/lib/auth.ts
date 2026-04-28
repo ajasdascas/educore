@@ -1,4 +1,4 @@
-import { API_URL } from "./api";
+import { API_URL, isNgrok } from "./api";
 
 export interface User {
   id: string;
@@ -59,10 +59,13 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  if (isNgrok()) {
+    headers["ngrok-skip-browser-warning"] = "true";
+  }
+
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: "include",
   });
 
   // If 401, try refresh
@@ -73,7 +76,6 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
       const retryRes = await fetch(`${API_URL}${endpoint}`, {
         ...options,
         headers,
-        credentials: "include",
       });
       return retryRes.json();
     } else {
@@ -90,9 +92,12 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
 async function tryRefreshToken(): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {};
+    if (isNgrok()) headers["ngrok-skip-browser-warning"] = "true";
+
     const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
       method: "POST",
-      credentials: "include",
+      headers,
     });
     if (!res.ok) return false;
     const data = await res.json();
@@ -108,9 +113,12 @@ async function tryRefreshToken(): Promise<boolean> {
 
 export async function logout() {
   try {
+    const headers: Record<string, string> = {};
+    if (isNgrok()) headers["ngrok-skip-browser-warning"] = "true";
+
     await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: "POST",
-      credentials: "include",
+      headers,
     });
   } catch {
     // Ignore errors on logout

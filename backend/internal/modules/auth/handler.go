@@ -165,7 +165,7 @@ func (h *Handler) Logout(c *fiber.Ctx) error {
 		HTTPOnly: true,
 		Path:     "/",
 	})
-	return response.Success(c, nil, "Logged out")
+	return response.Success(c, nil, "Logged out", "Success")
 }
 
 func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
@@ -186,12 +186,12 @@ func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
 
 	if err != nil {
 		// Don't reveal if email exists
-		return response.Success(c, nil, "If the email exists, a reset link has been sent")
+		return response.Success(c, nil, "If the email exists, a reset link has been sent", "Success")
 	}
 
 	// TODO: Send email via Resend with link: APP_BASE_URL/reset-password?token=<token>
 
-	return response.Success(c, nil, "If the email exists, a reset link has been sent")
+	return response.Success(c, nil, "If the email exists, a reset link has been sent", "Success")
 }
 
 func (h *Handler) ResetPassword(c *fiber.Ctx) error {
@@ -217,7 +217,7 @@ func (h *Handler) ResetPassword(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid or expired token")
 	}
 
-	return response.Success(c, nil, "Password updated successfully")
+	return response.Success(c, nil, "Password updated successfully", "Success")
 }
 
 func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
@@ -245,5 +245,5 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid or expired invitation")
 	}
 
-	return response.Success(c, nil, "Account activated successfully")
+	return response.Success(c, nil, "Account activated successfully", "Success")
 }

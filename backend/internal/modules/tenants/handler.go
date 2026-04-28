@@ -275,7 +275,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error updating tenant")
 	}
 
-	return response.Success(c, nil, "Tenant updated")
+	return response.Success(c, nil, "Tenant updated", "Success")
 }
 
 func (h *Handler) Suspend(c *fiber.Ctx) error {
@@ -284,7 +284,7 @@ func (h *Handler) Suspend(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error suspending tenant")
 	}
-	return response.Success(c, nil, "Tenant suspended")
+	return response.Success(c, nil, "Tenant suspended", "Success")
 }
 
 func (h *Handler) Activate(c *fiber.Ctx) error {
@@ -293,7 +293,7 @@ func (h *Handler) Activate(c *fiber.Ctx) error {
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error activating tenant")
 	}
-	return response.Success(c, nil, "Tenant activated")
+	return response.Success(c, nil, "Tenant activated", "Success")
 }
 
 // helper

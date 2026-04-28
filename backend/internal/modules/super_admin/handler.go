@@ -109,7 +109,7 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 		schools = []fiber.Map{}
 	}
 
-	return response.Success(c, fiber.Map{"schools": schools, "page": page, "limit": limit}, "Schools retrieved")
+	return response.Success(c, fiber.Map{"schools": schools, "page": page, "limit": limit}, "Schools retrieved", "Success")
 }
 
 type CreateSchoolRequest struct {
@@ -222,7 +222,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not commit transaction")
 	}
 
-	return response.Success(c, fiber.Map{"id": tenantID}, "School created successfully")
+	return response.Success(c, fiber.Map{"id": tenantID}, "School created successfully", "Success")
 }
 
 func (h *Handler) GetSchool(c *fiber.Ctx) error {
@@ -296,7 +296,7 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 		modules = []fiber.Map{}
 	}
 
-	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved")
+	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved", "Success")
 }
 
 type ToggleModuleRequest struct {
@@ -335,7 +335,7 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 		}
 	}
 
-	return response.Success(c, nil, "Module toggled")
+	return response.Success(c, nil, "Module toggled", "Success")
 }
 
 func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
@@ -367,7 +367,7 @@ func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
 		modules = []fiber.Map{}
 	}
 
-	return response.Success(c, fiber.Map{"modules": modules}, "Catalog retrieved")
+	return response.Success(c, fiber.Map{"modules": modules}, "Catalog retrieved", "Success")
 }
 
 func (h *Handler) UploadLogo(c *fiber.Ctx) error {
@@ -381,5 +381,5 @@ func (h *Handler) UploadLogo(c *fiber.Ctx) error {
 	filename := "logo_" + file.Filename
 	c.SaveFile(file, "./uploads/"+filename)
 	
-	return response.Success(c, fiber.Map{"url": "http://localhost:8082/uploads/" + filename}, "Logo uploaded")
+	return response.Success(c, fiber.Map{"url": "http://localhost:8082/uploads/" + filename}, "Logo uploaded", "Success")
 }

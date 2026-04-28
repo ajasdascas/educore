@@ -6,10 +6,15 @@ import (
 	"time"
 
 	"educore/internal/config"
+	"educore/internal/events"
 	"educore/internal/middleware"
 	"educore/internal/modules/auth"
-	"educore/internal/modules/tenants"
+	"educore/internal/modules/communications"
+	"educore/internal/modules/parent"
+	"educore/internal/modules/reports"
+	"educore/internal/modules/school_admin"
 	superadmin "educore/internal/modules/super_admin"
+	"educore/internal/modules/tenants"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
@@ -35,12 +40,23 @@ func main() {
 	}
 	defer db.Close()
 
+	// Create SQL DB adapter for modules that use database/sql
+	sqlDB, err := database.NewSQLDBFromURL(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to create SQL DB adapter: %v", err)
+	}
+	defer sqlDB.Close()
+
 	// 3. Init Redis (optional in dev)
 	redisClient, err := redis.New(ctx, cfg.RedisURL)
 	if err != nil {
 		log.Printf("Redis not available: %v — continuing without cache", err)
 	}
 	defer redisClient.Close()
+
+	// 4. Initialize Event Bus
+	eventBus := events.NewEventBus()
+	eventBus.Start()
 
 	// 4. Setup Fiber
 	app := fiber.New(fiber.Config{
@@ -56,7 +72,7 @@ func main() {
 	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000, http://localhost:3001, http://localhost:3002, http://localhost:3003, https://onlineu.mx, http://onlineu.mx, https://pester-dramatize-ocean.ngrok-free.dev",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Tenant-ID",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Tenant-ID, ngrok-skip-browser-warning",
 		AllowCredentials: true,
 	}))
 
@@ -94,21 +110,42 @@ func main() {
 	superAdminHandler := superadmin.NewHandler(db)
 	superAdminHandler.RegisterRoutes(superAdminGroup)
 
-	// School module (SCHOOL_ADMIN)
-	schoolGroup := api.Group("/school", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
-	_ = schoolGroup
+	// Initialize module repositories, services, and handlers
 
-	// Academic module (TEACHER, SCHOOL_ADMIN)
+	// School Admin module (SCHOOL_ADMIN, TEACHER)
+	schoolAdminRepo := school_admin.NewRepository(db)
+	schoolAdminService := school_admin.NewService(schoolAdminRepo, eventBus)
+	schoolAdminHandler := school_admin.NewHandler(schoolAdminService)
+	schoolAdminGroup := api.Group("/school-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN"))
+	schoolAdminHandler.RegisterRoutes(schoolAdminGroup)
+
+	// Academic module (same as school admin for now - could be separated later)
 	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	// For now, academic routes are part of school admin - could be separated later
 	_ = academicGroup
 
 	// Parent module
+	parentRepo := parent.NewRepository(db)
+	parentService := parent.NewService(parentRepo, eventBus)
+	parentHandler := parent.NewHandler(parentService)
 	parentGroup := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("PARENT"))
-	_ = parentGroup
+	parentHandler.RegisterRoutes(parentGroup)
 
-	// Notifications
-	notifGroup := api.Group("/notifications", middleware.Protected(cfg.JWTSecret))
-	_ = notifGroup
+	// Reports module (SCHOOL_ADMIN, TEACHER)
+	reportsRepo := reports.NewRepository(sqlDB)
+	reportsService := reports.NewService(reportsRepo, eventBus)
+	reportsHandler := reports.NewHandler(reportsService)
+	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	reportsHandler.RegisterRoutes(reportsGroup)
+	reportsHandler.RegisterQuickRoutes(app) // Quick routes with different base path
+
+	// Communications module (All authenticated users)
+	communicationsRepo := communications.NewRepository(sqlDB)
+	communicationsService := communications.NewService(communicationsRepo, eventBus)
+	communicationsHandler := communications.NewHandler(communicationsService)
+	communicationsGroup := api.Group("/communications", middleware.Protected(cfg.JWTSecret))
+	communicationsHandler.RegisterRoutes(communicationsGroup)
+	communicationsHandler.RegisterUtilityRoutes(app)
 
 	// 5. Start server
 	log.Printf("EduCore API starting on port %s", cfg.Port)
