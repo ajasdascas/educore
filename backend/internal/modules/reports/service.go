@@ -287,8 +287,8 @@ func (s *Service) ExportReport(ctx context.Context, tenantID, reportID, userID s
 		return "", err
 	}
 
-	// Get the report
-	report, err := s.GetReportById(ctx, tenantID, reportID)
+	// Get the report (for validation)
+	_, err := s.GetReportById(ctx, tenantID, reportID)
 	if err != nil {
 		return "", err
 	}

@@ -119,17 +119,12 @@ func main() {
 	schoolAdminGroup := api.Group("/school-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN"))
 	schoolAdminHandler.RegisterRoutes(schoolAdminGroup)
 
-	// Academic module (same as school admin for now - could be separated later)
-	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
-	// For now, academic routes are part of school admin - could be separated later
-	_ = academicGroup
-
 	// Parent module
 	parentRepo := parent.NewRepository(db)
 	parentService := parent.NewService(parentRepo, eventBus)
 	parentHandler := parent.NewHandler(parentService)
-	parentGroup := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("PARENT"))
-	parentHandler.RegisterRoutes(parentGroup)
+	parentGroupActive := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("PARENT"))
+	parentHandler.RegisterRoutes(parentGroupActive)
 
 	// Reports module (SCHOOL_ADMIN, TEACHER)
 	reportsRepo := reports.NewRepository(sqlDB)
@@ -137,7 +132,6 @@ func main() {
 	reportsHandler := reports.NewHandler(reportsService)
 	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
 	reportsHandler.RegisterRoutes(reportsGroup)
-	reportsHandler.RegisterQuickRoutes(app) // Quick routes with different base path
 
 	// Communications module (All authenticated users)
 	communicationsRepo := communications.NewRepository(sqlDB)
@@ -145,7 +139,10 @@ func main() {
 	communicationsHandler := communications.NewHandler(communicationsService)
 	communicationsGroup := api.Group("/communications", middleware.Protected(cfg.JWTSecret))
 	communicationsHandler.RegisterRoutes(communicationsGroup)
-	communicationsHandler.RegisterUtilityRoutes(app)
+
+	// Academic module (placeholder)
+	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	_ = academicGroup
 
 	// 5. Start server
 	log.Printf("EduCore API starting on port %s", cfg.Port)

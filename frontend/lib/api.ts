@@ -1,13 +1,13 @@
 // URL del backend API
 // Configuración dinámica para diferentes entornos
 const getApiUrl = () => {
-  if (typeof window === "undefined") return "http://localhost:8082";
+  if (typeof window === "undefined") return "http://localhost:8083";
   
   const hostname = window.location.hostname;
   
-  // Si es localhost o IP local, usar puerto 8082 directo
+  // Si es localhost o IP local, usar puerto 8083 directo
   if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.")) {
-    return "http://localhost:8082";
+    return "http://localhost:8083";
   }
 
   // En producción, usar el backend en tu dominio

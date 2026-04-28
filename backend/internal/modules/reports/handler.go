@@ -1,7 +1,6 @@
 package reports
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
@@ -64,7 +63,7 @@ func (h *Handler) GenerateReport(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
 
-	return response.Success(c, report, "Report generation started successfully", "Success")
+	return response.Success(c, report, "Report generation started successfully")
 }
 
 func (h *Handler) GetReports(c *fiber.Ctx) error {
@@ -248,7 +247,7 @@ func (h *Handler) GetDashboardMetrics(c *fiber.Ctx) error {
 
 	return response.Success(c, map[string]interface{}{
 		"metrics": metrics,
-	})
+	}, "Dashboard metrics retrieved successfully")
 }
 
 // Export and scheduling handlers
@@ -270,7 +269,7 @@ func (h *Handler) ExportReport(c *fiber.Ctx) error {
 	return response.Success(c, map[string]interface{}{
 		"job_id": jobID,
 		"message": "Export job started successfully",
-	})
+	}, "Export job started successfully")
 }
 
 func (h *Handler) ScheduleReport(c *fiber.Ctx) error {
@@ -361,7 +360,7 @@ func (h *Handler) GetReportStatus(c *fiber.Ctx) error {
 		"progress":     100, // Placeholder
 		"file_url":     report.FileURL,
 		"completed_at": report.CompletedAt,
-	})
+	}, "Report status retrieved successfully")
 }
 
 // Download report file

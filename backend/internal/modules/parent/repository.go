@@ -151,7 +151,7 @@ func (r *Repository) GetChildDetails(ctx context.Context, tenantID, childID stri
 			   COALESCE(g.name, '') as group_name, COALESCE(gl.name, '') as grade_name,
 			   COALESCE(t_user.first_name || ' ' || t_user.last_name, '') as teacher_name,
 			   COALESCE(t_user.email, '') as teacher_email,
-			   s.created_at, s.updated_at
+			   s.updated_at
 		FROM students s
 		LEFT JOIN group_students gs ON s.id = gs.student_id
 		LEFT JOIN groups g ON gs.group_id = g.id
@@ -166,7 +166,7 @@ func (r *Repository) GetChildDetails(ctx context.Context, tenantID, childID stri
 		&child.ID, &child.FirstName, &child.LastName, &child.EnrollmentID,
 		&child.BirthDate, &child.Address, &child.Status, &child.ProfilePhoto,
 		&child.GroupName, &child.GradeName, &child.TeacherName, &child.TeacherEmail,
-		&child.CreatedAt, &child.UpdatedAt,
+		&child.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get child details: %w", err)

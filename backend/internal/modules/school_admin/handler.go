@@ -1,7 +1,6 @@
 package school_admin
 
 import (
-	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"educore/internal/pkg/response"

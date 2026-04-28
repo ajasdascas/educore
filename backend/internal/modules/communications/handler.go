@@ -258,7 +258,7 @@ func (h *Handler) CreateNotification(c *fiber.Ctx) error {
 	return response.Success(c, map[string]interface{}{
 		"notifications": notifications,
 		"total_sent":    len(notifications),
-	})
+	}, "Bulk notification sent successfully")
 }
 
 func (h *Handler) GetNotifications(c *fiber.Ctx) error {
@@ -415,7 +415,7 @@ func (h *Handler) GetRecentActivity(c *fiber.Ctx) error {
 	return response.Success(c, map[string]interface{}{
 		"activity": activity,
 		"limit":    limit,
-	})
+	}, "Recent activity retrieved successfully")
 }
 
 // Helper methods
@@ -453,12 +453,12 @@ func (h *Handler) GetUnreadCounts(c *fiber.Ctx) error {
 		"unread_messages":     stats.UnreadMessages,
 		"unread_notifications": stats.UnreadNotifications,
 		"active_conversations": stats.ActiveConversations,
-	})
+	}, "Communication stats retrieved successfully")
 }
 
 func (h *Handler) GetMessageThread(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
-	userID := c.Locals("user_id").(string)
+	_ = c.Locals("tenant_id").(string)
+	_ = c.Locals("user_id").(string)
 	messageID := c.Params("id")
 
 	// This would get the conversation for a specific message
@@ -466,7 +466,7 @@ func (h *Handler) GetMessageThread(c *fiber.Ctx) error {
 	return response.Success(c, map[string]interface{}{
 		"message_id": messageID,
 		"redirect":   "/api/v1/communications/conversations/{conversation_id}/messages",
-	})
+	}, "Message thread redirect")
 }
 
 // Register additional utility routes
@@ -483,6 +483,6 @@ func (h *Handler) RegisterUtilityRoutes(app *fiber.App) {
 			"status":    "healthy",
 			"module":    "communications",
 			"timestamp": c.Locals("timestamp"),
-		})
+		}, "Communications module is healthy")
 	})
 }
