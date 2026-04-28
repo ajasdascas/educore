@@ -59,26 +59,11 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // --- MOCK INTERCEPTOR ---
+  // --- DEMO INTERCEPTOR ---
   if (token && token.startsWith("mock-")) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          success: true,
-          data: {
-            // Provide some default dummy stats
-            total_tenants: 15,
-            active_tenants: 12,
-            trial_tenants: 3,
-            total_students: 450,
-            recent_schools: [],
-            alerts: []
-          }
-        });
-      }, 500);
-    });
+    return mockSuperAdminFetch(endpoint, options);
   }
-  // -------------------------
+  // ------------------------
 
   if (isNgrok()) {
     headers["ngrok-skip-browser-warning"] = "true";
@@ -110,6 +95,389 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
   }
 
   return res.json();
+}
+
+const nowIso = () => new Date().toISOString();
+
+const defaultMockSchools = [
+  {
+    id: "school-don-bosco",
+    name: "Instituto Tecnologico Don Bosco",
+    slug: "don-bosco",
+    status: "active",
+    plan: "professional",
+    logo_url: "",
+    created_at: "2026-04-20T10:00:00.000Z",
+    updated_at: "2026-04-28T10:00:00.000Z",
+    total_students: 248,
+    total_users: 34,
+    total_teachers: 22,
+    total_parents: 226,
+  },
+  {
+    id: "school-san-miguel",
+    name: "Colegio San Miguel",
+    slug: "san-miguel",
+    status: "trial",
+    plan: "basic",
+    logo_url: "",
+    created_at: "2026-04-22T12:00:00.000Z",
+    updated_at: "2026-04-28T12:00:00.000Z",
+    total_students: 86,
+    total_users: 14,
+    total_teachers: 9,
+    total_parents: 72,
+  },
+  {
+    id: "school-la-paz",
+    name: "Escuela Primaria La Paz",
+    slug: "la-paz",
+    status: "suspended",
+    plan: "enterprise",
+    logo_url: "",
+    created_at: "2026-04-24T09:30:00.000Z",
+    updated_at: "2026-04-28T09:30:00.000Z",
+    total_students: 412,
+    total_users: 58,
+    total_teachers: 31,
+    total_parents: 379,
+  },
+];
+
+const defaultMockPlans = [
+  {
+    id: "basic",
+    name: "Basico",
+    description: "Para escuelas pequenas que inician su digitalizacion.",
+    price_monthly: 899,
+    price_annual: 8990,
+    currency: "MXN",
+    max_students: 120,
+    max_teachers: 12,
+    modules: JSON.stringify(["students", "attendance", "grades"]),
+    features: JSON.stringify(["Gestion de alumnos", "Asistencia", "Calificaciones", "Soporte por email"]),
+    is_active: true,
+    is_featured: false,
+    created_at: "2026-04-20T08:00:00.000Z",
+  },
+  {
+    id: "professional",
+    name: "Profesional",
+    description: "Para colegios en crecimiento con operacion academica completa.",
+    price_monthly: 1899,
+    price_annual: 18990,
+    currency: "MXN",
+    max_students: 500,
+    max_teachers: 45,
+    modules: JSON.stringify(["students", "attendance", "grades", "reports", "communications"]),
+    features: JSON.stringify(["Reportes academicos", "Portal de padres", "Comunicacion escolar", "Soporte prioritario"]),
+    is_active: true,
+    is_featured: true,
+    created_at: "2026-04-20T08:00:00.000Z",
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    description: "Para instituciones multi-campus con necesidades avanzadas.",
+    price_monthly: 3499,
+    price_annual: 34990,
+    currency: "MXN",
+    max_students: 0,
+    max_teachers: 0,
+    modules: JSON.stringify(["students", "attendance", "grades", "reports", "communications", "billing", "transport"]),
+    features: JSON.stringify(["Alumnos ilimitados", "SLA empresarial", "Integraciones a medida", "Acompanamiento dedicado"]),
+    is_active: true,
+    is_featured: false,
+    created_at: "2026-04-20T08:00:00.000Z",
+  },
+];
+
+const defaultMockUsers = [
+  {
+    id: "user-admin-1",
+    email: "admin@educore.mx",
+    first_name: "Giovanni",
+    last_name: "SuperAdmin",
+    role: "SUPER_ADMIN",
+    is_active: true,
+    created_at: "2026-04-20T08:00:00.000Z",
+    updated_at: "2026-04-28T08:00:00.000Z",
+  },
+  {
+    id: "user-ops-1",
+    email: "operaciones@educore.mx",
+    first_name: "Equipo",
+    last_name: "Operaciones",
+    role: "SUPER_ADMIN",
+    is_active: true,
+    created_at: "2026-04-21T08:00:00.000Z",
+    updated_at: "2026-04-28T08:00:00.000Z",
+  },
+];
+
+const modulesCatalog = [
+  { key: "students", name: "Alumnos", description: "Expedientes, inscripciones y datos academicos.", is_core: true, price_monthly_mxn: 0 },
+  { key: "attendance", name: "Asistencias", description: "Registro diario y reportes de asistencia.", is_core: true, price_monthly_mxn: 0 },
+  { key: "grades", name: "Calificaciones", description: "Evaluaciones, boletas y promedios.", is_core: true, price_monthly_mxn: 0 },
+  { key: "reports", name: "Reportes", description: "Indicadores academicos y administrativos.", is_core: false, price_monthly_mxn: 299 },
+  { key: "communications", name: "Comunicaciones", description: "Avisos, mensajes y notificaciones.", is_core: false, price_monthly_mxn: 249 },
+  { key: "billing", name: "Cobranza", description: "Pagos, adeudos y facturacion escolar.", is_core: false, price_monthly_mxn: 399 },
+  { key: "transport", name: "Transporte", description: "Rutas, unidades y seguimiento operativo.", is_core: false, price_monthly_mxn: 349 },
+];
+
+function readMockList<T>(key: string, fallback: T[]): T[] {
+  if (typeof window === "undefined") return fallback;
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    localStorage.setItem(key, JSON.stringify(fallback));
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    localStorage.setItem(key, JSON.stringify(fallback));
+    return fallback;
+  }
+}
+
+function writeMockList<T>(key: string, value: T[]) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+}
+
+function parseBody(options: RequestInit): any {
+  if (!options.body || typeof options.body !== "string") return {};
+  try {
+    return JSON.parse(options.body);
+  } catch {
+    return {};
+  }
+}
+
+function paginate<T>(items: T[], page: number, perPage: number) {
+  const total = items.length;
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  const start = (page - 1) * perPage;
+  return {
+    items: items.slice(start, start + perPage),
+    meta: { total, page, per_page: perPage, pages },
+  };
+}
+
+async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) {
+  await new Promise((resolve) => setTimeout(resolve, 180));
+
+  const method = (options.method || "GET").toUpperCase();
+  const url = new URL(endpoint, "https://mock.educore.local");
+  const path = url.pathname;
+
+  if (path.endsWith("/super-admin/stats")) {
+    const schools = readMockList("mock_schools", defaultMockSchools);
+    return {
+      success: true,
+      data: {
+        total_tenants: schools.length,
+        active_tenants: schools.filter((school) => school.status === "active").length,
+        trial_tenants: schools.filter((school) => school.status === "trial").length,
+        total_students: schools.reduce((sum, school) => sum + (school.total_students || 0), 0),
+        mrr_mxn: 0,
+        recent_schools: schools.slice(0, 5),
+        alerts: [],
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/modules-catalog")) {
+    return { success: true, data: { modules: modulesCatalog } };
+  }
+
+  if (path.endsWith("/super-admin/plans")) {
+    const plans = readMockList("mock_plans", defaultMockPlans);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = {
+        id: (body.name || "plan").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `plan-${Date.now()}`,
+        created_at: nowIso(),
+        ...body,
+        modules: JSON.stringify(body.modules || []),
+        features: JSON.stringify(body.features || []),
+      };
+      writeMockList("mock_plans", [created, ...plans]);
+      return { success: true, data: created, message: "Plan creado en modo demo" };
+    }
+    return { success: true, data: { plans } };
+  }
+
+  const planMatch = path.match(/\/super-admin\/plans\/([^/]+)(?:\/toggle)?$/);
+  if (planMatch) {
+    const id = decodeURIComponent(planMatch[1]);
+    const plans = readMockList("mock_plans", defaultMockPlans);
+    if (path.endsWith("/toggle")) {
+      const updated = plans.map((plan) => plan.id === id ? { ...plan, is_active: !plan.is_active } : plan);
+      writeMockList("mock_plans", updated);
+      return { success: true, message: "Plan actualizado en modo demo" };
+    }
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updatedPlan = {
+        ...plans.find((plan) => plan.id === id),
+        ...body,
+        id,
+        modules: JSON.stringify(body.modules || []),
+        features: JSON.stringify(body.features || []),
+      };
+      writeMockList("mock_plans", plans.map((plan) => plan.id === id ? updatedPlan : plan));
+      return { success: true, data: updatedPlan, message: "Plan actualizado en modo demo" };
+    }
+    if (method === "DELETE") {
+      writeMockList("mock_plans", plans.filter((plan) => plan.id !== id));
+      return { success: true, message: "Plan eliminado en modo demo" };
+    }
+    return { success: true, data: plans.find((plan) => plan.id === id) || null };
+  }
+
+  if (path.endsWith("/super-admin/users")) {
+    const users = readMockList("mock_users", defaultMockUsers);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = {
+        id: `user-${Date.now()}`,
+        email: body.email,
+        first_name: body.first_name,
+        last_name: body.last_name,
+        role: "SUPER_ADMIN",
+        is_active: body.is_active ?? true,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      writeMockList("mock_users", [created, ...users]);
+      return { success: true, data: created, message: "Usuario creado en modo demo" };
+    }
+    const search = (url.searchParams.get("search") || "").toLowerCase();
+    const status = url.searchParams.get("status") || "all";
+    const page = Number(url.searchParams.get("page") || "1");
+    const perPage = Number(url.searchParams.get("per_page") || "20");
+    const filtered = users.filter((user) => {
+      const matchesSearch = !search || `${user.first_name} ${user.last_name} ${user.email}`.toLowerCase().includes(search);
+      const matchesStatus = status === "all" || (status === "active" ? user.is_active : !user.is_active);
+      return matchesSearch && matchesStatus;
+    });
+    const { items, meta } = paginate(filtered, page, perPage);
+    return { success: true, data: items, meta };
+  }
+
+  const userMatch = path.match(/\/super-admin\/users\/([^/]+)(?:\/toggle)?$/);
+  if (userMatch) {
+    const id = decodeURIComponent(userMatch[1]);
+    const users = readMockList("mock_users", defaultMockUsers);
+    if (path.endsWith("/toggle")) {
+      writeMockList("mock_users", users.map((user) => user.id === id ? { ...user, is_active: !user.is_active, updated_at: nowIso() } : user));
+      return { success: true, message: "Usuario actualizado en modo demo" };
+    }
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = users.map((user) => user.id === id ? { ...user, ...body, updated_at: nowIso() } : user);
+      writeMockList("mock_users", updated);
+      return { success: true, data: updated.find((user) => user.id === id), message: "Usuario actualizado en modo demo" };
+    }
+    if (method === "DELETE") {
+      writeMockList("mock_users", users.map((user) => user.id === id ? { ...user, is_active: false, updated_at: nowIso() } : user));
+      return { success: true, message: "Usuario desactivado en modo demo" };
+    }
+  }
+
+  if (path.endsWith("/super-admin/schools")) {
+    const schools = readMockList("mock_schools", defaultMockSchools);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = {
+        id: `school-${Date.now()}`,
+        name: body.name,
+        slug: body.slug,
+        status: "active",
+        plan: body.plan,
+        logo_url: body.logo_url || "",
+        created_at: nowIso(),
+        updated_at: nowIso(),
+        total_students: 0,
+        total_users: 1,
+        total_teachers: 0,
+        total_parents: 0,
+      };
+      writeMockList("mock_schools", [created, ...schools]);
+      return { success: true, data: { id: created.id }, message: "Escuela creada en modo demo" };
+    }
+    const search = (url.searchParams.get("search") || "").toLowerCase();
+    const status = url.searchParams.get("status") || "";
+    const plan = url.searchParams.get("plan") || "";
+    const page = Number(url.searchParams.get("page") || "1");
+    const perPage = Number(url.searchParams.get("limit") || "12");
+    const filtered = schools.filter((school) => {
+      const matchesSearch = !search || `${school.name} ${school.slug}`.toLowerCase().includes(search);
+      const matchesStatus = !status || school.status === status;
+      const matchesPlan = !plan || school.plan === plan;
+      return matchesSearch && matchesStatus && matchesPlan;
+    });
+    const { items, meta } = paginate(filtered, page, perPage);
+    return { success: true, data: { schools: items }, meta };
+  }
+
+  const schoolMatch = path.match(/\/super-admin\/schools\/([^/]+)(?:\/(status|modules|users|modules\/toggle))?$/);
+  if (schoolMatch) {
+    const id = decodeURIComponent(schoolMatch[1]);
+    const action = schoolMatch[2];
+    const schools = readMockList("mock_schools", defaultMockSchools);
+    const school = schools.find((item) => item.id === id);
+
+    if (action === "status" && method === "PATCH") {
+      const body = parseBody(options);
+      writeMockList("mock_schools", schools.map((item) => item.id === id ? { ...item, status: body.status, updated_at: nowIso() } : item));
+      return { success: true, message: "Estado actualizado en modo demo" };
+    }
+
+    if (action === "modules") {
+      const activeKeys = new Set((school?.plan === "enterprise" ? modulesCatalog : modulesCatalog.slice(0, 5)).map((mod) => mod.key));
+      return {
+        success: true,
+        data: {
+          modules: modulesCatalog.map((mod) => ({
+            ...mod,
+            is_active: mod.is_core || activeKeys.has(mod.key),
+          })),
+        },
+      };
+    }
+
+    if (action === "modules/toggle" && method === "POST") {
+      return { success: true, message: "Modulo actualizado en modo demo" };
+    }
+
+    if (action === "users") {
+      return {
+        success: true,
+        data: {
+          users: [
+            {
+              id: `${id}-admin`,
+              email: `director@${school?.slug || "escuela"}.mx`,
+              first_name: "Director",
+              last_name: school?.name || "Escuela",
+              role: "SCHOOL_ADMIN",
+              is_active: true,
+            },
+          ],
+        },
+      };
+    }
+
+    return school
+      ? { success: true, data: school }
+      : { success: false, message: "Escuela no encontrada" };
+  }
+
+  return { success: false, message: "Endpoint demo no implementado" };
 }
 
 async function tryRefreshToken(): Promise<boolean> {

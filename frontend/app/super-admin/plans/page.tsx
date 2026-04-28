@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Package, Edit, Trash2, Check, X, Star } from "lucide-react";
 import { authFetch } from "@/lib/auth";
 import { PlanFormModal } from "./PlanFormModal";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Plan {
   id: string;
@@ -36,7 +36,7 @@ export default function PlansPage() {
     try {
       const res = await authFetch("/api/v1/super-admin/plans");
       if (res.success) {
-        setPlans(res.data.plans || []);
+        setPlans(Array.isArray(res.data?.plans) ? res.data.plans : []);
       }
     } catch (err) {
       console.error("Error fetching plans:", err);
@@ -123,8 +123,8 @@ export default function PlansPage() {
           {plans.map((plan) => {
             let parsedModules = [];
             let parsedFeatures = [];
-            try { parsedModules = JSON.parse(plan.modules); } catch(e){}
-            try { parsedFeatures = JSON.parse(plan.features); } catch(e){}
+            try { parsedModules = Array.isArray(plan.modules) ? plan.modules : JSON.parse(plan.modules || "[]"); } catch(e){}
+            try { parsedFeatures = Array.isArray(plan.features) ? plan.features : JSON.parse(plan.features || "[]"); } catch(e){}
 
             return (
               <Card key={plan.id} className={`flex flex-col relative overflow-hidden transition-all ${plan.is_featured ? 'border-primary shadow-md' : ''} ${!plan.is_active ? 'opacity-70' : ''}`}>

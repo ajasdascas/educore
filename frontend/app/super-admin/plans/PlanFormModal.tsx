@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { X, Plus, Trash2, Save, Sparkles } from "lucide-react";
 import { authFetch } from "@/lib/auth";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface PlanFormModalProps {
   isOpen: boolean;
@@ -43,7 +43,7 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
       try {
         const res = await authFetch("/api/v1/super-admin/modules-catalog");
         if (res.success) {
-          setCatalog(res.data.modules || []);
+          setCatalog(Array.isArray(res.data?.modules) ? res.data.modules : []);
         }
       } catch (err) {
         console.error("Error loading catalog:", err);
@@ -65,13 +65,13 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
       });
 
       try {
-        setSelectedModules(JSON.parse(plan.modules));
+        setSelectedModules(Array.isArray(plan.modules) ? plan.modules : JSON.parse(plan.modules || "[]"));
       } catch (e) {
         setSelectedModules([]);
       }
 
       try {
-        const parsedF = JSON.parse(plan.features);
+        const parsedF = Array.isArray(plan.features) ? plan.features : JSON.parse(plan.features || "[]");
         setFeatures(parsedF.length > 0 ? parsedF : [""]);
       } catch (e) {
         setFeatures([""]);

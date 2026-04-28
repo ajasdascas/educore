@@ -126,7 +126,7 @@ export default function SchoolsPage() {
 
       const response = await authFetch(`/api/v1/super-admin/schools?${queryParams.toString()}`);
       if (response.success) {
-        setSchools(response.data.schools);
+        setSchools(Array.isArray(response.data?.schools) ? response.data.schools : []);
         setTotal(response.meta?.total || 0);
       } else {
         setError(response.message || "Error al cargar las escuelas");
@@ -153,7 +153,7 @@ export default function SchoolsPage() {
       try {
         const res = await authFetch("/api/v1/super-admin/plans");
         if(res.success && res.data) {
-          setPlans(res.data || []);
+          setPlans(Array.isArray(res.data?.plans) ? res.data.plans : Array.isArray(res.data) ? res.data : []);
         }
       } catch (error) {
         console.error("Error fetching plans:", error);
@@ -559,7 +559,7 @@ export default function SchoolsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link href={`/super-admin/schools/${school.id}`}>
+                          <Link href={`/super-admin/schools/details?id=${encodeURIComponent(school.id)}`}>
                             <Eye className="w-4 h-4 mr-2" />Ver detalles
                           </Link>
                         </DropdownMenuItem>
@@ -577,7 +577,7 @@ export default function SchoolsPage() {
                     </Badge>
                   </div>
                 </CardHeader>
-                <Link href={`/super-admin/schools/${school.id}`} className="block">
+                <Link href={`/super-admin/schools/details?id=${encodeURIComponent(school.id)}`} className="block">
                   <CardContent className="border-t pt-4 bg-muted/20 hover:bg-muted/40 transition-colors">
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>

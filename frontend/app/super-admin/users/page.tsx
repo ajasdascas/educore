@@ -84,7 +84,7 @@ export default function UsersPage() {
       const response = await authFetch(`/api/v1/super-admin/users?${params}`);
 
       if (response.success) {
-        setUsers(response.data || []);
+        setUsers(Array.isArray(response.data) ? response.data : []);
         setMeta(response.meta || { total: 0, pages: 1, per_page: 20 });
       } else {
         throw new Error(response.message || "Error loading users");
@@ -355,7 +355,7 @@ export default function UsersPage() {
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-                              {user.first_name.charAt(0)}{user.last_name.charAt(0)}
+                              {(user.first_name || "U").charAt(0)}{(user.last_name || "S").charAt(0)}
                             </div>
                             <div>
                               <p className="font-medium">{user.first_name} {user.last_name}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +83,8 @@ interface SchoolUser {
 }
 
 export default function SchoolDetailPage() {
-  const { id } = useParams();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
   const router = useRouter();
   const { toast } = useToast();
   const [school, setSchool] = useState<School | null>(null);
@@ -95,6 +96,8 @@ export default function SchoolDetailPage() {
   useEffect(() => {
     if (id) {
       fetchData();
+    } else {
+      setLoading(false);
     }
   }, [id]);
 
@@ -108,8 +111,8 @@ export default function SchoolDetailPage() {
       ]);
 
       if (schoolRes.success) setSchool(schoolRes.data);
-      if (modulesRes.success) setModules(modulesRes.data);
-      if (usersRes.success) setUsers(usersRes.data.users);
+      if (modulesRes.success) setModules(Array.isArray(modulesRes.data?.modules) ? modulesRes.data.modules : []);
+      if (usersRes.success) setUsers(Array.isArray(usersRes.data?.users) ? usersRes.data.users : []);
     } catch (error) {
       toast({
         title: "Error",
