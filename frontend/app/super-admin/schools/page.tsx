@@ -12,7 +12,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { authFetch } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 const statusColors = {
   active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
@@ -51,25 +63,74 @@ export default function SchoolsPage() {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState({
+    name: "",
+    slug: "",
+    plan: "Basic",
+    admin_email: "",
+    admin_name: "",
+  });
+
+  const fetchSchools = async () => {
+    try {
+      const response = await authFetch("/api/v1/super-admin/schools");
+      if (response.success) {
+        setSchools(response.data.schools);
+      } else {
+        setError(response.message || "Error al cargar las escuelas");
+      }
+    } catch (err) {
+      setError("Error de conexión con el servidor");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchSchools = async () => {
-      try {
-        const response = await authFetch("/api/v1/super-admin/schools");
-        if (response.success) {
-          setSchools(response.data.schools);
-        } else {
-          setError(response.message || "Error al cargar las escuelas");
-        }
-      } catch (err) {
-        setError("Error de conexión con el servidor");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchSchools();
   }, []);
+
+  const handleCreateSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // Endpoint logic for creation should be here
+      // For now, let's assume /api/v1/super-admin/schools exists as POST
+      const response = await authFetch("/api/v1/super-admin/schools", {
+        method: "POST",
+        body: JSON.stringify(formData),
+      });
+
+      if (response.success) {
+        toast({
+          title: "Escuela creada",
+          description: `La escuela ${formData.name} se ha registrado exitosamente.`,
+        });
+        setIsModalOpen(false);
+        setFormData({ name: "", slug: "", plan: "Basic", admin_email: "", admin_name: "" });
+        fetchSchools();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: response.message || "No se pudo crear la escuela",
+        });
+      }
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error de conexión",
+        description: "No se pudo conectar con el servidor.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const filteredSchools = schools.filter(school =>
     school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,10 +153,113 @@ export default function SchoolsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Gestión de Escuelas</h1>
           <p className="text-muted-foreground">Administra todas las instituciones educativas registradas</p>
         </div>
-        <Button className="w-fit">
-          <Plus className="w-4 h-4 mr-2" />
-          Nueva Escuela
-        </Button>
+        
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogTrigger>
+            <Button className="w-fit">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Escuela
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <form onSubmit={handleCreateSchool}>
+              <DialogHeader>
+                <DialogTitle>Registrar Nueva Escuela</DialogTitle>
+                <DialogDescription>
+                  Crea un nuevo tenant en el sistema. Se generará un entorno aislado para la institución.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Nombre de la Institución</Label>
+                  <Input
+                    id="name"
+                    placeholder="Ej. Colegio San José"
+                    value={formData.name}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const slug = name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+                      setFormData({ ...formData, name, slug });
+                    }}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="slug">Slug (URL)</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">educore.mx/</span>
+                    <Input
+                      id="slug"
+                      placeholder="colegio-san-jose"
+                      value={formData.slug}
+                      onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="plan">Plan</Label>
+                    <Select
+                      value={formData.plan}
+                      onValueChange={(val: string) => setFormData({ ...formData, plan: val })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Basic">Basic</SelectItem>
+                        <SelectItem value="Premium">Premium</SelectItem>
+                        <SelectItem value="Enterprise">Enterprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="border-t pt-4 mt-2">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Administrador de la Escuela</Label>
+                  <div className="grid gap-4 mt-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="admin_name">Nombre Completo</Label>
+                      <Input
+                        id="admin_name"
+                        placeholder="Ej. Juan Pérez"
+                        value={formData.admin_name}
+                        onChange={(e) => setFormData({ ...formData, admin_name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="admin_email">Correo Electrónico</Label>
+                      <Input
+                        id="admin_email"
+                        type="email"
+                        placeholder="admin@escuela.com"
+                        value={formData.admin_email}
+                        onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    "Registrar Escuela"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {error && (
@@ -195,7 +359,7 @@ export default function SchoolsPage() {
                 </div>
 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <DropdownMenuTrigger>
                     <Button variant="ghost" size="sm">
                       <MoreVertical className="w-4 h-4" />
                     </Button>
@@ -255,7 +419,7 @@ export default function SchoolsPage() {
             <p className="text-muted-foreground mb-4">
               No hay escuelas que coincidan con tu búsqueda
             </p>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setIsModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Crear primera escuela
             </Button>

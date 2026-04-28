@@ -18,6 +18,7 @@ func NewHandler(db *pgxpool.Pool) *Handler {
 func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/stats", h.Stats)
 	router.Get("/schools", h.ListSchools)
+	router.Post("/schools", h.CreateSchool)
 	router.Get("/schools/:id", h.GetSchool)
 	router.Get("/schools/:id/modules", h.GetSchoolModules)
 	router.Post("/schools/:id/modules/toggle", h.ToggleModule)
@@ -108,6 +109,67 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.Map{"schools": schools, "page": page, "limit": limit}, "Schools retrieved")
+}
+
+type CreateSchoolRequest struct {
+	Name       string `json:"name"`
+	Slug       string `json:"slug"`
+	Plan       string `json:"plan"`
+	AdminEmail string `json:"admin_email"`
+	AdminName  string `json:"admin_name"`
+}
+
+func (h *Handler) CreateSchool(c *fiber.Ctx) error {
+	var req CreateSchoolRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	// 1. Start transaction
+	tx, err := h.db.Begin(c.Context())
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not start transaction")
+	}
+	defer tx.Rollback(c.Context())
+
+	// 2. Create Tenant
+	var tenantID string
+	err = tx.QueryRow(c.Context(),
+		"INSERT INTO tenants (name, slug, plan, status) VALUES ($1, $2, $3, 'active') RETURNING id",
+		req.Name, req.Slug, req.Plan).Scan(&tenantID)
+
+	if err != nil {
+		return response.Error(c, fiber.StatusConflict, "Slug already exists or database error")
+	}
+
+	// 3. Create Admin User for the School
+	// Default password for new admins: "Escuela2024!" (bcrypt hash)
+	passwordHash := "$2a$10$MJsfnrvcdfz1LtAsrYyiYeKhFbK/LdUbGuKMhfEu0rxfaKjzpVMV." // "admin123" for testing, or use a better default
+
+	_, err = tx.Exec(c.Context(),
+		`INSERT INTO users (tenant_id, email, password_hash, first_name, role, is_active)
+		 VALUES ($1, $2, $3, $4, 'SCHOOL_ADMIN', true)`,
+		tenantID, req.AdminEmail, passwordHash, req.AdminName)
+
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error creating admin user")
+	}
+
+	// 4. Activate core modules for the new tenant
+	_, err = tx.Exec(c.Context(),
+		`INSERT INTO tenant_modules (tenant_id, module_key, is_active)
+		 SELECT $1, key, true FROM modules_catalog WHERE is_core = true`,
+		tenantID)
+
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error activating core modules")
+	}
+
+	if err := tx.Commit(c.Context()); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not commit transaction")
+	}
+
+	return response.Success(c, fiber.Map{"id": tenantID}, "School created successfully")
 }
 
 func (h *Handler) GetSchool(c *fiber.Ctx) error {
