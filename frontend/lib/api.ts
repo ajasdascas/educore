@@ -2,16 +2,22 @@
 // Configuración dinámica para diferentes entornos
 const getApiUrl = () => {
   if (typeof window === "undefined") return "http://localhost:8083";
-  
+
   const hostname = window.location.hostname;
-  
+
   // Si es localhost o IP local, usar puerto 8083 directo
   if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.")) {
     return "http://localhost:8083";
   }
 
-  // En producción, usar el backend en tu dominio
-  return "https://onlineu.mx/educore-api";
+  // En producción, usar el backend deployado
+  // Opción 1: Subdominio dedicado (recomendado)
+  if (hostname === "onlineu.mx") {
+    return "https://api.onlineu.mx";
+  }
+
+  // Opción 2: Path en mismo dominio (alternativa)
+  return "https://onlineu.mx/api";
 };
 
 const API_URL = getApiUrl();
