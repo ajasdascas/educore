@@ -79,7 +79,7 @@ export default function LoginPage() {
           {step === "role_selection" ? (
             <div className="space-y-4">
               <h2 className="text-center text-white font-medium mb-6">Selecciona tu perfil para ingresar</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Button variant="outline" className="h-24 flex-col gap-2 hover:bg-blue-600 hover:text-white border-slate-700 bg-slate-800 text-slate-300" onClick={() => handleRoleSelect("padre")}>
                   <Users className="w-8 h-8" />
                   <span>Padre de Familia</span>

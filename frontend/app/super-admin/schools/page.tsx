@@ -214,7 +214,7 @@ export default function SchoolsPage() {
         </Button>
         
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[80vw] xl:w-[75vw] !max-w-none max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogContent className="w-[95vw] md:w-[90vw] lg:max-w-[1000px] xl:max-w-[1200px] max-h-[95vh] overflow-y-auto p-4 md:p-8">
             <form onSubmit={handleCreateSchool}>
               <DialogHeader>
                 <DialogTitle>Registrar Nueva Escuela</DialogTitle>
