@@ -1,31 +1,16 @@
 // URL del backend API
 // Configuración dinámica para diferentes entornos
 const getApiUrl = () => {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    if (hostname === "onlineu.mx" || hostname === "www.onlineu.mx") {
-      return "https://pester-dramatize-ocean.ngrok-free.dev";
-    }
-  }
-
-  const envApiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envApiUrl) {
-    return envApiUrl;
-  }
-
-  if (typeof window === "undefined") {
-    return "http://localhost:8082";
-  }
-
+  if (typeof window === "undefined") return "http://localhost:8082";
+  
   const hostname = window.location.hostname;
-
-  // Desarrollo local
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
+  
+  // Si es localhost o IP local, usar puerto 8082 directo
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.")) {
     return "http://localhost:8082";
   }
 
-  // Producción: Fallback a ngrok
-  // NOTA: Actualiza NEXT_PUBLIC_API_URL en .env.local
+  // En producción, forzar el uso del túnel seguro para evitar errores de conexión
   return "https://pester-dramatize-ocean.ngrok-free.dev";
 };
 
