@@ -71,7 +71,7 @@ func main() {
 		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
 	}))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000, http://localhost:3001, http://localhost:3002, http://localhost:3003, https://onlineu.mx, http://onlineu.mx, https://pester-dramatize-ocean.ngrok-free.dev",
+		AllowOrigins:     "http://localhost:3000, http://localhost:3001, http://localhost:3002, http://localhost:3003, https://onlineu.mx, http://onlineu.mx, https://educore-production-beef.up.railway.app",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Tenant-ID, ngrok-skip-browser-warning",
 		AllowCredentials: true,
 	}))

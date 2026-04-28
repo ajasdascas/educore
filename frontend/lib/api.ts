@@ -10,7 +10,7 @@ const getApiUrl = () => {
   }
 
   // Producción: Railway (se actualizará con la URL real después del deploy)
-  return "https://educore-production-f7a5.up.railway.app";
+  return "https://educore-production-beef.up.railway.app";
 };
 
 const API_URL = getApiUrl();
