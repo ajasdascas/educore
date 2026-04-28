@@ -63,6 +63,9 @@ func main() {
 	// Tenant middleware
 	app.Use(middleware.TenantResolver(db))
 
+	// Static files (Uploads)
+	app.Static("/uploads", "./uploads")
+
 	// Routes
 	api := app.Group("/api/v1")
 

@@ -23,6 +23,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schools/:id/modules", h.GetSchoolModules)
 	router.Post("/schools/:id/modules/toggle", h.ToggleModule)
 	router.Get("/modules-catalog", h.GetModulesCatalog)
+	router.Post("/upload", h.UploadLogo)
 }
 
 func (h *Handler) Stats(c *fiber.Ctx) error {
@@ -112,11 +113,33 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 }
 
 type CreateSchoolRequest struct {
-	Name       string `json:"name"`
-	Slug       string `json:"slug"`
-	Plan       string `json:"plan"`
+	// 1. Datos Generales
+	Name         string   `json:"name"`
+	LogoURL      string   `json:"logo_url"`
+	Levels       []string `json:"levels"`
+	Phone        string   `json:"phone"`
+	ContactEmail string   `json:"contact_email"`
+	Address      string   `json:"address"`
+
+	// 2. Configuración Técnica
+	Slug     string `json:"slug"`
+	Timezone string `json:"timezone"`
+
+	// 3. Cuenta Admin
 	AdminEmail string `json:"admin_email"`
 	AdminName  string `json:"admin_name"`
+
+	// 4. Suscripción Financiera
+	Plan           string   `json:"plan"`
+	PremiumModules []string `json:"premium_modules"`
+	RFC            string   `json:"rfc"`
+	RazonSocial    string   `json:"razon_social"`
+	Regimen        string   `json:"regimen"`
+	CodigoPostal   string   `json:"codigo_postal"`
+
+	// 5. Semilla Académica
+	SchoolYear string `json:"school_year"`
+	EvalScheme string `json:"eval_scheme"`
 }
 
 func (h *Handler) CreateSchool(c *fiber.Ctx) error {
@@ -132,11 +155,28 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback(c.Context())
 
-	// 2. Create Tenant
+	// 2. Create Tenant with Settings
 	var tenantID string
+	
+	settingsJSON := fiber.Map{
+		"levels":         req.Levels,
+		"phone":          req.Phone,
+		"contact_email":  req.ContactEmail,
+		"address":        req.Address,
+		"timezone":       req.Timezone,
+		"fiscal_data": fiber.Map{
+			"rfc":           req.RFC,
+			"razon_social":  req.RazonSocial,
+			"regimen":       req.Regimen,
+			"codigo_postal": req.CodigoPostal,
+		},
+		"school_year": req.SchoolYear,
+		"eval_scheme": req.EvalScheme,
+	}
+
 	err = tx.QueryRow(c.Context(),
-		"INSERT INTO tenants (name, slug, plan, status) VALUES ($1, $2, $3, 'active') RETURNING id",
-		req.Name, req.Slug, req.Plan).Scan(&tenantID)
+		"INSERT INTO tenants (name, slug, logo_url, plan, status, settings) VALUES ($1, $2, $3, $4, 'active', $5) RETURNING id",
+		req.Name, req.Slug, req.LogoURL, req.Plan, settingsJSON).Scan(&tenantID)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusConflict, "Slug already exists or database error")
@@ -155,7 +195,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error creating admin user")
 	}
 
-	// 4. Activate core modules for the new tenant
+	// 4. Activate core modules and selected premium modules
 	_, err = tx.Exec(c.Context(),
 		`INSERT INTO tenant_modules (tenant_id, module_key, is_active)
 		 SELECT $1, key, true FROM modules_catalog WHERE is_core = true`,
@@ -163,6 +203,19 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error activating core modules")
+	}
+
+	for _, mod := range req.PremiumModules {
+		_, _ = tx.Exec(c.Context(),
+			"INSERT INTO tenant_modules (tenant_id, module_key, is_active) VALUES ($1, $2, true) ON CONFLICT DO NOTHING",
+			tenantID, mod)
+	}
+
+	// 5. Seed grade levels based on selection
+	for i, level := range req.Levels {
+		_, _ = tx.Exec(c.Context(),
+			"INSERT INTO grade_levels (tenant_id, name, level, sort_order) VALUES ($1, $2, $3, $4)",
+			tenantID, level, level, i)
 	}
 
 	if err := tx.Commit(c.Context()); err != nil {
@@ -315,4 +368,18 @@ func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.Map{"modules": modules}, "Catalog retrieved")
+}
+
+func (h *Handler) UploadLogo(c *fiber.Ctx) error {
+	file, err := c.FormFile("logo")
+	if err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "No file uploaded")
+	}
+	
+	// Ensure uploads directory exists (in real prod this would be S3 logic)
+	// We use a mock URL for now that serves locally
+	filename := "logo_" + file.Filename
+	c.SaveFile(file, "./uploads/"+filename)
+	
+	return response.Success(c, fiber.Map{"url": "http://localhost:8082/uploads/" + filename}, "Logo uploaded")
 }
