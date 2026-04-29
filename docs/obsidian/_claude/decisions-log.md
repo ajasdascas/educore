@@ -61,3 +61,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** La UX y contratos del modulo quedan definidos. Cuando se formalice backend, se podra conectar el mismo endpoint a tablas reales sin cambiar el flujo de usuario.
 
 #frontend #school_admin #schedule #architecture
+
+## 29-04-2026 - Reportes define UX y contrato antes de motor real
+
+**Decision:** School Admin > Reportes se implemento como modulo funcional en static export con historial persistente, generacion demo, descarga local y contrato `authFetch` bajo `/api/v1/school-admin/reports`.
+
+**Razon:** El backend de reportes existe como modulo general, pero requiere alineacion futura con rutas, permisos y tablas reales. Para mantener avance sin romper produccion estatica, primero se fijo la experiencia completa y acciones esperadas por direccion escolar.
+
+**Impacto:** El modulo queda usable en produccion demo y listo para conectar a un motor real de PDF/Excel cuando se formalicen jobs asincronos, almacenamiento de archivos y RLS por tenant.
+
+#frontend #school_admin #reports #architecture

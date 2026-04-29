@@ -203,3 +203,22 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con School Admin > Reportes. No avanzar a Comunicaciones/Configuracion hasta que Reportes tenga vistas, filtros, export/demo y acciones completas.
 
 #school_admin #schedule #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Reportes completado
+
+### Cambios completados
+- `frontend/app/school-admin/reports/page.tsx`: submodulo de Reportes implementado con metricas ejecutivas, historial, busqueda, filtros por tipo/estado, generacion de reportes, detalle, descarga, reprocesar y eliminacion.
+- `frontend/lib/auth.ts`: mock demo de reportes con persistencia en `localStorage`, endpoints de metricas, generar, detalle, exportar, actualizar y eliminar.
+- UX directiva: tarjetas de asistencia/promedio/riesgo, insights del reporte y exportacion local para simular PDF/Excel/CSV en produccion estatica.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `next build` con Node bundled: OK, genera `/school-admin/reports`.
+- Prueba headless local con Chrome DevTools: renderizar, generar reporte, ver detalle, descargar, reprocesar y eliminar: OK sin errores significativos de consola.
+
+### Siguiente paso recomendado
+- Continuar con School Admin > Comunicaciones. No avanzar a Configuracion hasta que Comunicaciones tenga listado, filtros, crear/enviar demo, detalle y acciones completas.
+
+#school_admin #reports #frontend #memory

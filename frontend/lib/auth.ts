@@ -466,6 +466,86 @@ const defaultMockScheduleBlocks = [
   },
 ];
 
+const defaultMockReports = [
+  {
+    id: "report-attendance-week",
+    name: "Asistencia semanal - Primaria",
+    type: "attendance",
+    status: "completed",
+    format: "pdf",
+    group_id: "all",
+    group_name: "Todos los grupos",
+    start_date: "2026-04-22",
+    end_date: "2026-04-29",
+    generated_by: "Direccion",
+    created_at: "2026-04-29T08:00:00.000Z",
+    completed_at: "2026-04-29T08:01:00.000Z",
+    summary: {
+      attendance_rate: 94,
+      average_grade: 88,
+      total_students: 245,
+      risk_students: 7,
+      generated_files: 1,
+    },
+    insights: [
+      "La asistencia subio 2 puntos contra la semana anterior.",
+      "Segundo B mantiene el mejor promedio de puntualidad.",
+      "7 estudiantes requieren seguimiento por ausencias acumuladas.",
+    ],
+  },
+  {
+    id: "report-grades-month",
+    name: "Calificaciones mensuales",
+    type: "grades",
+    status: "completed",
+    format: "excel",
+    group_id: "all",
+    group_name: "Todos los grupos",
+    start_date: "2026-04-01",
+    end_date: "2026-04-29",
+    generated_by: "Coordinacion academica",
+    created_at: "2026-04-28T15:30:00.000Z",
+    completed_at: "2026-04-28T15:31:00.000Z",
+    summary: {
+      attendance_rate: 92,
+      average_grade: 87,
+      total_students: 245,
+      risk_students: 12,
+      generated_files: 1,
+    },
+    insights: [
+      "Matematicas concentra la mayor dispersion de calificaciones.",
+      "El promedio general se mantiene en rango saludable.",
+      "Tercero A necesita refuerzo academico en Ingles.",
+    ],
+  },
+  {
+    id: "report-academic-summary",
+    name: "Resumen academico directivo",
+    type: "academic_summary",
+    status: "scheduled",
+    format: "pdf",
+    group_id: "all",
+    group_name: "Todos los grupos",
+    start_date: "2026-04-01",
+    end_date: "2026-04-30",
+    generated_by: "Direccion",
+    created_at: "2026-04-27T10:00:00.000Z",
+    completed_at: "",
+    summary: {
+      attendance_rate: 92,
+      average_grade: 87,
+      total_students: 245,
+      risk_students: 9,
+      generated_files: 0,
+    },
+    insights: [
+      "Programado para cierre mensual.",
+      "Incluye asistencia, calificaciones y alertas por grupo.",
+    ],
+  },
+];
+
 const mockGradeLevels = [
   { id: "grade-1", name: "Primero" },
   { id: "grade-2", name: "Segundo" },
@@ -688,6 +768,118 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     }
 
     return block ? { success: true, data: block } : { success: false, message: "Bloque de horario no encontrado" };
+  }
+
+  if (path.endsWith("/school-admin/reports/metrics")) {
+    const reports = readMockList("mock_school_reports", defaultMockReports);
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const completed = reports.filter((report) => report.status === "completed");
+    const latest = completed[0]?.summary || {};
+    return {
+      success: true,
+      data: {
+        total_reports: reports.length,
+        completed_reports: completed.length,
+        scheduled_reports: reports.filter((report) => report.status === "scheduled").length,
+        attendance_rate: latest.attendance_rate ?? 92,
+        average_grade: latest.average_grade ?? 87,
+        risk_students: latest.risk_students ?? students.filter((student) => (student.average_grade || 0) < 80 || (student.attendance_rate || 0) < 85).length,
+      },
+    };
+  }
+
+  if (path.endsWith("/school-admin/reports/generate")) {
+    const reports = readMockList("mock_school_reports", defaultMockReports);
+    const body = parseBody(options);
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    const group = groups.find((item) => item.id === body.group_id);
+    const typeLabel = {
+      attendance: "Asistencia",
+      grades: "Calificaciones",
+      academic_summary: "Resumen academico",
+      behavior: "Conducta",
+      financial: "Financiero",
+    }[body.type as string] || "Reporte";
+    const created = {
+      id: `report-${Date.now()}`,
+      name: `${typeLabel} - ${group ? `${group.grade_name} ${group.name}` : "Todos los grupos"}`,
+      type: body.type || "academic_summary",
+      status: "completed",
+      format: body.format || "pdf",
+      group_id: body.group_id || "all",
+      group_name: group ? `${group.grade_name} ${group.name}` : "Todos los grupos",
+      start_date: body.start_date || new Date().toISOString().slice(0, 10),
+      end_date: body.end_date || new Date().toISOString().slice(0, 10),
+      generated_by: "Direccion",
+      created_at: nowIso(),
+      completed_at: nowIso(),
+      summary: {
+        attendance_rate: 93,
+        average_grade: 88,
+        total_students: group?.student_count || readMockList("mock_school_students", defaultMockStudents).length,
+        risk_students: 4,
+        generated_files: 1,
+      },
+      insights: [
+        "Reporte generado correctamente en modo demo.",
+        "Los indicadores estan listos para revision directiva.",
+        "Exportacion disponible desde el historial.",
+      ],
+    };
+    writeMockList("mock_school_reports", [created, ...reports]);
+    return { success: true, data: created, message: "Reporte generado en modo demo" };
+  }
+
+  if (path.endsWith("/school-admin/reports")) {
+    const reports = readMockList("mock_school_reports", defaultMockReports);
+    const type = url.searchParams.get("type") || "";
+    const status = url.searchParams.get("status") || "";
+    const search = (url.searchParams.get("search") || "").toLowerCase();
+    const filtered = reports.filter((report) => {
+      const matchesType = !type || type === "all" || report.type === type;
+      const matchesStatus = !status || status === "all" || report.status === status;
+      const matchesSearch = !search || `${report.name} ${report.group_name} ${report.generated_by}`.toLowerCase().includes(search);
+      return matchesType && matchesStatus && matchesSearch;
+    });
+    return { success: true, data: filtered };
+  }
+
+  const reportExportMatch = path.match(/\/school-admin\/reports\/([^/]+)\/export$/);
+  if (reportExportMatch) {
+    const id = decodeURIComponent(reportExportMatch[1]);
+    const reports = readMockList("mock_school_reports", defaultMockReports);
+    const report = reports.find((item) => item.id === id);
+    return report
+      ? {
+          success: true,
+          data: {
+            filename: `${report.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.${report.format === "excel" ? "csv" : report.format}`,
+            content: JSON.stringify(report, null, 2),
+            mime_type: report.format === "excel" || report.format === "csv" ? "text/csv" : "application/json",
+          },
+        }
+      : { success: false, message: "Reporte no encontrado" };
+  }
+
+  const reportMatch = path.match(/\/school-admin\/reports\/([^/]+)$/);
+  if (reportMatch) {
+    const id = decodeURIComponent(reportMatch[1]);
+    const reports = readMockList("mock_school_reports", defaultMockReports);
+    const report = reports.find((item) => item.id === id);
+
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = reports.map((item) => item.id === id ? { ...item, ...body } : item);
+      writeMockList("mock_school_reports", updated);
+      return { success: true, data: updated.find((item) => item.id === id), message: "Reporte actualizado en modo demo" };
+    }
+
+    if (method === "DELETE") {
+      writeMockList("mock_school_reports", reports.filter((item) => item.id !== id));
+      return { success: true, message: "Reporte eliminado en modo demo" };
+    }
+
+    return report ? { success: true, data: report } : { success: false, message: "Reporte no encontrado" };
   }
 
   const groupMatch = path.match(/\/school-admin\/academic\/groups\/([^/]+)$/);

@@ -35,8 +35,9 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **School Admin > Estudiantes:** completado con listado, filtros, matricula, edicion, detalle, activar/pausar y eliminacion con confirmacion.
 - **School Admin > Grupos:** completado con listado, busqueda, crear, editar, detalle, activar/pausar y eliminacion con confirmacion.
 - **School Admin > Horarios:** completado con agenda semanal, filtros por grupo/dia/estado, crear, editar, detalle, activar/pausar, eliminacion con confirmacion y deteccion de cruces por grupo.
+- **School Admin > Reportes:** completado con metricas, historial, filtros, generar reporte, detalle ejecutivo, descarga demo, reprocesar y eliminacion con confirmacion.
 - **Correccion backend critica:** rutas de School Admin ya no duplican `/api/v1/school-admin`.
-- **Verificacion:** `go test ./...`, `next build` y pruebas headless de Profesores, Estudiantes, Grupos y Horarios OK.
-- **Siguiente submodulo:** School Admin > Reportes. No avanzar a Comunicaciones/Configuracion hasta que Reportes quede 100% funcional.
+- **Verificacion:** `go test ./...`, `next build` y pruebas headless de Profesores, Estudiantes, Grupos, Horarios y Reportes OK.
+- **Siguiente submodulo:** School Admin > Comunicaciones. No avanzar a Configuracion hasta que Comunicaciones quede 100% funcional.
 
 #module #architecture #super_admin #school_admin
