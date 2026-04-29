@@ -51,3 +51,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** El modulo de Grupos puede mostrar y actualizar un titular inicial hoy, manteniendo compatibilidad con futuras asignaciones por materia.
 
 #backend #database #school_admin #groups
+
+## 29-04-2026 - Horarios opera primero como agenda estatica persistente
+
+**Decision:** El submodulo School Admin > Horarios se implemento en frontend con mock persistente en `localStorage` y contrato `authFetch` bajo `/api/v1/school-admin/academic/schedule`, sin agregar tablas nuevas todavia.
+
+**Razon:** Produccion corre como Next.js static export en Hostinger. Para que el modulo sea usable inmediatamente y no bloquear el roadmap, la agenda semanal debe funcionar en modo demo/estatico con crear, editar, pausar y eliminar. El schema formal de horarios debe agregarse despues con migracion explicita y revision de RLS.
+
+**Impacto:** La UX y contratos del modulo quedan definidos. Cuando se formalice backend, se podra conectar el mismo endpoint a tablas reales sin cambiar el flujo de usuario.
+
+#frontend #school_admin #schedule #architecture

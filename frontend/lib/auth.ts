@@ -395,6 +395,77 @@ const mockSchoolGroups = [
   },
 ];
 
+const defaultMockScheduleBlocks = [
+  {
+    id: "schedule-math-1a-mon",
+    group_id: "group-1a",
+    group_name: "1A",
+    grade_name: "Primero",
+    teacher_id: "teacher-maria-lopez",
+    teacher_name: "Maria Lopez",
+    subject: "Matematicas",
+    day: "monday",
+    start_time: "08:00",
+    end_time: "08:50",
+    room: "A-101",
+    status: "active",
+    notes: "Bloque de inicio para calculo mental.",
+    created_at: "2026-01-10T09:00:00.000Z",
+    updated_at: "2026-04-29T09:00:00.000Z",
+  },
+  {
+    id: "schedule-reading-1a-mon",
+    group_id: "group-1a",
+    group_name: "1A",
+    grade_name: "Primero",
+    teacher_id: "teacher-maria-lopez",
+    teacher_name: "Maria Lopez",
+    subject: "Lectura",
+    day: "monday",
+    start_time: "09:00",
+    end_time: "09:50",
+    room: "A-101",
+    status: "active",
+    notes: "Comprension lectora guiada.",
+    created_at: "2026-01-10T09:00:00.000Z",
+    updated_at: "2026-04-29T09:00:00.000Z",
+  },
+  {
+    id: "schedule-history-2b-tue",
+    group_id: "group-2b",
+    group_name: "2B",
+    grade_name: "Segundo",
+    teacher_id: "teacher-carlos-rivera",
+    teacher_name: "Carlos Rivera",
+    subject: "Historia",
+    day: "tuesday",
+    start_time: "10:00",
+    end_time: "10:50",
+    room: "B-204",
+    status: "active",
+    notes: "Linea del tiempo del periodo.",
+    created_at: "2026-01-10T09:00:00.000Z",
+    updated_at: "2026-04-29T09:00:00.000Z",
+  },
+  {
+    id: "schedule-english-3a-wed",
+    group_id: "group-3a",
+    group_name: "3A",
+    grade_name: "Tercero",
+    teacher_id: "teacher-ana-martinez",
+    teacher_name: "Ana Martinez",
+    subject: "Ingles",
+    day: "wednesday",
+    start_time: "11:00",
+    end_time: "11:50",
+    room: "C-301",
+    status: "inactive",
+    notes: "Bloque pausado por grupo inactivo.",
+    created_at: "2026-01-10T09:00:00.000Z",
+    updated_at: "2026-04-29T09:00:00.000Z",
+  },
+];
+
 const mockGradeLevels = [
   { id: "grade-1", name: "Primero" },
   { id: "grade-2", name: "Segundo" },
@@ -537,6 +608,86 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       return { success: true, data: created, message: "Grupo creado en modo demo" };
     }
     return { success: true, data: groups };
+  }
+
+  if (path.endsWith("/school-admin/academic/schedule")) {
+    const blocks = readMockList("mock_school_schedule", defaultMockScheduleBlocks);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const groups = readMockList("mock_school_groups", mockSchoolGroups);
+      const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+      const group = groups.find((item) => item.id === body.group_id);
+      const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const created = {
+        id: `schedule-${Date.now()}`,
+        group_id: body.group_id || "",
+        group_name: group?.name || "",
+        grade_name: group?.grade_name || "",
+        teacher_id: body.teacher_id || "",
+        teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : "",
+        subject: body.subject || "",
+        day: body.day || "monday",
+        start_time: body.start_time || "08:00",
+        end_time: body.end_time || "08:50",
+        room: body.room || group?.room || "",
+        status: body.status || "active",
+        notes: body.notes || "",
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      writeMockList("mock_school_schedule", [created, ...blocks]);
+      return { success: true, data: created, message: "Bloque de horario creado en modo demo" };
+    }
+
+    const groupID = url.searchParams.get("group_id") || "";
+    const day = url.searchParams.get("day") || "";
+    const status = url.searchParams.get("status") || "";
+    const search = (url.searchParams.get("search") || "").toLowerCase();
+    const filtered = blocks.filter((block) => {
+      const matchesGroup = !groupID || groupID === "all" || block.group_id === groupID;
+      const matchesDay = !day || day === "all" || block.day === day;
+      const matchesStatus = !status || status === "all" || block.status === status;
+      const matchesSearch = !search || `${block.subject} ${block.teacher_name} ${block.group_name} ${block.room}`.toLowerCase().includes(search);
+      return matchesGroup && matchesDay && matchesStatus && matchesSearch;
+    });
+    return { success: true, data: filtered };
+  }
+
+  const scheduleMatch = path.match(/\/school-admin\/academic\/schedule\/([^/]+)$/);
+  if (scheduleMatch) {
+    const id = decodeURIComponent(scheduleMatch[1]);
+    const blocks = readMockList("mock_school_schedule", defaultMockScheduleBlocks);
+    const block = blocks.find((item) => item.id === id);
+
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const groups = readMockList("mock_school_groups", mockSchoolGroups);
+      const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+      const group = groups.find((item) => item.id === body.group_id);
+      const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const updated = blocks.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...body,
+              group_name: group?.name ?? item.group_name,
+              grade_name: group?.grade_name ?? item.grade_name,
+              teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : item.teacher_name,
+              room: body.room ?? item.room,
+              updated_at: nowIso(),
+            }
+          : item
+      );
+      writeMockList("mock_school_schedule", updated);
+      return { success: true, data: updated.find((item) => item.id === id), message: "Horario actualizado en modo demo" };
+    }
+
+    if (method === "DELETE") {
+      writeMockList("mock_school_schedule", blocks.filter((item) => item.id !== id));
+      return { success: true, message: "Bloque eliminado en modo demo" };
+    }
+
+    return block ? { success: true, data: block } : { success: false, message: "Bloque de horario no encontrado" };
   }
 
   const groupMatch = path.match(/\/school-admin\/academic\/groups\/([^/]+)$/);

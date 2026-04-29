@@ -184,3 +184,22 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con School Admin > Horarios. No avanzar a Reportes/Comunicaciones hasta que Horarios quede funcional.
 
 #school_admin #groups #frontend #backend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Horarios completado
+
+### Cambios completados
+- `frontend/app/school-admin/schedule/page.tsx`: submodulo de Horarios implementado con agenda semanal por dia, filtros por grupo/dia/estado, busqueda, crear, editar, detalle, activar/pausar y eliminacion con confirmacion.
+- `frontend/lib/auth.ts`: mock demo de bloques de horario con persistencia en `localStorage` y endpoints CRUD bajo `/api/v1/school-admin/academic/schedule`.
+- Validacion UX: evita guardar bloques sin grupo/profesor/materia, valida rango horario y detecta cruces activos por grupo en el mismo dia.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `next build` con Node bundled: OK, genera `/school-admin/schedule`.
+- Prueba headless local con Chrome DevTools: renderizar, crear bloque sin cruce, ver detalle, editar salon, pausar y eliminar: OK sin errores significativos de consola.
+
+### Siguiente paso recomendado
+- Continuar con School Admin > Reportes. No avanzar a Comunicaciones/Configuracion hasta que Reportes tenga vistas, filtros, export/demo y acciones completas.
+
+#school_admin #schedule #frontend #memory
