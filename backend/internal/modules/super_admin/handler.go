@@ -32,6 +32,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 
 	h.RegisterPlanRoutes(router)
 	h.RegisterUserRoutes(router)
+	h.RegisterEnterpriseRoutes(router)
 }
 
 func (h *Handler) Stats(c *fiber.Ctx) error {
