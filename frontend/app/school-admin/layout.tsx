@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -42,8 +42,22 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: Modu
 export default function SchoolAdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [schoolBrand, setSchoolBrand] = useState<{ name: string; logo_url?: string } | null>(null);
   const { user, logout, loading } = useAuth();
   const { isModuleEnabled } = useEnabledModules();
+
+  useEffect(() => {
+    try {
+      const schools = JSON.parse(localStorage.getItem("mock_schools") || "[]");
+      const currentSchoolID = localStorage.getItem("mock_current_school_id");
+      const selected = schools.find((school: any) => school.id === currentSchoolID) || schools[0];
+      if (selected) {
+        setSchoolBrand({ name: selected.name, logo_url: selected.logo_url });
+      }
+    } catch {
+      setSchoolBrand(null);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -74,10 +88,14 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
       `}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-border bg-sidebar">
           <div className="flex items-center">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mr-3">
-              <span className="text-primary-foreground font-bold text-sm">E</span>
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center mr-3 overflow-hidden border border-border">
+              {schoolBrand?.logo_url ? (
+                <img src={schoolBrand.logo_url} alt="Logo de la escuela" className="h-full w-full object-contain bg-white" />
+              ) : (
+                <span className="text-primary font-bold text-sm">E</span>
+              )}
             </div>
-            <span className="text-lg font-bold tracking-tight">EduCore</span>
+            <span className="text-lg font-bold tracking-tight truncate">{schoolBrand?.name || "EduCore"}</span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -118,7 +136,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-semibold text-foreground">Panel Escuela</h1>
+            <h1 className="text-lg font-semibold text-foreground truncate">Panel Escuela{schoolBrand?.name ? ` · ${schoolBrand.name}` : ""}</h1>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
             <ThemeToggle />

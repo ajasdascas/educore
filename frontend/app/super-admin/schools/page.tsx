@@ -92,6 +92,15 @@ interface School {
   logo_url: string;
 }
 
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SchoolsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -199,21 +208,27 @@ export default function SchoolsPage() {
     setIsSubmitting(true);
 
     try {
-      let finalLogoUrl = "";
-      // 1. Upload Logo if present
+      let finalLogoUrl = formData.logo_url || "";
       if (logoFile) {
-        const logoFormData = new FormData();
-        logoFormData.append("logo", logoFile);
-        const uploadRes = await fetch(API_URL + "/api/v1/super-admin/upload", {
-          method: "POST",
-          body: logoFormData,
-          headers: {
-            "Authorization": `Bearer ${localStorage.getItem("access_token")}`
-          }
-        }).then(res => res.json());
+        const token = localStorage.getItem("access_token") || "";
+        if (token.startsWith("mock-")) {
+          finalLogoUrl = await fileToDataUrl(logoFile);
+        } else {
+          const logoFormData = new FormData();
+          logoFormData.append("logo", logoFile);
+          const uploadRes = await fetch(API_URL + "/api/v1/super-admin/upload", {
+            method: "POST",
+            body: logoFormData,
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          }).then(res => res.json());
 
-        if (uploadRes && uploadRes.success) {
-          finalLogoUrl = uploadRes.data.url;
+          if (uploadRes && uploadRes.success) {
+            finalLogoUrl = uploadRes.data.url;
+          } else {
+            finalLogoUrl = await fileToDataUrl(logoFile);
+          }
         }
       }
 
@@ -230,6 +245,9 @@ export default function SchoolsPage() {
           description: `La escuela ${formData.name} se ha registrado exitosamente.`,
         });
         setIsModalOpen(false);
+        if (response.data?.id && typeof window !== "undefined") {
+          localStorage.setItem("mock_current_school_id", response.data.id);
+        }
         // Reset
         setFormData({
           name: "", slug: "", plan: "basic", admin_email: "", admin_name: "",
@@ -297,9 +315,17 @@ export default function SchoolsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label>Logo Institucional</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
+                        {logoFile ? (
+                          <img src={URL.createObjectURL(logoFile)} alt="Vista previa del logo" className="h-full w-full object-contain" />
+                        ) : (
+                          <Building2 className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </div>
                       <Input id="logo" type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
                     </div>
+                    <p className="text-xs text-muted-foreground">Opcional. Si la escuela tiene logo, se mostrara en su panel y configuracion.</p>
                   </div>
                   <div className="grid gap-2">
                     <Label>Niveles Educativos</Label>

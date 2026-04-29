@@ -871,10 +871,240 @@ function buildMockParentsFromBody(body: any) {
 
 async function mockDemoFetch(endpoint: string, options: RequestInit = {}) {
   const url = new URL(endpoint, "https://mock.educore.local");
+  if (url.pathname.includes("/parent")) {
+    return mockParentFetch(endpoint, options);
+  }
   if (url.pathname.includes("/school-admin")) {
     return mockSchoolAdminFetch(endpoint, options);
   }
   return mockSuperAdminFetch(endpoint, options);
+}
+
+function getMockParentChildren() {
+  const students = readMockList("mock_school_students", defaultMockStudents)
+    .filter((student: any) => student.status !== "inactive")
+    .slice(0, 2);
+
+  return students.map((student: any) => ({
+    id: student.id,
+    first_name: student.first_name,
+    last_name: student.last_name,
+    enrollment_id: student.enrollment_id,
+    group_name: student.group_name || "",
+    grade_name: student.grade_name || "",
+    status: student.status || "active",
+    attendance_rate: Number(student.attendance_rate || 0),
+    current_gpa: Number(student.average_grade || 0),
+    last_attendance: "2026-04-29",
+    next_class: student.group_id === "group-1a" ? "Matematicas 08:00" : "Espanol 09:00",
+    recent_grade: `${student.average_grade || 0} - Matematicas`,
+    profile_photo: "",
+    updated_at: student.updated_at || nowIso(),
+    birth_date: student.birth_date || "",
+    address: student.address || "",
+    teacher_name: student.group_id === "group-1a" ? "Maria Lopez" : "Carlos Rivera",
+    teacher_email: student.group_id === "group-1a" ? "maria.lopez@donbosco.mx" : "carlos.rivera@donbosco.mx",
+    emergency_info: {
+      primary_contact: student.parent_name || "Tutor principal",
+      primary_phone: student.parent_phone || "",
+    },
+  }));
+}
+
+function buildMockParentGrades(child: any, period = "current") {
+  const subjects = readMockList("mock_school_subjects", defaultMockSubjects).slice(0, 4);
+  const base = Number(child?.average_grade || child?.current_gpa || 88);
+  const subjectGrades = subjects.map((subject: any, index: number) => {
+    const score = Math.max(60, Math.min(100, base + (index % 2 === 0 ? 2 : -3)));
+    const letter = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : "D";
+    return {
+      subject_id: subject.id,
+      subject_name: subject.name,
+      teacher_name: index % 2 === 0 ? "Maria Lopez" : "Carlos Rivera",
+      current_grade: score,
+      letter_grade: letter,
+      trend: index === 0 ? "improving" : "stable",
+      last_updated: nowIso(),
+      assignments: [
+        {
+          id: `grade-${child.id}-${subject.id}-1`,
+          title: period === "current" ? "Evaluacion parcial" : period,
+          type: "exam",
+          score,
+          max_score: 100,
+          percentage: score,
+          letter_grade: letter,
+          date: "2026-04-28",
+          subject: subject.name,
+          teacher_name: index % 2 === 0 ? "Maria Lopez" : "Carlos Rivera",
+          comments: score >= 80 ? "Buen desempeno." : "Requiere reforzar el tema.",
+          created_at: nowIso(),
+        },
+      ],
+    };
+  });
+  const average = Math.round(subjectGrades.reduce((sum: number, item: any) => sum + item.current_grade, 0) / Math.max(subjectGrades.length, 1));
+  return {
+    child_id: child.id,
+    child_name: `${child.first_name} ${child.last_name}`,
+    period,
+    overall_gpa: average,
+    overall_grade: average >= 90 ? "A" : average >= 80 ? "B" : "C",
+    subjects: subjectGrades,
+    trend_data: [{ period: "Actual", gpa: average, change: 1.2 }],
+    summary: {
+      highest_grade: Math.max(...subjectGrades.map((item: any) => item.current_grade)),
+      lowest_grade: Math.min(...subjectGrades.map((item: any) => item.current_grade)),
+      average_grade: average,
+      total_assignments: subjectGrades.length,
+      passing_rate: 100,
+      improvement_trend: "stable",
+    },
+    last_updated: nowIso(),
+  };
+}
+
+function buildMockParentAttendance(child: any, startDate: string, endDate: string) {
+  const records = [
+    { date: "2026-04-29", status: "present", check_in: "08:02", check_out: "14:00", notes: "", excuse_note: "" },
+    { date: "2026-04-28", status: "present", check_in: "07:58", check_out: "14:00", notes: "", excuse_note: "" },
+    { date: "2026-04-27", status: child.id.includes("garcia") ? "late" : "present", check_in: "08:14", check_out: "14:00", notes: "Entrada despues del timbre", excuse_note: "" },
+    { date: "2026-04-24", status: "present", check_in: "08:00", check_out: "14:00", notes: "", excuse_note: "" },
+    { date: "2026-04-23", status: child.attendance_rate < 90 ? "absent" : "present", check_in: "", check_out: "", notes: child.attendance_rate < 90 ? "Ausencia sin justificar" : "", excuse_note: "" },
+  ];
+  const present = records.filter((item) => ["present", "late", "excused"].includes(item.status)).length;
+  const late = records.filter((item) => item.status === "late").length;
+  const absent = records.filter((item) => item.status === "absent").length;
+  const excused = records.filter((item) => item.status === "excused").length;
+  return {
+    child_id: child.id,
+    child_name: `${child.first_name} ${child.last_name}`,
+    start_date: startDate,
+    end_date: endDate,
+    records,
+    summary: {
+      total_days: records.length,
+      present_days: records.filter((item) => item.status === "present").length,
+      absent_days: absent,
+      late_days: late,
+      excused_days: excused,
+      rate: Math.round((present * 100) / records.length),
+      on_time_rate: Math.round(((present - late) * 100) / records.length),
+    },
+    trend_data: [{ week: "Actual", rate: child.attendance_rate || 0 }],
+    patterns: {
+      most_absent_day: "Jueves",
+      most_late_day: "Lunes",
+      best_attendance_month: "Abril",
+      needs_attention: (child.attendance_rate || 0) < 85,
+    },
+  };
+}
+
+async function mockParentFetch(endpoint: string, options: RequestInit = {}) {
+  await new Promise((resolve) => setTimeout(resolve, 160));
+
+  const method = (options.method || "GET").toUpperCase();
+  const url = new URL(endpoint, "https://mock.educore.local");
+  const path = url.pathname;
+  const children = getMockParentChildren();
+  const childMatch = path.match(/\/parent\/children\/([^/]+)(?:\/([^/]+))?$/);
+  const defaultEvents = [
+    { id: "event-parents", title: "Reunion de padres", description: "Junta mensual con direccion.", type: "meeting", start_date: "2026-05-06", end_date: "2026-05-06", start_time: "18:00", end_time: "19:00", location: "Auditorio", is_all_day: false, is_recurring: false, child_name: "", category: "school", priority: "high", created_at: nowIso() },
+    { id: "event-exam", title: "Evaluacion de Matematicas", description: "Repaso de operaciones basicas.", type: "exam", start_date: "2026-05-08", end_date: "2026-05-08", start_time: "09:00", end_time: "10:00", location: "Salon 1A", is_all_day: false, is_recurring: false, child_name: `${children[0]?.first_name || "Alumno"} ${children[0]?.last_name || ""}`.trim(), category: "academic", priority: "normal", created_at: nowIso() },
+  ];
+  const defaultMessages = [
+    { id: "message-demo-1", conversation_id: "conversation-demo-1", sender_name: "Maria Lopez", recipient_name: "padre@educore.mx", subject: "Avance en Matematicas", content: "El alumno entrego sus actividades y muestra buen avance esta semana.", is_read: false, priority: "normal", has_attachments: false, created_at: "2026-04-29T10:00:00.000Z" },
+  ];
+
+  if (path.endsWith("/parent/dashboard")) {
+    const notifications = readMockList("mock_parent_notifications", [
+      { id: "notif-parent-1", title: "Boleta disponible", type: "grade_published", is_read: false, created_at: nowIso() },
+      { id: "notif-parent-2", title: "Recordatorio de reunion", type: "announcement", is_read: true, created_at: "2026-04-28T13:00:00.000Z" },
+    ]);
+    const events = readMockList("mock_parent_events", defaultEvents);
+    return {
+      success: true,
+      data: {
+        children,
+        recent_activity: [
+          { id: "act-grade", type: "grade", title: "Nueva calificacion", description: children[0]?.recent_grade || "Calificacion publicada", child_name: `${children[0]?.first_name || ""} ${children[0]?.last_name || ""}`.trim(), timestamp: nowIso(), action_url: "/parent/grades" },
+          { id: "act-att", type: "attendance", title: "Asistencia registrada", description: "Registro del dia actualizado", child_name: `${children[1]?.first_name || ""} ${children[1]?.last_name || ""}`.trim(), timestamp: "2026-04-29T08:20:00.000Z", action_url: "/parent/attendance" },
+        ],
+        upcoming_events: events.slice(0, 3).map((event: any) => ({ id: event.id, title: event.title, date: event.start_date, time: event.start_time, type: event.type, child_name: event.child_name })),
+        recent_notifications: notifications.slice(0, 5),
+        quick_stats: {
+          total_children: children.length,
+          overall_attendance: Math.round(children.reduce((sum: number, child: any) => sum + child.attendance_rate, 0) / Math.max(children.length, 1)),
+          overall_gpa: Math.round(children.reduce((sum: number, child: any) => sum + child.current_gpa, 0) / Math.max(children.length, 1)),
+          unread_notifications: notifications.filter((item: any) => !item.is_read).length,
+          upcoming_events: events.length,
+          pending_assignments: 2,
+        },
+        last_updated: nowIso(),
+      },
+    };
+  }
+
+  if (path.endsWith("/parent/children")) {
+    return { success: true, data: children };
+  }
+
+  if (childMatch) {
+    const child = children.find((item: any) => item.id === decodeURIComponent(childMatch[1]));
+    if (!child) return { success: false, message: "Alumno no encontrado" };
+    const action = childMatch[2];
+    if (!action) {
+      return { success: true, data: { ...child, schedule: [], recent_attendance: buildMockParentAttendance(child, "", "").records.slice(0, 3), recent_grades: buildMockParentGrades(child).subjects.flatMap((subject: any) => subject.assignments).slice(0, 3), upcoming_assignments: [], behavior: { overall_rating: "Adecuado", recent_incidents: [], improvements: [], goals: [] } } };
+    }
+    if (action === "grades") return { success: true, data: buildMockParentGrades(child, url.searchParams.get("period") || "current") };
+    if (action === "attendance") return { success: true, data: buildMockParentAttendance(child, url.searchParams.get("start_date") || "", url.searchParams.get("end_date") || "") };
+    if (action === "schedule") return { success: true, data: { child_id: child.id, child_name: `${child.first_name} ${child.last_name}`, group_name: child.group_name, weekly_schedule: [], special_events: [] } };
+    if (action === "report-card") {
+      const grades = buildMockParentGrades(child);
+      return { success: true, data: { child_id: child.id, child_name: `${child.first_name} ${child.last_name}`, period: url.searchParams.get("period") || "current", grade_name: child.grade_name, group_name: child.group_name, overall_gpa: grades.overall_gpa, overall_grade: grades.overall_grade, attendance_rate: child.attendance_rate, subject_grades: grades.subjects, generated_at: nowIso(), status: "generated" } };
+    }
+    if (action === "teachers") return { success: true, data: readMockList("mock_school_teachers", defaultMockTeachers).slice(0, 2).map((teacher: any) => ({ teacher_id: teacher.id, first_name: teacher.first_name, last_name: teacher.last_name, email: teacher.email, phone: teacher.phone, subject: teacher.specialties?.[0] || "Titular", role: "Docente", can_message: true })) };
+    if (action === "assignments") return { success: true, data: [{ assignments: [], summary: { total: 0, pending: 0, submitted: 0, graded: 0, overdue: 0 }, subjects: [] }] };
+  }
+
+  if (path.endsWith("/parent/messages")) {
+    const messages = readMockList("mock_parent_messages", defaultMessages);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const recipient = defaultMockTeachers.find((teacher) => teacher.id === body.recipient_id);
+      const created = { id: `message-${Date.now()}`, conversation_id: `conversation-${Date.now()}`, sender_name: "padre@educore.mx", recipient_name: recipient ? `${recipient.first_name} ${recipient.last_name}` : "Direccion", subject: body.subject, content: body.content, is_read: false, priority: body.priority || "normal", has_attachments: false, created_at: nowIso() };
+      writeMockList("mock_parent_messages", [created, ...messages]);
+      return { success: true, data: created, message: "Mensaje enviado en modo demo" };
+    }
+    return { success: true, data: messages, meta: { total: messages.length, page: 1, per_page: 20 } };
+  }
+
+  if (path.endsWith("/parent/notifications")) {
+    const notifications = readMockList("mock_parent_notifications", [
+      { id: "notif-parent-1", title: "Boleta disponible", message: "Ya puedes revisar la boleta del periodo.", type: "grade_published", priority: "normal", is_read: false, sender_name: "Direccion", created_at: nowIso() },
+    ]);
+    return { success: true, data: notifications, meta: { total: notifications.length, page: 1, per_page: 20 } };
+  }
+
+  const notificationReadMatch = path.match(/\/parent\/notifications\/([^/]+)\/read$/);
+  if (notificationReadMatch && method === "PUT") {
+    const notifications = readMockList("mock_parent_notifications", []);
+    writeMockList("mock_parent_notifications", notifications.map((item: any) => item.id === decodeURIComponent(notificationReadMatch[1]) ? { ...item, is_read: true, read_at: nowIso() } : item));
+    return { success: true, message: "Notificacion marcada como leida" };
+  }
+
+  if (path.endsWith("/parent/calendar")) {
+    const events = readMockList("mock_parent_events", defaultEvents);
+    return { success: true, data: { month: Number(url.searchParams.get("month") || "4"), year: Number(url.searchParams.get("year") || "2026"), days: [], events, holidays: [], statistics: { total_events: events.length, school_days: 20, holidays: 0, weekends: 8 } } };
+  }
+
+  if (path.endsWith("/parent/events")) {
+    const events = readMockList("mock_parent_events", defaultEvents);
+    return { success: true, data: [{ events, grouped_by: {}, summary: { total: events.length, by_type: {}, by_child: {}, upcoming: events.length, this_week: 1 }, child_filter: children.map((child: any) => `${child.first_name} ${child.last_name}`) }] };
+  }
+
+  return { success: false, message: "Endpoint Parent demo no implementado" };
 }
 
 async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {}) {
