@@ -76,10 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await authLogout();
+    clearAuth();
     setUser(null);
     setToken(null);
     router.replace("/");
+    void authLogout();
   };
 
   return (
