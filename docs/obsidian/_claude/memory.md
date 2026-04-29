@@ -452,3 +452,11 @@ Se completo el Teacher Portal con rutas reales para dashboard, clases, asistenci
 Verificacion realizada: `go test ./...`, `npm run build`, smoke estatico local de rutas Teacher/Parent nuevas y `git diff --check` pendiente antes de commit.
 
 #memory #teacher_portal #parent_portal #backend #frontend #security
+
+---
+
+# 29-04-2026 - Deploy Hostinger estabilizado
+
+Se recupero el repo despues de un reinicio que corrompio `.git/index` y `refs/heads/master`, se preservaron los commits locales de cierre Parent/Teacher y se empujaron correctamente. Luego se endurecio `.github/workflows/deploy.yml` porque GitHub Actions fallaba en Hostinger por una prueba FTP fragil. El workflow ahora usa conexion pasiva, retries, timeouts mas amplios y verificacion directa del directorio remoto. La corrida `25138255245` termino en verde y Hostinger recibio el deploy.
+
+#memory #deploy #hostinger #github_actions #recovery

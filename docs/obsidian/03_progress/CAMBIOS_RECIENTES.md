@@ -262,3 +262,15 @@
 - Verificacion local: `go test ./...`, `npm run build` y smoke estatico de rutas nuevas OK.
 
 #parent_portal #teacher_portal #frontend #backend #security #ux
+
+---
+
+# 29-04-2026 - Hardening deploy Hostinger
+
+- Corregido `.github/workflows/deploy.yml` despues de un fallo real en GitHub Actions por el paso `Test FTP connection`.
+- El deploy ahora usa `lftp` con `passive-mode`, `prefer-epsv false`, `dns:order inet`, retries y timeouts mas robustos.
+- La verificacion FTP ya no depende de `ls` en raiz; valida acceso directo al path `/domains/onlineu.mx/public_html/educore/`.
+- Despliegue y post-check tambien quedan con reintentos y verificacion posterior de archivos.
+- Resultado: GitHub Actions `25138255245` en verde y despliegue a Hostinger completado.
+
+#deploy #hostinger #github_actions #ci_cd
