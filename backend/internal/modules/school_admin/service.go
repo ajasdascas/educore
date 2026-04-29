@@ -66,6 +66,14 @@ func (s *Service) UpdateSettings(ctx context.Context, tenantID, userID string, r
 	return settings, nil
 }
 
+func (s *Service) GetEnabledModules(ctx context.Context, tenantID string) ([]EnabledModuleResponse, error) {
+	modules, err := s.repo.GetEnabledModules(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get enabled modules: %w", err)
+	}
+	return modules, nil
+}
+
 func (s *Service) GetSchoolYears(ctx context.Context, tenantID string) ([]SchoolYearResponse, error) {
 	years, err := s.repo.GetSchoolYears(ctx, tenantID)
 	if err != nil {

@@ -221,6 +221,37 @@ type CreateSchoolRequest struct {
 	EvalScheme string `json:"eval_scheme"`
 }
 
+var modulesByEducationLevel = map[string][]string{
+	"kinder":             {"academic_core", "users", "students", "groups", "schedules", "attendance", "reports", "communications"},
+	"primaria":           {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+	"secundaria_general": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+	"secundaria_tecnica": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+	"prepa_general":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+	"prepa_tecnica":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+	"universidad":        {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+}
+
+func normalizeEducationLevel(level string) string {
+	switch level {
+	case "Kínder", "Kinder", "KÃ­nder", "kinder", "preescolar":
+		return "kinder"
+	case "Primaria", "primaria":
+		return "primaria"
+	case "Secundaria", "Secundaria General", "secundaria", "secundaria_general":
+		return "secundaria_general"
+	case "Secundaria Técnica", "Secundaria Tecnica", "secundaria_tecnica":
+		return "secundaria_tecnica"
+	case "Preparatoria", "Preparatoria General", "prepa", "prepa_general":
+		return "prepa_general"
+	case "Preparatoria Técnica", "Preparatoria Tecnica", "prepa_tecnica":
+		return "prepa_tecnica"
+	case "Universidad", "universidad":
+		return "universidad"
+	default:
+		return level
+	}
+}
+
 func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	var req CreateSchoolRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -295,17 +326,37 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 
 	// 4. Activate core modules and selected premium modules
 	_, err = tx.Exec(c.UserContext(),
-		`INSERT INTO tenant_modules (tenant_id, module_key, is_active)
-		 SELECT $1, key, true FROM modules_catalog WHERE is_core = true`,
+		`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+		 SELECT $1, key, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
+		 ON CONFLICT (tenant_id, module_key)
+		 DO UPDATE SET is_active = true, enabled = true, is_required = true, updated_at = NOW()`,
 		tenantID)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error activating core modules")
 	}
 
+	for _, level := range req.Levels {
+		normalizedLevel := normalizeEducationLevel(level)
+		for _, mod := range modulesByEducationLevel[normalizedLevel] {
+			if _, err := tx.Exec(c.UserContext(),
+				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, level, is_required, source)
+				 VALUES ($1, $2, true, true, $3, true, 'level')
+				 ON CONFLICT (tenant_id, module_key)
+				 DO UPDATE SET is_active = true, enabled = true, level = COALESCE(tenant_modules.level, EXCLUDED.level),
+				               is_required = true, source = EXCLUDED.source, updated_at = NOW()`,
+				tenantID, mod, normalizedLevel); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, "Error activating level module: "+mod)
+			}
+		}
+	}
+
 	for _, mod := range req.PremiumModules {
 		if _, err := tx.Exec(c.UserContext(),
-			"INSERT INTO tenant_modules (tenant_id, module_key, is_active) VALUES ($1, $2, true) ON CONFLICT DO NOTHING",
+			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+			 VALUES ($1, $2, true, true, false, 'plan')
+			 ON CONFLICT (tenant_id, module_key)
+			 DO UPDATE SET is_active = true, enabled = true, source = EXCLUDED.source, updated_at = NOW()`,
 			tenantID, mod); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Error activating premium module: "+mod)
 		}
@@ -371,7 +422,11 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(c.UserContext(),
 		`SELECT mc.key, mc.name, mc.description, mc.is_core, mc.price_monthly_mxn,
-		 COALESCE(tm.is_active, false) as is_active
+		 COALESCE(tm.is_active, false) as is_active,
+		 COALESCE(tm.enabled, tm.is_active, false) as enabled,
+		 COALESCE(tm.level, '') as level,
+		 COALESCE(tm.is_required, mc.is_core, false) as is_required,
+		 COALESCE(tm.source, CASE WHEN mc.is_core THEN 'core' ELSE 'manual' END) as source
 		 FROM modules_catalog mc
 		 LEFT JOIN tenant_modules tm ON tm.module_key = mc.key AND tm.tenant_id = $1
 		 ORDER BY mc.is_core DESC, mc.name`, id)
@@ -385,10 +440,11 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 	for rows.Next() {
 		var key, name string
 		var description *string
-		var isCore, isActive bool
+		var isCore, isActive, enabled, isRequired bool
+		var level, source string
 		var price float64
 
-		rows.Scan(&key, &name, &description, &isCore, &price, &isActive)
+		rows.Scan(&key, &name, &description, &isCore, &price, &isActive, &enabled, &level, &isRequired, &source)
 
 		desc := ""
 		if description != nil {
@@ -398,6 +454,7 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 		modules = append(modules, fiber.Map{
 			"key": key, "name": name, "description": desc,
 			"is_core": isCore, "price_monthly_mxn": price, "is_active": isActive,
+			"enabled": enabled, "level": level, "is_required": isRequired, "source": source,
 		})
 	}
 	if modules == nil {
@@ -409,7 +466,7 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 
 type ToggleModuleRequest struct {
 	ModuleKey string `json:"module_key"`
-	IsActive  bool   `json:"is_active"`
+	IsActive  *bool  `json:"is_active"`
 }
 
 func (h *Handler) ToggleModule(c *fiber.Ctx) error {
@@ -419,22 +476,33 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
 	}
 
-	// Check if core module
+	// Required modules are protected because they are part of the tenant's base contract.
 	var isCore bool
 	if err := h.db.QueryRow(c.UserContext(), "SELECT is_core FROM modules_catalog WHERE key = $1", req.ModuleKey).Scan(&isCore); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Module not found in catalog")
 	}
-	if isCore {
+	var isRequired bool
+	_ = h.db.QueryRow(c.UserContext(), "SELECT COALESCE(is_required, false) FROM tenant_modules WHERE tenant_id = $1 AND module_key = $2", id, req.ModuleKey).Scan(&isRequired)
+	if isCore || isRequired {
 		return response.Error(c, fiber.StatusForbidden, "Cannot toggle core modules")
 	}
 
-	// Toggle logic: if exists and active, deactivate. If not exists or inactive, activate.
+	nextActive := true
+	if req.IsActive != nil {
+		nextActive = *req.IsActive
+	} else {
+		_ = h.db.QueryRow(c.UserContext(), "SELECT NOT COALESCE(is_active, false) FROM tenant_modules WHERE tenant_id = $1 AND module_key = $2", id, req.ModuleKey).Scan(&nextActive)
+	}
+
 	_, err := h.db.Exec(c.UserContext(),
-		`INSERT INTO tenant_modules (tenant_id, module_key, is_active)
-		 VALUES ($1, $2, true)
+		`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+		 VALUES ($1, $2, $3, $3, false, 'manual')
 		 ON CONFLICT (tenant_id, module_key)
-		 DO UPDATE SET is_active = NOT tenant_modules.is_active`,
-		id, req.ModuleKey)
+		 DO UPDATE SET is_active = EXCLUDED.is_active,
+		               enabled = EXCLUDED.enabled,
+		               source = CASE WHEN tenant_modules.source = 'core' THEN tenant_modules.source ELSE EXCLUDED.source END,
+		               updated_at = NOW()`,
+		id, req.ModuleKey, nextActive)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error toggling module")

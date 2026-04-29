@@ -175,6 +175,19 @@ type UpdateSchoolSettingsRequest struct {
 	Security      map[string]interface{} `json:"security"`
 }
 
+type EnabledModuleResponse struct {
+	Key             string  `json:"key"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	Layer           string  `json:"layer"`
+	Level           string  `json:"level"`
+	IsCore          bool    `json:"is_core"`
+	IsRequired      bool    `json:"is_required"`
+	Enabled         bool    `json:"enabled"`
+	Source          string  `json:"source"`
+	PriceMonthlyMXN float64 `json:"price_monthly_mxn"`
+}
+
 type CreateScheduleBlockRequest struct {
 	GroupID   string `json:"group_id" validate:"required"`
 	SubjectID string `json:"subject_id"`

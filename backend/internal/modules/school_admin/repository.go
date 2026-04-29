@@ -327,6 +327,55 @@ func (r *Repository) UpdateSettings(ctx context.Context, tenantID string, req Up
 	return r.GetSettings(ctx, tenantID)
 }
 
+func (r *Repository) GetEnabledModules(ctx context.Context, tenantID string) ([]EnabledModuleResponse, error) {
+	query := `
+		SELECT mc.key, mc.name, COALESCE(mc.description, ''),
+		       CASE
+		         WHEN mc.key IN ('academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'grades', 'reports', 'communication', 'communications')
+		           THEN 'core'
+		         ELSE 'level'
+		       END AS layer,
+		       COALESCE(tm.level, ''),
+		       mc.is_core,
+		       COALESCE(tm.is_required, mc.is_core, false),
+		       COALESCE(tm.enabled, tm.is_active, false),
+		       COALESCE(tm.source, CASE WHEN mc.is_core THEN 'core' ELSE 'manual' END),
+		       COALESCE(mc.price_monthly_mxn, 0)
+		FROM tenant_modules tm
+		INNER JOIN modules_catalog mc ON mc.key = tm.module_key
+		WHERE tm.tenant_id = $1
+		  AND COALESCE(tm.enabled, tm.is_active, false) = true
+		ORDER BY mc.is_core DESC, mc.name
+	`
+	rows, err := r.db.Query(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get enabled modules: %w", err)
+	}
+	defer rows.Close()
+
+	modules := []EnabledModuleResponse{}
+	for rows.Next() {
+		var module EnabledModuleResponse
+		if err := rows.Scan(
+			&module.Key,
+			&module.Name,
+			&module.Description,
+			&module.Layer,
+			&module.Level,
+			&module.IsCore,
+			&module.IsRequired,
+			&module.Enabled,
+			&module.Source,
+			&module.PriceMonthlyMXN,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan enabled module: %w", err)
+		}
+		modules = append(modules, module)
+	}
+
+	return modules, nil
+}
+
 // Student queries
 func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, params GetStudentsParams) ([]StudentResponse, int, error) {
 	whereClause := "WHERE s.tenant_id = $1"

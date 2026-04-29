@@ -25,6 +25,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	api.Get("/stats", h.GetStats)
 	api.Get("/settings", h.GetSettings)
 	api.Put("/settings", h.UpdateSettings)
+	api.Get("/modules/enabled", h.GetEnabledModules)
 
 	// Academic management
 	academic := api.Group("/academic")
@@ -98,6 +99,15 @@ func (h *Handler) UpdateSettings(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
 	return response.Success(c, settings, "Success")
+}
+
+func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	modules, err := h.service.GetEnabledModules(c.Context(), tenantID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, fiber.Map{"modules": modules}, "Success")
 }
 
 func (h *Handler) GetSchoolYears(c *fiber.Ctx) error {

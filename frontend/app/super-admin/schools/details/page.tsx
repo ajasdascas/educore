@@ -70,6 +70,10 @@ interface Module {
   description: string;
   is_core: boolean;
   is_active: boolean;
+  enabled?: boolean;
+  level?: string;
+  is_required?: boolean;
+  source?: string;
   price_monthly_mxn: number;
 }
 
@@ -154,9 +158,10 @@ export default function SchoolDetailPage() {
 
   const toggleModule = async (moduleKey: string) => {
     try {
+      const module = modules.find((item) => item.key === moduleKey);
       const res = await authFetch(`/api/v1/super-admin/schools/${id}/modules/toggle`, {
         method: "POST",
-        body: JSON.stringify({ module_key: moduleKey }),
+        body: JSON.stringify({ module_key: moduleKey, is_active: !(module?.is_active ?? false) }),
       });
 
       if (res.success) {
@@ -351,8 +356,14 @@ export default function SchoolDetailPage() {
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{mod.name}</span>
-                        {mod.is_core && (
+                        {(mod.is_core || mod.is_required) && (
                           <Badge variant="secondary" className="text-[10px] h-4">CORE</Badge>
+                        )}
+                        {mod.level && (
+                          <Badge variant="outline" className="text-[10px] h-4">{mod.level}</Badge>
+                        )}
+                        {mod.source && (
+                          <Badge variant="outline" className="text-[10px] h-4">{mod.source}</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">{mod.description}</p>
@@ -362,7 +373,7 @@ export default function SchoolDetailPage() {
                     </div>
                     <Switch 
                       checked={mod.is_active} 
-                      disabled={mod.is_core}
+                      disabled={mod.is_core || mod.is_required}
                       onCheckedChange={() => toggleModule(mod.key)}
                     />
                   </div>

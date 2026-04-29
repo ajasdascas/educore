@@ -744,11 +744,15 @@ const mockGradeLevels = [
 ];
 
 const modulesCatalog = [
+  { key: "academic_core", name: "Academico Core", description: "Ciclos, materias, grupos y horarios.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
+  { key: "users", name: "Usuarios", description: "Alumnos, padres, docentes y administrativos.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
   { key: "students", name: "Alumnos", description: "Expedientes, inscripciones y datos academicos.", is_core: true, price_monthly_mxn: 0 },
+  { key: "groups", name: "Grupos", description: "Grados, generaciones y asignaciones.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
+  { key: "schedules", name: "Horarios", description: "Agenda semanal por grupo, profesor y materia.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
   { key: "attendance", name: "Asistencias", description: "Registro diario y reportes de asistencia.", is_core: true, price_monthly_mxn: 0 },
   { key: "grades", name: "Calificaciones", description: "Evaluaciones, boletas y promedios.", is_core: true, price_monthly_mxn: 0 },
-  { key: "reports", name: "Reportes", description: "Indicadores academicos y administrativos.", is_core: false, price_monthly_mxn: 299 },
-  { key: "communications", name: "Comunicaciones", description: "Avisos, mensajes y notificaciones.", is_core: false, price_monthly_mxn: 249 },
+  { key: "reports", name: "Reportes", description: "Indicadores academicos y administrativos.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
+  { key: "communications", name: "Comunicaciones", description: "Avisos, mensajes y notificaciones.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
   { key: "billing", name: "Cobranza", description: "Pagos, adeudos y facturacion escolar.", is_core: false, price_monthly_mxn: 399 },
   { key: "transport", name: "Transporte", description: "Rutas, unidades y seguimiento operativo.", is_core: false, price_monthly_mxn: 349 },
 ];
@@ -937,6 +941,25 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       return { success: true, data: updated, message: "Configuracion guardada en modo demo" };
     }
     return { success: true, data: current };
+  }
+
+  if (path.endsWith("/school-admin/modules/enabled")) {
+    return {
+      success: true,
+      data: {
+        modules: modulesCatalog
+          .filter((mod) => mod.is_core || mod.enabled !== false)
+          .map((mod) => ({
+            ...mod,
+            enabled: mod.enabled !== false,
+            is_active: mod.enabled !== false,
+            is_required: mod.is_required ?? mod.is_core,
+            layer: (mod as any).layer || "core",
+            level: (mod as any).level || "",
+            source: (mod as any).source || (mod.is_core ? "core" : "manual"),
+          })),
+      },
+    };
   }
 
   if (path.endsWith("/school-admin/academic/school-years")) {

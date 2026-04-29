@@ -63,6 +63,23 @@ const planColors = {
   Enterprise: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
 };
 
+const educationLevelOptions = [
+  { value: "kinder", label: "Kinder / Preescolar" },
+  { value: "primaria", label: "Primaria" },
+  { value: "secundaria_general", label: "Secundaria General" },
+  { value: "secundaria_tecnica", label: "Secundaria Tecnica" },
+  { value: "prepa_general", label: "Preparatoria General" },
+  { value: "prepa_tecnica", label: "Preparatoria Tecnica" },
+  { value: "universidad", label: "Universidad" },
+];
+
+const premiumModuleOptions = [
+  { value: "billing", label: "Cobranza" },
+  { value: "transport", label: "Transporte" },
+  { value: "cafeteria", label: "Cafeteria" },
+  { value: "uniforms_store", label: "Tienda de Uniformes" },
+];
+
 interface School {
   id: string;
   name: string;
@@ -287,13 +304,13 @@ export default function SchoolsPage() {
                   <div className="grid gap-2">
                     <Label>Niveles Educativos</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["Kínder", "Primaria", "Secundaria", "Preparatoria", "Universidad"].map(lvl => (
+                      {educationLevelOptions.map((level) => (
                         <Badge 
-                          key={lvl} 
-                          variant={formData.levels.includes(lvl) ? "default" : "outline"}
+                          key={level.value}
+                          variant={formData.levels.includes(level.value) ? "default" : "outline"}
                           className="cursor-pointer" 
-                          onClick={() => handleLevelToggle(lvl)}>
-                          {lvl}
+                          onClick={() => handleLevelToggle(level.value)}>
+                          {level.label}
                         </Badge>
                       ))}
                     </div>
@@ -371,13 +388,13 @@ export default function SchoolsPage() {
                     <div className="grid gap-2">
                       <Label>Módulos Premium Activos</Label>
                       <div className="flex flex-wrap gap-2">
-                        {["Transporte", "Cafetería", "Tienda de Uniformes"].map(mod => (
+                        {premiumModuleOptions.map((mod) => (
                           <Badge 
-                            key={mod} 
-                            variant={formData.premium_modules.includes(mod) ? "default" : "outline"}
+                            key={mod.value}
+                            variant={formData.premium_modules.includes(mod.value) ? "default" : "outline"}
                             className="cursor-pointer" 
-                            onClick={() => handleModuleToggle(mod)}>
-                            {mod}
+                            onClick={() => handleModuleToggle(mod.value)}>
+                            {mod.label}
                           </Badge>
                         ))}
                       </div>
