@@ -110,3 +110,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** School Admin puede editar configuracion real y mantener compatibilidad con el backend y los mocks de exportacion estatica.
 
 #architecture #school_admin #settings #database
+
+## 29-04-2026 - Expediente de alumno con padres e historial formal
+
+**Decision:** Extender `students` con apellidos separados y fecha por partes, mantener `last_name` y `birth_date` como compatibilidad legacy, y agregar `student_academic_history` + `import_batches` para historiales e importaciones.
+
+**Razon:** El flujo escolar necesita registrar datos legales separados sin romper las consultas actuales. La importacion Excel debe dejar trazabilidad de lote y permitir cargar informacion historica de muchas columnas sin depender de un backend Node en Hostinger static export.
+
+**Impacto:** School Admin puede matricular alumnos con padres vinculados, consultar historial por ciclo y hacer importaciones masivas demo hoy; el backend queda preparado para persistencia real transaccional por tenant.
+
+#architecture #school_admin #students #database #imports

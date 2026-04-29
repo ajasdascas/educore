@@ -3,6 +3,7 @@ package school_admin
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"educore/internal/events"
@@ -132,6 +133,14 @@ func (s *Service) GetStudent(ctx context.Context, tenantID, studentID string) (*
 	return student, nil
 }
 
+func (s *Service) GetStudentAcademicHistory(ctx context.Context, tenantID, studentID string) ([]AcademicHistoryItem, error) {
+	history, err := s.repo.GetStudentAcademicHistory(ctx, tenantID, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student academic history: %w", err)
+	}
+	return history, nil
+}
+
 func (s *Service) UpdateStudent(ctx context.Context, tenantID, userID, studentID string, req UpdateStudentRequest) (*StudentResponse, error) {
 	// Validate business rules
 	if err := s.validateUpdateStudent(ctx, tenantID, studentID, req); err != nil {
@@ -174,6 +183,25 @@ func (s *Service) DeleteStudent(ctx context.Context, tenantID, userID, studentID
 	})
 
 	return nil
+}
+
+func (s *Service) CommitStudentImport(ctx context.Context, tenantID, userID string, req StudentImportCommitRequest) (*StudentImportCommitResponse, error) {
+	if len(req.Rows) == 0 {
+		return nil, fmt.Errorf("no rows to import")
+	}
+	result, err := s.repo.CommitStudentImport(ctx, tenantID, userID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit student import: %w", err)
+	}
+	s.bus.Publish("students.imported", map[string]interface{}{
+		"tenant_id":     tenantID,
+		"imported_rows": result.ImportedRows,
+		"total_rows":    result.TotalRows,
+		"source_sheet":  req.SourceSheet,
+		"imported_by":   userID,
+		"timestamp":     time.Now(),
+	})
+	return result, nil
 }
 
 // Teacher management use cases
@@ -507,13 +535,24 @@ func (s *Service) GetGroupFinalGrades(ctx context.Context, tenantID, groupID str
 
 // Business rule validation methods
 func (s *Service) validateCreateStudent(ctx context.Context, tenantID string, req CreateStudentRequest) error {
-	// Check if student with same email already exists
-	exists, err := s.repo.StudentEmailExists(ctx, tenantID, req.Email)
-	if err != nil {
-		return err
+	if strings.TrimSpace(req.FirstName) == "" || strings.TrimSpace(req.PaternalLastName) == "" || strings.TrimSpace(req.MaternalLastName) == "" {
+		return fmt.Errorf("student first name, paternal last name and maternal last name are required")
 	}
-	if exists {
-		return fmt.Errorf("student with email %s already exists", req.Email)
+	if strings.TrimSpace(req.BirthDay) == "" || strings.TrimSpace(req.BirthMonth) == "" || strings.TrimSpace(req.BirthYear) == "" {
+		return fmt.Errorf("student birth day, month and year are required")
+	}
+	if len(req.Parents) == 0 && strings.TrimSpace(req.ParentEmail) == "" {
+		return fmt.Errorf("at least one parent or guardian is required")
+	}
+	// Check if student with same email already exists
+	if req.Email != "" {
+		exists, err := s.repo.StudentEmailExists(ctx, tenantID, req.Email)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("student with email %s already exists", req.Email)
+		}
 	}
 
 	// Validate group exists and is active

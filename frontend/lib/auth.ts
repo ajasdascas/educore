@@ -816,6 +816,55 @@ function paginate<T>(items: T[], page: number, perPage: number) {
   };
 }
 
+function buildMockStudentHistory(student: any) {
+  const years = readMockList("mock_school_years", defaultMockSchoolYears);
+  const stored = readMockList("mock_student_academic_history", []);
+  const existing = stored.filter((item: any) => item.student_id === student.id);
+  if (existing.length > 0) return existing;
+
+  return years.slice(0, 3).map((year: any, index: number) => ({
+    id: `${student.id}-${year.id}`,
+    student_id: student.id,
+    school_year_id: year.id,
+    school_year: year.name,
+    grade_name: index === 0 ? student.grade_name || "Sin grado" : `Grado anterior ${index}`,
+    group_name: index === 0 ? student.group_name || "Sin grupo" : "Historico",
+    status: index === 0 ? student.status || "active" : "promoted",
+    average_grade: Math.max(70, Number(student.average_grade || 88) - index * 2),
+    attendance_rate: Math.max(80, Number(student.attendance_rate || 94) - index),
+    absences: Number(student.total_absences || 1) + index,
+    notes: index === 0 ? "Ciclo actual." : "Registro historico demo.",
+  }));
+}
+
+function buildMockParentsFromBody(body: any) {
+  if (Array.isArray(body.parents) && body.parents.length > 0) {
+    return body.parents.map((parent: any, index: number) => ({
+      id: parent.id || `parent-${Date.now()}-${index}`,
+      first_name: parent.first_name || "",
+      paternal_last_name: parent.paternal_last_name || "",
+      maternal_last_name: parent.maternal_last_name || "",
+      email: parent.email || "",
+      phone: parent.phone || "",
+      relationship: parent.relationship || (index === 0 ? "mother" : "father"),
+      is_primary: parent.is_primary || index === 0,
+      notes: parent.notes || "",
+    }));
+  }
+  const parentName = String(body.parent_name || "").trim().split(" ");
+  return [{
+    id: `parent-${Date.now()}-0`,
+    first_name: parentName.slice(0, -2).join(" ") || parentName[0] || "",
+    paternal_last_name: parentName.slice(-2, -1)[0] || "",
+    maternal_last_name: parentName.slice(-1)[0] || "",
+    email: body.parent_email || "",
+    phone: body.parent_phone || "",
+    relationship: "guardian",
+    is_primary: true,
+    notes: "",
+  }];
+}
+
 async function mockDemoFetch(endpoint: string, options: RequestInit = {}) {
   const url = new URL(endpoint, "https://mock.educore.local");
   if (url.pathname.includes("/school-admin")) {
@@ -1388,15 +1437,108 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       : { success: false, message: "Grupo no encontrado" };
   }
 
+  if (path.endsWith("/school-admin/academic/imports/students/commit")) {
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    const years = readMockList("mock_school_years", defaultMockSchoolYears);
+    const history = readMockList("mock_student_academic_history", []);
+    const body = parseBody(options);
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    const imported = rows.map((row: any, index: number) => {
+      const group = groups.find((item) =>
+        item.name?.toLowerCase() === String(row.group_name || "").toLowerCase() ||
+        `${item.grade_name} ${item.name}`.toLowerCase() === String(row.group_name || "").toLowerCase()
+      );
+      const parents = buildMockParentsFromBody({
+        parents: [
+          {
+            first_name: row.parent1_first_name,
+            paternal_last_name: row.parent1_paternal_last_name,
+            maternal_last_name: row.parent1_maternal_last_name,
+            email: row.parent1_email,
+            phone: row.parent1_phone,
+            relationship: "mother",
+            is_primary: true,
+          },
+          row.parent2_first_name || row.parent2_email
+            ? {
+                first_name: row.parent2_first_name,
+                paternal_last_name: row.parent2_paternal_last_name,
+                maternal_last_name: row.parent2_maternal_last_name,
+                email: row.parent2_email,
+                phone: row.parent2_phone,
+                relationship: "father",
+                is_primary: false,
+              }
+            : null,
+        ].filter(Boolean),
+      });
+      const birthDate = row.birth_year && row.birth_month && row.birth_day
+        ? `${String(row.birth_year).padStart(4, "0")}-${String(row.birth_month).padStart(2, "0")}-${String(row.birth_day).padStart(2, "0")}`
+        : "";
+      const student = {
+        id: `student-import-${Date.now()}-${index}`,
+        first_name: row.first_name,
+        paternal_last_name: row.paternal_last_name,
+        maternal_last_name: row.maternal_last_name,
+        last_name: [row.paternal_last_name, row.maternal_last_name].filter(Boolean).join(" "),
+        email: "",
+        phone: "",
+        enrollment_id: row.enrollment_id,
+        status: "active",
+        group_id: group?.id || "",
+        group_name: group?.name || row.group_name || "",
+        grade_name: group?.grade_name || row.history_grade_name || "",
+        parent_name: parents[0] ? `${parents[0].first_name} ${parents[0].paternal_last_name} ${parents[0].maternal_last_name}`.trim() : "",
+        parent_email: parents[0]?.email || "",
+        parent_phone: parents[0]?.phone || "",
+        parents,
+        birth_day: row.birth_day,
+        birth_month: row.birth_month,
+        birth_year: row.birth_year,
+        birth_date: birthDate,
+        address: row.address || "",
+        attendance_rate: Number(row.history_attendance_rate || 100),
+        average_grade: Number(row.history_average_grade || 0),
+        total_absences: Number(row.history_absences || 0),
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      const year = years.find((item) => item.name === row.school_year) || years.find((item) => item.is_current) || years[0];
+      if (year) {
+        history.push({
+          id: `${student.id}-${year.id}`,
+          student_id: student.id,
+          school_year_id: year.id,
+          school_year: year.name,
+          grade_name: row.history_grade_name || student.grade_name,
+          group_name: row.history_group_name || student.group_name,
+          status: "imported",
+          average_grade: Number(row.history_average_grade || 0),
+          attendance_rate: Number(row.history_attendance_rate || 0),
+          absences: Number(row.history_absences || 0),
+          notes: `Importado desde ${body.source_sheet || "Excel"}`,
+        });
+      }
+      return student;
+    });
+    writeMockList("mock_school_students", [...imported, ...students]);
+    writeMockList("mock_student_academic_history", history);
+    return { success: true, data: { imported: imported.length, total: rows.length }, message: "Importacion completada en modo demo" };
+  }
+
   if (path.endsWith("/school-admin/academic/students")) {
     const students = readMockList("mock_school_students", defaultMockStudents);
     if (method === "POST") {
       const body = parseBody(options);
-      const group = mockSchoolGroups.find((item) => item.id === body.group_id);
+      const group = readMockList("mock_school_groups", mockSchoolGroups).find((item) => item.id === body.group_id);
+      const parents = buildMockParentsFromBody(body);
       const created = {
         id: `student-${Date.now()}`,
         first_name: body.first_name,
-        last_name: body.last_name,
+        paternal_last_name: body.paternal_last_name || body.last_name || "",
+        maternal_last_name: body.maternal_last_name || "",
+        last_name: body.last_name || [body.paternal_last_name, body.maternal_last_name].filter(Boolean).join(" "),
         email: body.email || "",
         phone: body.phone || "",
         enrollment_id: body.enrollment_id,
@@ -1407,6 +1549,10 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
         parent_name: body.parent_name,
         parent_email: body.parent_email,
         parent_phone: body.parent_phone,
+        parents,
+        birth_day: body.birth_day || "",
+        birth_month: body.birth_month || "",
+        birth_year: body.birth_year || "",
         birth_date: body.birth_date,
         address: body.address || "",
         attendance_rate: 100,
@@ -1434,6 +1580,16 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     return { success: true, data: items, meta };
   }
 
+  const studentHistoryMatch = path.match(/\/school-admin\/academic\/students\/([^/]+)\/history$/);
+  if (studentHistoryMatch) {
+    const id = decodeURIComponent(studentHistoryMatch[1]);
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const student = students.find((item) => item.id === id);
+    return student
+      ? { success: true, data: buildMockStudentHistory(student) }
+      : { success: false, message: "Estudiante no encontrado" };
+  }
+
   const studentMatch = path.match(/\/school-admin\/academic\/students\/([^/]+)$/);
   if (studentMatch) {
     const id = decodeURIComponent(studentMatch[1]);
@@ -1442,12 +1598,15 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
 
     if (method === "PUT") {
       const body = parseBody(options);
-      const group = mockSchoolGroups.find((item) => item.id === body.group_id);
+      const group = readMockList("mock_school_groups", mockSchoolGroups).find((item) => item.id === body.group_id);
+      const parents = body.parents ? buildMockParentsFromBody(body) : undefined;
       const updated = students.map((item) =>
         item.id === id
           ? {
               ...item,
               ...body,
+              parents: parents ?? item.parents,
+              last_name: body.last_name || [body.paternal_last_name ?? item.paternal_last_name ?? item.last_name, body.maternal_last_name ?? item.maternal_last_name].filter(Boolean).join(" "),
               group_name: group?.name ?? item.group_name,
               grade_name: group?.grade_name ?? item.grade_name,
               updated_at: nowIso(),
@@ -1479,6 +1638,7 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
               { date: "2026-04-28", status: "present", notes: "" },
               { date: "2026-04-27", status: "present", notes: "" },
             ],
+            academic_history: buildMockStudentHistory(student),
           },
         }
       : { success: false, message: "Estudiante no encontrado" };

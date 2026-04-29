@@ -12,32 +12,62 @@ type GetStudentsParams struct {
 }
 
 type CreateStudentRequest struct {
-	FirstName    string `json:"first_name" validate:"required,min=2,max=100"`
-	LastName     string `json:"last_name" validate:"required,min=2,max=100"`
-	Email        string `json:"email" validate:"required,email"`
-	Phone        string `json:"phone" validate:"required"`
-	BirthDate    string `json:"birth_date" validate:"required"`
-	Address      string `json:"address" validate:"required"`
-	GroupID      string `json:"group_id"`
-	ParentName   string `json:"parent_name" validate:"required"`
-	ParentEmail  string `json:"parent_email" validate:"required,email"`
-	ParentPhone  string `json:"parent_phone" validate:"required"`
-	EnrollmentID string `json:"enrollment_id" validate:"required"`
-	Status       string `json:"status"`
+	FirstName        string        `json:"first_name" validate:"required,min=2,max=100"`
+	PaternalLastName string        `json:"paternal_last_name"`
+	MaternalLastName string        `json:"maternal_last_name"`
+	LastName         string        `json:"last_name"`
+	Email            string        `json:"email"`
+	Phone            string        `json:"phone"`
+	BirthDate        string        `json:"birth_date"`
+	BirthDay         string        `json:"birth_day"`
+	BirthMonth       string        `json:"birth_month"`
+	BirthYear        string        `json:"birth_year"`
+	Address          string        `json:"address"`
+	GroupID          string        `json:"group_id"`
+	ParentName       string        `json:"parent_name"`
+	ParentEmail      string        `json:"parent_email"`
+	ParentPhone      string        `json:"parent_phone"`
+	Parents          []ParentInput `json:"parents"`
+	EnrollmentID     string        `json:"enrollment_id" validate:"required"`
+	Status           string        `json:"status"`
 }
 
 type UpdateStudentRequest struct {
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	Email        string `json:"email"`
-	Phone        string `json:"phone"`
-	Address      string `json:"address"`
-	GroupID      string `json:"group_id"`
-	ParentName   string `json:"parent_name"`
-	ParentEmail  string `json:"parent_email"`
-	ParentPhone  string `json:"parent_phone"`
-	EnrollmentID string `json:"enrollment_id"`
-	Status       string `json:"status"`
+	FirstName        string        `json:"first_name"`
+	PaternalLastName string        `json:"paternal_last_name"`
+	MaternalLastName string        `json:"maternal_last_name"`
+	LastName         string        `json:"last_name"`
+	Email            string        `json:"email"`
+	Phone            string        `json:"phone"`
+	BirthDate        string        `json:"birth_date"`
+	BirthDay         string        `json:"birth_day"`
+	BirthMonth       string        `json:"birth_month"`
+	BirthYear        string        `json:"birth_year"`
+	Address          string        `json:"address"`
+	GroupID          string        `json:"group_id"`
+	ParentName       string        `json:"parent_name"`
+	ParentEmail      string        `json:"parent_email"`
+	ParentPhone      string        `json:"parent_phone"`
+	Parents          []ParentInput `json:"parents"`
+	EnrollmentID     string        `json:"enrollment_id"`
+	Status           string        `json:"status"`
+}
+
+type ParentInput struct {
+	FirstName        string `json:"first_name"`
+	PaternalLastName string `json:"paternal_last_name"`
+	MaternalLastName string `json:"maternal_last_name"`
+	Email            string `json:"email"`
+	Phone            string `json:"phone"`
+	Relationship     string `json:"relationship"`
+	IsPrimary        bool   `json:"is_primary"`
+	Notes            string `json:"notes"`
+}
+
+type StudentImportCommitRequest struct {
+	Rows        []map[string]string `json:"rows"`
+	Mapping     map[string]string   `json:"mapping"`
+	SourceSheet string              `json:"source_sheet"`
 }
 
 type CreateTeacherRequest struct {
@@ -279,31 +309,73 @@ type ActivityItem struct {
 }
 
 type StudentResponse struct {
-	ID           string    `json:"id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	Email        string    `json:"email"`
-	Phone        string    `json:"phone"`
-	EnrollmentID string    `json:"enrollment_id"`
-	Status       string    `json:"status"`
-	GroupName    string    `json:"group_name"`
-	GradeName    string    `json:"grade_name"`
-	ParentName   string    `json:"parent_name"`
-	ParentEmail  string    `json:"parent_email"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID               string          `json:"id"`
+	FirstName        string          `json:"first_name"`
+	PaternalLastName string          `json:"paternal_last_name"`
+	MaternalLastName string          `json:"maternal_last_name"`
+	LastName         string          `json:"last_name"`
+	Email            string          `json:"email"`
+	Phone            string          `json:"phone"`
+	EnrollmentID     string          `json:"enrollment_id"`
+	Status           string          `json:"status"`
+	GroupID          string          `json:"group_id"`
+	GroupName        string          `json:"group_name"`
+	GradeName        string          `json:"grade_name"`
+	ParentName       string          `json:"parent_name"`
+	ParentEmail      string          `json:"parent_email"`
+	ParentPhone      string          `json:"parent_phone"`
+	Parents          []ParentContact `json:"parents"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type StudentDetailResponse struct {
 	*StudentResponse
-	BirthDate        string           `json:"birth_date"`
-	Address          string           `json:"address"`
-	ParentPhone      string           `json:"parent_phone"`
-	AttendanceRate   float64          `json:"attendance_rate"`
-	AverageGrade     float64          `json:"average_grade"`
-	TotalAbsences    int              `json:"total_absences"`
-	RecentGrades     []GradeResponse  `json:"recent_grades"`
-	RecentAttendance []AttendanceItem `json:"recent_attendance"`
+	BirthDate        string                `json:"birth_date"`
+	BirthDay         string                `json:"birth_day"`
+	BirthMonth       string                `json:"birth_month"`
+	BirthYear        string                `json:"birth_year"`
+	Address          string                `json:"address"`
+	AttendanceRate   float64               `json:"attendance_rate"`
+	AverageGrade     float64               `json:"average_grade"`
+	TotalAbsences    int                   `json:"total_absences"`
+	AcademicHistory  []AcademicHistoryItem `json:"academic_history"`
+	RecentGrades     []GradeResponse       `json:"recent_grades"`
+	RecentAttendance []AttendanceItem      `json:"recent_attendance"`
+}
+
+type ParentContact struct {
+	ID               string `json:"id"`
+	FirstName        string `json:"first_name"`
+	PaternalLastName string `json:"paternal_last_name"`
+	MaternalLastName string `json:"maternal_last_name"`
+	Email            string `json:"email"`
+	Phone            string `json:"phone"`
+	Relationship     string `json:"relationship"`
+	IsPrimary        bool   `json:"is_primary"`
+	Notes            string `json:"notes"`
+}
+
+type AcademicHistoryItem struct {
+	ID             string    `json:"id"`
+	StudentID      string    `json:"student_id"`
+	SchoolYearID   string    `json:"school_year_id"`
+	SchoolYear     string    `json:"school_year"`
+	GradeName      string    `json:"grade_name"`
+	GroupName      string    `json:"group_name"`
+	Status         string    `json:"status"`
+	AverageGrade   float64   `json:"average_grade"`
+	AttendanceRate float64   `json:"attendance_rate"`
+	Absences       int       `json:"absences"`
+	Notes          string    `json:"notes"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type StudentImportCommitResponse struct {
+	BatchID      string `json:"batch_id"`
+	ImportedRows int    `json:"imported"`
+	TotalRows    int    `json:"total"`
+	ErrorRows    int    `json:"errors"`
 }
 
 type TeacherResponse struct {

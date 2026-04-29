@@ -34,9 +34,11 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 
 	academic.Get("/students", h.GetStudents)
 	academic.Post("/students", h.CreateStudent)
+	academic.Get("/students/:id/history", h.GetStudentAcademicHistory)
 	academic.Get("/students/:id", h.GetStudent)
 	academic.Put("/students/:id", h.UpdateStudent)
 	academic.Delete("/students/:id", h.DeleteStudent)
+	academic.Post("/imports/students/commit", h.CommitStudentImport)
 
 	academic.Get("/teachers", h.GetTeachers)
 	academic.Post("/teachers", h.CreateTeacher)
@@ -217,6 +219,18 @@ func (h *Handler) GetStudent(c *fiber.Ctx) error {
 	return response.Success(c, student, "Success")
 }
 
+func (h *Handler) GetStudentAcademicHistory(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	studentID := c.Params("id")
+
+	history, err := h.service.GetStudentAcademicHistory(c.Context(), tenantID, studentID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+
+	return response.Success(c, history, "Success")
+}
+
 func (h *Handler) UpdateStudent(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
@@ -246,6 +260,23 @@ func (h *Handler) DeleteStudent(c *fiber.Ctx) error {
 	}
 
 	return response.SuccessMessage(c, "Student deleted successfully")
+}
+
+func (h *Handler) CommitStudentImport(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+
+	var req StudentImportCommitRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+
+	result, err := h.service.CommitStudentImport(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+
+	return response.Success(c, result, "Success")
 }
 
 // Teacher management handlers

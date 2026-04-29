@@ -43,6 +43,7 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **School Admin > Configuracion:** completado con configuracion institucional, academica, notificaciones y seguridad; backend real `GET/PUT /settings` y mock persistente para produccion estatica.
 - **Correccion backend critica:** rutas de School Admin ya no duplican `/api/v1/school-admin`.
 - **Verificacion:** `go test ./...`, `next build` y pruebas headless de Profesores, Estudiantes, Grupos, Horarios y Reportes OK. Estructura Academica verificada con `go test ./...` y `npm run build`.
-- **Siguiente submodulo:** Alumnos/Padres + Historial Academico + Importacion Excel, o Asistencias/Calificaciones si se prioriza nucleo academico.
+- **School Admin > Alumnos/Padres + Historial + Importacion Excel:** completado con nombres separados obligatorios, fecha por dia/mes/ano, multiples padres vinculados, historial academico filtrable por ciclo y mapeo visual de columnas Excel.
+- **Siguiente submodulo:** Asistencias/Calificaciones como nucleo academico operativo.
 
 #module #architecture #super_admin #school_admin

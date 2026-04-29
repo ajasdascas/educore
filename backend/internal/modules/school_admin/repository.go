@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,24 @@ func splitFullName(fullName string) (string, string) {
 		return parts[0], ""
 	}
 	return parts[0], strings.Join(parts[1:], " ")
+}
+
+func parseIntOrZero(value string) int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	parsed, _ := strconv.Atoi(value)
+	return parsed
+}
+
+func parseFloatOrZero(value string) float64 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	parsed, _ := strconv.ParseFloat(value, 64)
+	return parsed
 }
 
 func parseJSONMap(raw []byte) map[string]interface{} {
@@ -411,15 +430,39 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 		status = "active"
 	}
 
+	lastName := req.LastName
+	if lastName == "" {
+		lastName = strings.TrimSpace(req.PaternalLastName + " " + req.MaternalLastName)
+	}
+	birthDay := parseIntOrZero(req.BirthDay)
+	birthMonth := parseIntOrZero(req.BirthMonth)
+	birthYear := parseIntOrZero(req.BirthYear)
+	parents := req.Parents
+	if len(parents) == 0 && req.ParentEmail != "" {
+		firstName, lastName := splitFullName(req.ParentName)
+		parents = []ParentInput{{
+			FirstName:        firstName,
+			PaternalLastName: lastName,
+			Email:            req.ParentEmail,
+			Phone:            req.ParentPhone,
+			Relationship:     "guardian",
+			IsPrimary:        true,
+		}}
+	}
+
 	var student StudentResponse
 	err = tx.QueryRow(ctx, `
-		INSERT INTO students (tenant_id, enrollment_number, first_name, last_name, birth_date, status, notes)
-		VALUES ($1, $2, $3, $4, NULLIF($5, '')::date, $6, $7)
-		RETURNING id, first_name, last_name, COALESCE(enrollment_number, ''), status, created_at, updated_at
+		INSERT INTO students (
+			tenant_id, enrollment_number, first_name, last_name, paternal_last_name,
+			maternal_last_name, birth_date, birth_day, birth_month, birth_year, status, notes
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, '')::date, NULLIF($8, 0), NULLIF($9, 0), NULLIF($10, 0), $11, $12)
+		RETURNING id, first_name, COALESCE(paternal_last_name, ''), COALESCE(maternal_last_name, ''), last_name, COALESCE(enrollment_number, ''), status, created_at, updated_at
 	`,
-		tenantID, req.EnrollmentID, req.FirstName, req.LastName, req.BirthDate, status, req.Address,
+		tenantID, req.EnrollmentID, req.FirstName, lastName, req.PaternalLastName,
+		req.MaternalLastName, req.BirthDate, birthDay, birthMonth, birthYear, status, req.Address,
 	).Scan(
-		&student.ID, &student.FirstName, &student.LastName, &student.EnrollmentID,
+		&student.ID, &student.FirstName, &student.PaternalLastName, &student.MaternalLastName, &student.LastName, &student.EnrollmentID,
 		&student.Status, &student.CreatedAt, &student.UpdatedAt,
 	)
 	if err != nil {
@@ -428,8 +471,11 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 
 	student.Email = req.Email
 	student.Phone = req.Phone
-	student.ParentName = req.ParentName
-	student.ParentEmail = req.ParentEmail
+	if len(parents) > 0 {
+		student.ParentName = strings.TrimSpace(parents[0].FirstName + " " + parents[0].PaternalLastName + " " + parents[0].MaternalLastName)
+		student.ParentEmail = parents[0].Email
+		student.ParentPhone = parents[0].Phone
+	}
 
 	if req.GroupID != "" {
 		_, err = tx.Exec(ctx, `
@@ -442,8 +488,15 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 		}
 	}
 
-	if req.ParentEmail != "" {
-		parentFirstName, parentLastName := splitFullName(req.ParentName)
+	for index, parent := range parents {
+		if parent.Email == "" {
+			continue
+		}
+		parentLastName := strings.TrimSpace(parent.PaternalLastName + " " + parent.MaternalLastName)
+		relationship := parent.Relationship
+		if relationship == "" {
+			relationship = "guardian"
+		}
 		var parentID string
 		err = tx.QueryRow(ctx, `
 			INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
@@ -451,16 +504,17 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 			ON CONFLICT (tenant_id, email)
 			DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
 			RETURNING id
-		`, tenantID, req.ParentEmail, parentFirstName, parentLastName).Scan(&parentID)
+		`, tenantID, parent.Email, parent.FirstName, parentLastName).Scan(&parentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create parent user: %w", err)
 		}
 
 		_, err = tx.Exec(ctx, `
-			INSERT INTO parent_student (parent_id, student_id, relationship, is_primary)
-			VALUES ($1, $2, 'guardian', true)
-			ON CONFLICT (parent_id, student_id) DO UPDATE SET is_primary = true
-		`, parentID, student.ID)
+			INSERT INTO parent_student (parent_id, student_id, relationship, is_primary, phone, notes)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (parent_id, student_id)
+			DO UPDATE SET relationship = EXCLUDED.relationship, is_primary = EXCLUDED.is_primary, phone = EXCLUDED.phone, notes = EXCLUDED.notes, updated_at = NOW()
+		`, parentID, student.ID, relationship, parent.IsPrimary || index == 0, parent.Phone, parent.Notes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to link parent to student: %w", err)
 		}
@@ -671,6 +725,168 @@ func (r *Repository) DeleteStudent(ctx context.Context, tenantID, studentID stri
 	}
 
 	return nil
+}
+
+func (r *Repository) GetStudentAcademicHistory(ctx context.Context, tenantID, studentID string) ([]AcademicHistoryItem, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, student_id, COALESCE(school_year_id::text, ''), school_year,
+		       COALESCE(grade_name, ''), COALESCE(group_name, ''), status,
+		       average_grade, attendance_rate, absences, COALESCE(notes, ''), created_at
+		FROM student_academic_history
+		WHERE tenant_id = $1 AND student_id = $2
+		ORDER BY created_at DESC
+	`, tenantID, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student academic history: %w", err)
+	}
+	defer rows.Close()
+
+	history := []AcademicHistoryItem{}
+	for rows.Next() {
+		var item AcademicHistoryItem
+		if err := rows.Scan(
+			&item.ID, &item.StudentID, &item.SchoolYearID, &item.SchoolYear,
+			&item.GradeName, &item.GroupName, &item.Status, &item.AverageGrade,
+			&item.AttendanceRate, &item.Absences, &item.Notes, &item.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan academic history: %w", err)
+		}
+		history = append(history, item)
+	}
+	return history, nil
+}
+
+func (r *Repository) CommitStudentImport(ctx context.Context, tenantID, userID string, req StudentImportCommitRequest) (*StudentImportCommitResponse, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	mappingRaw, _ := json.Marshal(req.Mapping)
+	var batchID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO import_batches (tenant_id, type, source_sheet, mapping, total_rows, imported_rows, error_rows, created_by)
+		VALUES ($1, 'students', $2, $3, $4, 0, 0, NULLIF($5, '')::uuid)
+		RETURNING id
+	`, tenantID, req.SourceSheet, string(mappingRaw), len(req.Rows), userID).Scan(&batchID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create import batch: %w", err)
+	}
+
+	imported := 0
+	for _, row := range req.Rows {
+		firstName := strings.TrimSpace(row["first_name"])
+		paternal := strings.TrimSpace(row["paternal_last_name"])
+		maternal := strings.TrimSpace(row["maternal_last_name"])
+		enrollment := strings.TrimSpace(row["enrollment_id"])
+		if firstName == "" || paternal == "" || maternal == "" || enrollment == "" {
+			continue
+		}
+
+		birthDate := ""
+		if row["birth_year"] != "" && row["birth_month"] != "" && row["birth_day"] != "" {
+			birthDate = fmt.Sprintf("%04d-%02d-%02d", parseIntOrZero(row["birth_year"]), parseIntOrZero(row["birth_month"]), parseIntOrZero(row["birth_day"]))
+		}
+
+		groupID := ""
+		groupName := strings.TrimSpace(row["group_name"])
+		if groupName != "" {
+			_ = tx.QueryRow(ctx, `
+				SELECT id FROM groups
+				WHERE tenant_id = $1 AND (lower(name) = lower($2) OR lower(school_year || ' ' || name) = lower($2))
+				ORDER BY created_at DESC
+				LIMIT 1
+			`, tenantID, groupName).Scan(&groupID)
+		}
+
+		var studentID string
+		err = tx.QueryRow(ctx, `
+			INSERT INTO students (
+				tenant_id, enrollment_number, first_name, last_name, paternal_last_name,
+				maternal_last_name, birth_date, birth_day, birth_month, birth_year, status, notes, import_source
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, '')::date, NULLIF($8, 0), NULLIF($9, 0), NULLIF($10, 0), 'active', $11, $12)
+			ON CONFLICT DO NOTHING
+			RETURNING id
+		`, tenantID, enrollment, firstName, strings.TrimSpace(paternal+" "+maternal), paternal, maternal,
+			birthDate, parseIntOrZero(row["birth_day"]), parseIntOrZero(row["birth_month"]), parseIntOrZero(row["birth_year"]),
+			row["address"], req.SourceSheet).Scan(&studentID)
+		if err != nil || studentID == "" {
+			continue
+		}
+
+		if groupID != "" {
+			_, _ = tx.Exec(ctx, `INSERT INTO group_students (group_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, studentID)
+		}
+
+		parentRows := []ParentInput{
+			{FirstName: row["parent1_first_name"], PaternalLastName: row["parent1_paternal_last_name"], MaternalLastName: row["parent1_maternal_last_name"], Email: row["parent1_email"], Phone: row["parent1_phone"], Relationship: "mother", IsPrimary: true},
+			{FirstName: row["parent2_first_name"], PaternalLastName: row["parent2_paternal_last_name"], MaternalLastName: row["parent2_maternal_last_name"], Email: row["parent2_email"], Phone: row["parent2_phone"], Relationship: "father", IsPrimary: false},
+		}
+		for _, parent := range parentRows {
+			if strings.TrimSpace(parent.Email) == "" {
+				continue
+			}
+			parentLastName := strings.TrimSpace(parent.PaternalLastName + " " + parent.MaternalLastName)
+			var parentID string
+			err = tx.QueryRow(ctx, `
+				INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
+				VALUES ($1, $2, '', $3, $4, 'PARENT', true)
+				ON CONFLICT (tenant_id, email)
+				DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
+				RETURNING id
+			`, tenantID, parent.Email, parent.FirstName, parentLastName).Scan(&parentID)
+			if err == nil {
+				_, _ = tx.Exec(ctx, `
+					INSERT INTO parent_student (parent_id, student_id, relationship, is_primary, phone)
+					VALUES ($1, $2, $3, $4, $5)
+					ON CONFLICT (parent_id, student_id)
+					DO UPDATE SET relationship = EXCLUDED.relationship, is_primary = EXCLUDED.is_primary, phone = EXCLUDED.phone, updated_at = NOW()
+				`, parentID, studentID, parent.Relationship, parent.IsPrimary, parent.Phone)
+			}
+		}
+
+		schoolYearID := ""
+		schoolYear := strings.TrimSpace(row["school_year"])
+		if schoolYear != "" {
+			_ = tx.QueryRow(ctx, `
+				SELECT id FROM school_years WHERE tenant_id = $1 AND lower(name) = lower($2) LIMIT 1
+			`, tenantID, schoolYear).Scan(&schoolYearID)
+		}
+		if schoolYear == "" {
+			schoolYear = time.Now().Format("2006")
+		}
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO student_academic_history (
+				tenant_id, student_id, school_year_id, school_year, grade_name, group_name,
+				status, average_grade, attendance_rate, absences, notes
+			)
+			VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, 'imported', $7, $8, $9, $10)
+		`, tenantID, studentID, schoolYearID, schoolYear, row["history_grade_name"], row["history_group_name"],
+			parseFloatOrZero(row["history_average_grade"]), parseFloatOrZero(row["history_attendance_rate"]),
+			parseIntOrZero(row["history_absences"]), "Importado desde Excel")
+
+		imported++
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE import_batches SET imported_rows = $1, error_rows = $2 WHERE id = $3 AND tenant_id = $4
+	`, imported, len(req.Rows)-imported, batchID, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update import batch: %w", err)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit import: %w", err)
+	}
+
+	return &StudentImportCommitResponse{
+		BatchID:      batchID,
+		ImportedRows: imported,
+		TotalRows:    len(req.Rows),
+		ErrorRows:    len(req.Rows) - imported,
+	}, nil
 }
 
 // Teacher queries

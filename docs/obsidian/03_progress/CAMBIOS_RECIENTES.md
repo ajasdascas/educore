@@ -94,3 +94,27 @@
 - Iniciar Fase 3: Módulo de Escuelas (School Admin).
 
 #super_admin #backend #frontend #changelog
+
+---
+
+## [29-04-2026] - School Admin: Alumnos, Padres, Historial e Importacion Excel
+
+### Backend
+- Nueva migracion `008_students_parents_history_imports.sql` para apellidos separados, fecha por partes, metadata de padres, historial academico e import batches.
+- Nuevos contratos para padres/tutores, historial academico y commit de importacion masiva.
+- Endpoints agregados:
+  - `GET /api/v1/school-admin/academic/students/:id/history`
+  - `POST /api/v1/school-admin/academic/imports/students/commit`
+- Importacion backend transaccional para alumnos, padres vinculados e historial academico.
+
+### Frontend
+- `school-admin/students` ahora captura `Nombre(s)`, `Apellido paterno`, `Apellido materno` y nacimiento como `Dia`, `Mes`, `Ano`.
+- Registro de multiples padres/tutores en el mismo flujo, con contacto principal obligatorio.
+- Detalle de alumno con pestañas de resumen, padres e historial academico filtrable por ciclo escolar.
+- Importador Excel con selector de hoja, filtro de columnas, automapeo, mapeo visual y preview antes de importar.
+
+### Verificacion
+- `go test ./...`: OK.
+- `npm run build`: OK.
+
+#school_admin #students #parents #imports #backend #frontend

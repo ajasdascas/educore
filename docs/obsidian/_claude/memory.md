@@ -293,3 +293,23 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con el flujo pendiente de alumnos/padres, historial academico e importacion masiva Excel si se prioriza la solicitud anterior; si no, avanzar a asistencias/calificaciones.
 
 #school_admin #settings #backend #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Alumnos/Padres, historial e importacion Excel completado
+
+### Cambios completados
+- `frontend/app/school-admin/students/page.tsx`: Estudiantes ahora captura `Nombre(s)`, `Apellido paterno`, `Apellido materno`, nacimiento por `Dia/Mes/Ano`, varios padres/tutores vinculados, detalle con pestañas y `Historial Academico` filtrable por ciclo.
+- `frontend/app/school-admin/students/page.tsx`: Importador Excel completo con lectura `.xlsx/.xls/.csv`, selector de hoja, filtro de columnas, automapeo, mapeo visual campo EduCore -> columna Excel, preview y commit demo.
+- `frontend/lib/auth.ts`: mocks persistentes para padres, historial academico e importacion masiva bajo `/api/v1/school-admin/academic/imports/students/commit`.
+- `backend/migrations/008_students_parents_history_imports.sql`: estructura real para apellidos separados, fecha por partes, metadata de padres, historial academico e import batches.
+- Backend School Admin: endpoints `GET /academic/students/:id/history` y `POST /academic/imports/students/commit` agregados, con DTOs y repositorio transaccional.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `npm run build` en frontend: OK, genera `/school-admin/students` como pagina estatica funcional.
+
+### Siguiente paso recomendado
+- Continuar con Asistencias/Calificaciones para cerrar el nucleo academico operativo antes de pasar a otros modulos.
+
+#school_admin #students #parents #imports #backend #frontend #memory
