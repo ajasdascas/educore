@@ -2,6 +2,7 @@ package school_admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -35,6 +36,25 @@ func splitFullName(fullName string) (string, string) {
 		return parts[0], ""
 	}
 	return parts[0], strings.Join(parts[1:], " ")
+}
+
+func parseJSONMap(raw []byte) map[string]interface{} {
+	result := map[string]interface{}{}
+	if len(raw) == 0 {
+		return result
+	}
+	_ = json.Unmarshal(raw, &result)
+	return result
+}
+
+func mergeMaps(base map[string]interface{}, updates map[string]interface{}) map[string]interface{} {
+	if base == nil {
+		base = map[string]interface{}{}
+	}
+	for key, value := range updates {
+		base[key] = value
+	}
+	return base
 }
 
 // Dashboard & Stats queries
@@ -114,6 +134,163 @@ func (r *Repository) GetRecentActivity(ctx context.Context, tenantID string, lim
 	}
 
 	return activities, nil
+}
+
+func (r *Repository) GetSettings(ctx context.Context, tenantID string) (*SchoolSettingsResponse, error) {
+	query := `
+		SELECT t.name, COALESCE(t.logo_url, ''), COALESCE(t.settings, '{}'::jsonb),
+		       COALESCE(ss.school_year, ''), COALESCE(ss.periods, '[]'::jsonb),
+		       COALESCE(ss.grading_scale, '{"min":0,"max":100,"passing":60}'::jsonb),
+		       COALESCE(ss.primary_color, '#4f46e5'), COALESCE(ss.updated_at, t.updated_at)
+		FROM tenants t
+		LEFT JOIN school_settings ss ON ss.tenant_id = t.id
+		WHERE t.id = $1
+	`
+	var name, logoURL, schoolYear, primaryColor string
+	var tenantSettingsRaw, periodsRaw, gradingRaw []byte
+	var updatedAt time.Time
+	err := r.db.QueryRow(ctx, query, tenantID).Scan(&name, &logoURL, &tenantSettingsRaw, &schoolYear, &periodsRaw, &gradingRaw, &primaryColor, &updatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get settings: %w", err)
+	}
+
+	tenantSettings := parseJSONMap(tenantSettingsRaw)
+	notifications, _ := tenantSettings["notifications"].(map[string]interface{})
+	security, _ := tenantSettings["security"].(map[string]interface{})
+	schoolExtra, _ := tenantSettings["school"].(map[string]interface{})
+
+	school := mergeMaps(map[string]interface{}{
+		"name":          name,
+		"logo_url":      logoURL,
+		"primary_color": primaryColor,
+		"timezone":      "America/Mexico_City",
+		"language":      "es-MX",
+	}, schoolExtra)
+
+	academic := map[string]interface{}{
+		"school_year":      schoolYear,
+		"periods":          parseJSONMap([]byte(`{"items":` + string(periodsRaw) + `}`))["items"],
+		"grading_scale":    parseJSONMap(gradingRaw),
+		"attendance_mode":  "daily",
+		"default_capacity": 30,
+	}
+	if academicExtra, ok := tenantSettings["academic"].(map[string]interface{}); ok {
+		academic = mergeMaps(academic, academicExtra)
+	}
+
+	if notifications == nil {
+		notifications = map[string]interface{}{
+			"email_enabled":  true,
+			"push_enabled":   true,
+			"absence_alerts": true,
+			"grade_alerts":   true,
+			"weekly_summary": true,
+		}
+	}
+	if security == nil {
+		security = map[string]interface{}{
+			"require_2fa_admins":      false,
+			"session_timeout_minutes": 120,
+			"allow_parent_invites":    true,
+			"audit_log_enabled":       true,
+		}
+	}
+
+	return &SchoolSettingsResponse{
+		School:        school,
+		Academic:      academic,
+		Notifications: notifications,
+		Security:      security,
+		UpdatedAt:     updatedAt,
+	}, nil
+}
+
+func (r *Repository) UpdateSettings(ctx context.Context, tenantID string, req UpdateSchoolSettingsRequest) (*SchoolSettingsResponse, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	settings := map[string]interface{}{}
+	if req.School != nil {
+		settings["school"] = req.School
+		if name, ok := req.School["name"].(string); ok && strings.TrimSpace(name) != "" {
+			_, err = tx.Exec(ctx, "UPDATE tenants SET name = $1, updated_at = NOW() WHERE id = $2", strings.TrimSpace(name), tenantID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update tenant name: %w", err)
+			}
+		}
+		if logoURL, ok := req.School["logo_url"].(string); ok {
+			_, err = tx.Exec(ctx, "UPDATE tenants SET logo_url = $1, updated_at = NOW() WHERE id = $2", logoURL, tenantID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update tenant logo: %w", err)
+			}
+		}
+	}
+	if req.Academic != nil {
+		settings["academic"] = req.Academic
+	}
+	if req.Notifications != nil {
+		settings["notifications"] = req.Notifications
+	}
+	if req.Security != nil {
+		settings["security"] = req.Security
+	}
+	settingsJSON, _ := json.Marshal(settings)
+	_, err = tx.Exec(ctx, `
+		UPDATE tenants
+		SET settings = settings || $1::jsonb, updated_at = NOW()
+		WHERE id = $2
+	`, string(settingsJSON), tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update tenant settings: %w", err)
+	}
+
+	if req.Academic != nil || req.School != nil {
+		schoolYear := ""
+		periods := "[]"
+		gradingScale := `{"min":0,"max":100,"passing":60}`
+		primaryColor := "#4f46e5"
+		if req.Academic != nil {
+			if value, ok := req.Academic["school_year"].(string); ok {
+				schoolYear = value
+			}
+			if value, ok := req.Academic["periods"]; ok {
+				if raw, err := json.Marshal(value); err == nil {
+					periods = string(raw)
+				}
+			}
+			if value, ok := req.Academic["grading_scale"]; ok {
+				if raw, err := json.Marshal(value); err == nil {
+					gradingScale = string(raw)
+				}
+			}
+		}
+		if req.School != nil {
+			if value, ok := req.School["primary_color"].(string); ok && value != "" {
+				primaryColor = value
+			}
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
+			VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, NOW())
+			ON CONFLICT (tenant_id)
+			DO UPDATE SET school_year = EXCLUDED.school_year,
+			              periods = EXCLUDED.periods,
+			              grading_scale = EXCLUDED.grading_scale,
+			              primary_color = EXCLUDED.primary_color,
+			              updated_at = NOW()
+		`, tenantID, schoolYear, periods, gradingScale, primaryColor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upsert school settings: %w", err)
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return r.GetSettings(ctx, tenantID)
 }
 
 // Student queries

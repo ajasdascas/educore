@@ -130,6 +130,21 @@ type UpdateSchoolYearRequest struct {
 	Notes     string `json:"notes"`
 }
 
+type SchoolSettingsResponse struct {
+	School        map[string]interface{} `json:"school"`
+	Academic      map[string]interface{} `json:"academic"`
+	Notifications map[string]interface{} `json:"notifications"`
+	Security      map[string]interface{} `json:"security"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+}
+
+type UpdateSchoolSettingsRequest struct {
+	School        map[string]interface{} `json:"school"`
+	Academic      map[string]interface{} `json:"academic"`
+	Notifications map[string]interface{} `json:"notifications"`
+	Security      map[string]interface{} `json:"security"`
+}
+
 type CreateScheduleBlockRequest struct {
 	GroupID   string `json:"group_id" validate:"required"`
 	SubjectID string `json:"subject_id"`

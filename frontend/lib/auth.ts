@@ -698,6 +698,42 @@ const defaultMockCommunications = [
   },
 ];
 
+const defaultMockSchoolSettings = {
+  school: {
+    name: "Instituto Tecnologico Don Bosco",
+    legal_name: "Instituto Tecnologico Don Bosco S.C.",
+    campus_code: "DONBOSCO-MOR",
+    logo_url: "",
+    primary_color: "#4f46e5",
+    timezone: "America/Mexico_City",
+    language: "es-MX",
+    phone: "777 100 2000",
+    email: "direccion@donbosco.mx",
+    address: "Jiutepec, Morelos",
+  },
+  academic: {
+    school_year: "Ciclo 2025-2026",
+    attendance_mode: "daily",
+    default_capacity: 30,
+    periods: ["Primer trimestre", "Segundo trimestre", "Tercer trimestre"],
+    grading_scale: { min: 0, max: 100, passing: 60 },
+  },
+  notifications: {
+    email_enabled: true,
+    push_enabled: true,
+    absence_alerts: true,
+    grade_alerts: true,
+    weekly_summary: true,
+  },
+  security: {
+    require_2fa_admins: false,
+    session_timeout_minutes: 120,
+    allow_parent_invites: true,
+    audit_log_enabled: true,
+  },
+  updated_at: "2026-04-29T09:00:00.000Z",
+};
+
 const mockGradeLevels = [
   { id: "grade-1", name: "Primero" },
   { id: "grade-2", name: "Segundo" },
@@ -734,6 +770,28 @@ function readMockList<T>(key: string, fallback: T[]): T[] {
 }
 
 function writeMockList<T>(key: string, value: T[]) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+}
+
+function readMockObject<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    localStorage.setItem(key, JSON.stringify(fallback));
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    localStorage.setItem(key, JSON.stringify(fallback));
+    return fallback;
+  }
+}
+
+function writeMockObject<T>(key: string, value: T) {
   if (typeof window !== "undefined") {
     localStorage.setItem(key, JSON.stringify(value));
   }
@@ -812,6 +870,24 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
         last_updated: nowIso(),
       },
     };
+  }
+
+  if (path.endsWith("/school-admin/settings")) {
+    const current = readMockObject("mock_school_settings", defaultMockSchoolSettings);
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = {
+        ...current,
+        school: { ...current.school, ...(body.school || {}) },
+        academic: { ...current.academic, ...(body.academic || {}) },
+        notifications: { ...current.notifications, ...(body.notifications || {}) },
+        security: { ...current.security, ...(body.security || {}) },
+        updated_at: nowIso(),
+      };
+      writeMockObject("mock_school_settings", updated);
+      return { success: true, data: updated, message: "Configuracion guardada en modo demo" };
+    }
+    return { success: true, data: current };
   }
 
   if (path.endsWith("/school-admin/academic/school-years")) {

@@ -48,6 +48,23 @@ func (s *Service) GetStats(ctx context.Context, tenantID string) (*StatsResponse
 	return stats, nil
 }
 
+func (s *Service) GetSettings(ctx context.Context, tenantID string) (*SchoolSettingsResponse, error) {
+	settings, err := s.repo.GetSettings(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get settings: %w", err)
+	}
+	return settings, nil
+}
+
+func (s *Service) UpdateSettings(ctx context.Context, tenantID, userID string, req UpdateSchoolSettingsRequest) (*SchoolSettingsResponse, error) {
+	settings, err := s.repo.UpdateSettings(ctx, tenantID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update settings: %w", err)
+	}
+	s.bus.Publish("settings.updated", map[string]interface{}{"tenant_id": tenantID, "updated_by": userID, "timestamp": time.Now()})
+	return settings, nil
+}
+
 func (s *Service) GetSchoolYears(ctx context.Context, tenantID string) ([]SchoolYearResponse, error) {
 	years, err := s.repo.GetSchoolYears(ctx, tenantID)
 	if err != nil {

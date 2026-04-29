@@ -100,3 +100,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** Grupos, horarios y materias pueden operar con ciclos reales. Se evita una migracion destructiva y se mantiene compatibilidad con produccion actual.
 
 #architecture #school_admin #database
+
+## 29-04-2026 — Configuracion School Admin
+
+**Decision:** Guardar configuraciones extendidas de escuela en `tenants.settings` y mantener los campos academicos legacy en `school_settings`.
+
+**Razon:** `school_settings` ya existia con ciclo, periodos, escala y color. Usar `tenants.settings` para secciones flexibles evita migraciones destructivas y permite evolucionar notificaciones/seguridad sin romper produccion.
+
+**Impacto:** School Admin puede editar configuracion real y mantener compatibilidad con el backend y los mocks de exportacion estatica.
+
+#architecture #school_admin #settings #database

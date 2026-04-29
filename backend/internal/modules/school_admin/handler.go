@@ -23,6 +23,8 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	// Dashboard & stats
 	api.Get("/dashboard", h.GetDashboard)
 	api.Get("/stats", h.GetStats)
+	api.Get("/settings", h.GetSettings)
+	api.Put("/settings", h.UpdateSettings)
 
 	// Academic management
 	academic := api.Group("/academic")
@@ -71,6 +73,29 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	grades.Post("/grades/bulk", h.BulkUpdateGrades)
 	grades.Get("/students/:studentId/report-card", h.GetStudentReportCard)
 	grades.Get("/groups/:groupId/final-grades", h.GetGroupFinalGrades)
+}
+
+func (h *Handler) GetSettings(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	settings, err := h.service.GetSettings(c.Context(), tenantID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, settings, "Success")
+}
+
+func (h *Handler) UpdateSettings(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req UpdateSchoolSettingsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	settings, err := h.service.UpdateSettings(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, settings, "Success")
 }
 
 func (h *Handler) GetSchoolYears(c *fiber.Ctx) error {

@@ -275,3 +275,21 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Impacto: la notificacion blanca de "Descarga lista" en Reportes ya no queda estorbando despues de cerrarla.
 
 #frontend #school_admin #reports #ux
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Configuracion completado
+
+### Cambios completados
+- `frontend/app/school-admin/settings/page.tsx`: reemplazada la pagina generica de cuenta por configuracion real de escuela con pestañas Institucion, Academico, Notificaciones y Seguridad.
+- `frontend/lib/auth.ts`: mock persistente en `localStorage` para `/api/v1/school-admin/settings`.
+- Backend School Admin: endpoints `GET/PUT /api/v1/school-admin/settings` con lectura/escritura en `tenants.settings` y `school_settings`.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `npm run build` en frontend: OK, genera `/school-admin/settings` como pagina estatica funcional.
+
+### Siguiente paso recomendado
+- Continuar con el flujo pendiente de alumnos/padres, historial academico e importacion masiva Excel si se prioriza la solicitud anterior; si no, avanzar a asistencias/calificaciones.
+
+#school_admin #settings #backend #frontend #memory
