@@ -41,3 +41,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** Los endpoints de estudiantes ya no consultan columnas inexistentes. El contacto principal se obtiene desde el tutor relacionado; campos extra de demo se mantienen solo en frontend/mock hasta formalizar una migracion de perfil extendido.
 
 #backend #database #school_admin #students
+
+## 29-04-2026 - Grupos usa tabla de asignaciones para profesor titular
+
+**Decision:** El profesor titular de un grupo se gestiona mediante `group_teachers` en lugar de agregar `teacher_id` directo a `groups`.
+
+**Razon:** El schema actual ya modela la relacion grupo-profesor-materia con `group_teachers`, lo cual permite crecer a multiples profesores por grupo sin redisenar la tabla principal.
+
+**Impacto:** El modulo de Grupos puede mostrar y actualizar un titular inicial hoy, manteniendo compatibilidad con futuras asignaciones por materia.
+
+#backend #database #school_admin #groups

@@ -253,6 +253,22 @@ func (s *Service) UpdateGroup(ctx context.Context, tenantID, userID, groupID str
 	return group, nil
 }
 
+func (s *Service) DeleteGroup(ctx context.Context, tenantID, userID, groupID string) error {
+	err := s.repo.DeleteGroup(ctx, tenantID, groupID)
+	if err != nil {
+		return fmt.Errorf("failed to delete group: %w", err)
+	}
+
+	s.bus.Publish("group.deleted", map[string]interface{}{
+		"tenant_id":  tenantID,
+		"group_id":   groupID,
+		"deleted_by": userID,
+		"timestamp":  time.Now(),
+	})
+
+	return nil
+}
+
 // Subject management use cases
 func (s *Service) GetSubjects(ctx context.Context, tenantID string) ([]SubjectResponse, error) {
 	subjects, err := s.repo.GetSubjects(ctx, tenantID)

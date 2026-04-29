@@ -333,10 +333,75 @@ const defaultMockStudents = [
 ];
 
 const mockSchoolGroups = [
-  { id: "group-1a", name: "1A", grade_name: "Primero" },
-  { id: "group-2b", name: "2B", grade_name: "Segundo" },
-  { id: "group-3a", name: "3A", grade_name: "Tercero" },
-  { id: "group-4a", name: "4A", grade_name: "Cuarto" },
+  {
+    id: "group-1a",
+    name: "1A",
+    grade_level_id: "grade-1",
+    grade_name: "Primero",
+    teacher_id: "teacher-maria-lopez",
+    teacher_name: "Maria Lopez",
+    student_count: 26,
+    max_students: 30,
+    room: "A-101",
+    schedule: "Lun-Vie 08:00-13:30",
+    status: "active",
+    description: "Grupo base de primer grado.",
+    created_at: "2026-01-10T09:00:00.000Z",
+  },
+  {
+    id: "group-2b",
+    name: "2B",
+    grade_level_id: "grade-2",
+    grade_name: "Segundo",
+    teacher_id: "teacher-carlos-rivera",
+    teacher_name: "Carlos Rivera",
+    student_count: 24,
+    max_students: 30,
+    room: "B-204",
+    schedule: "Lun-Vie 08:00-13:30",
+    status: "active",
+    description: "Grupo con enfoque en lectura y civismo.",
+    created_at: "2026-01-10T09:00:00.000Z",
+  },
+  {
+    id: "group-3a",
+    name: "3A",
+    grade_level_id: "grade-3",
+    grade_name: "Tercero",
+    teacher_id: "teacher-ana-martinez",
+    teacher_name: "Ana Martinez",
+    student_count: 21,
+    max_students: 28,
+    room: "C-301",
+    schedule: "Lun-Vie 08:00-13:30",
+    status: "inactive",
+    description: "Grupo temporalmente pausado.",
+    created_at: "2026-01-10T09:00:00.000Z",
+  },
+  {
+    id: "group-4a",
+    name: "4A",
+    grade_level_id: "grade-4",
+    grade_name: "Cuarto",
+    teacher_id: "",
+    teacher_name: "",
+    student_count: 0,
+    max_students: 30,
+    room: "D-401",
+    schedule: "Lun-Vie 08:00-13:30",
+    status: "active",
+    description: "Grupo listo para asignacion.",
+    created_at: "2026-01-10T09:00:00.000Z",
+  },
+];
+
+const mockGradeLevels = [
+  { id: "grade-1", name: "Primero" },
+  { id: "grade-2", name: "Segundo" },
+  { id: "grade-3", name: "Tercero" },
+  { id: "grade-4", name: "Cuarto" },
+  { id: "grade-5", name: "Quinto" },
+  { id: "grade-6", name: "Sexto" },
 ];
 
 const modulesCatalog = [
@@ -447,7 +512,75 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
   }
 
   if (path.endsWith("/school-admin/academic/groups")) {
-    return { success: true, data: mockSchoolGroups };
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const grade = mockGradeLevels.find((item) => item.id === body.grade_level_id);
+      const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+      const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const created = {
+        id: `group-${Date.now()}`,
+        name: body.name,
+        grade_level_id: body.grade_level_id,
+        grade_name: grade?.name || "",
+        teacher_id: body.teacher_id || "",
+        teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : "",
+        student_count: 0,
+        max_students: Number(body.max_students || 30),
+        room: body.room || "",
+        schedule: body.schedule || "",
+        status: body.status || "active",
+        description: body.description || "",
+        created_at: nowIso(),
+      };
+      writeMockList("mock_school_groups", [created, ...groups]);
+      return { success: true, data: created, message: "Grupo creado en modo demo" };
+    }
+    return { success: true, data: groups };
+  }
+
+  const groupMatch = path.match(/\/school-admin\/academic\/groups\/([^/]+)$/);
+  if (groupMatch) {
+    const id = decodeURIComponent(groupMatch[1]);
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    const group = groups.find((item) => item.id === id);
+
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const grade = mockGradeLevels.find((item) => item.id === body.grade_level_id);
+      const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+      const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const updated = groups.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...body,
+              grade_name: grade?.name ?? item.grade_name,
+              teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : item.teacher_name,
+              max_students: body.max_students !== undefined ? Number(body.max_students) : item.max_students,
+            }
+          : item
+      );
+      writeMockList("mock_school_groups", updated);
+      return { success: true, data: updated.find((item) => item.id === id), message: "Grupo actualizado en modo demo" };
+    }
+
+    if (method === "DELETE") {
+      writeMockList("mock_school_groups", groups.filter((item) => item.id !== id));
+      return { success: true, message: "Grupo eliminado en modo demo" };
+    }
+
+    return group
+      ? {
+          success: true,
+          data: {
+            ...group,
+            students: readMockList("mock_school_students", defaultMockStudents).filter((student) => student.group_id === id),
+            subjects: [],
+            recent_activity: [],
+          },
+        }
+      : { success: false, message: "Grupo no encontrado" };
   }
 
   if (path.endsWith("/school-admin/academic/students")) {

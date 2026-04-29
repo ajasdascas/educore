@@ -163,3 +163,24 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con School Admin > Grupos. No avanzar a Horarios/Reportes hasta que Grupos tenga CRUD, asignacion de profesor y capacidad funcionales.
 
 #school_admin #students #frontend #backend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Grupos completado
+
+### Cambios completados
+- `frontend/app/school-admin/groups/page.tsx`: submodulo de Grupos implementado con listado, busqueda, filtro por estado, crear, editar, detalle, activar/pausar y eliminacion con confirmacion.
+- `frontend/lib/auth.ts`: mock demo de grupos con profesor titular, cupos, salon, horario y estudiantes relacionados.
+- `backend/internal/modules/school_admin/handler.go`: agregado `DELETE /academic/groups/:id`.
+- `backend/internal/modules/school_admin/service.go`: caso de uso `DeleteGroup` con evento de dominio.
+- `backend/internal/modules/school_admin/repository.go`: `GetGroups`, `CreateGroup`, `GetGroupByID`, `UpdateGroup` y `DeleteGroup` implementados contra schema real (`groups.grade_id`, `group_teachers`, `group_students`).
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `next build` con Node bundled: OK, genera `/school-admin/groups`.
+- Prueba headless local con Chrome DevTools: listar, crear, ver detalle, editar, cambiar estado y eliminar grupo: OK sin errores ni warnings.
+
+### Siguiente paso recomendado
+- Continuar con School Admin > Horarios. No avanzar a Reportes/Comunicaciones hasta que Horarios quede funcional.
+
+#school_admin #groups #frontend #backend #memory

@@ -41,6 +41,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	academic.Post("/groups", h.CreateGroup)
 	academic.Get("/groups/:id", h.GetGroup)
 	academic.Put("/groups/:id", h.UpdateGroup)
+	academic.Delete("/groups/:id", h.DeleteGroup)
 
 	academic.Get("/subjects", h.GetSubjects)
 	academic.Post("/subjects", h.CreateSubject)
@@ -288,6 +289,19 @@ func (h *Handler) UpdateGroup(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, group, "Success")
+}
+
+func (h *Handler) DeleteGroup(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	groupID := c.Params("id")
+
+	err := h.service.DeleteGroup(c.Context(), tenantID, userID, groupID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+
+	return response.SuccessMessage(c, "Group deleted successfully")
 }
 
 // Subject management handlers

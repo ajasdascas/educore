@@ -643,7 +643,7 @@ func (r *Repository) TeacherEmailExistsExcluding(ctx context.Context, tenantID, 
 func (r *Repository) GroupNameExists(ctx context.Context, tenantID, name, gradeLevelID string) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM groups WHERE tenant_id = $1 AND name = $2 AND grade_level_id = $3)",
+		"SELECT EXISTS(SELECT 1 FROM groups WHERE tenant_id = $1 AND name = $2 AND grade_id = $3)",
 		tenantID, name, gradeLevelID).Scan(&exists)
 	return exists, err
 }
@@ -822,19 +822,229 @@ func (r *Repository) UpdateTeacher(ctx context.Context, tenantID, teacherID stri
 }
 
 func (r *Repository) GetGroups(ctx context.Context, tenantID string) ([]GroupResponse, error) {
-	return []GroupResponse{}, nil
+	query := `
+		SELECT g.id, g.name, COALESCE(gl.name, '') as grade_name,
+			   COALESCE((
+			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
+			   	FROM group_teachers gt
+			   	INNER JOIN users u ON gt.teacher_id = u.id
+			   	WHERE gt.group_id = g.id
+			   	LIMIT 1
+			   ), '') as teacher_name,
+			   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
+			   COALESCE(g.capacity, 0) as max_students,
+			   '' as room,
+			   g.school_year as schedule,
+			   'active' as status,
+			   g.created_at
+		FROM groups g
+		INNER JOIN grade_levels gl ON g.grade_id = gl.id
+		WHERE g.tenant_id = $1
+		ORDER BY gl.sort_order, g.name
+	`
+
+	rows, err := r.db.Query(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get groups: %w", err)
+	}
+	defer rows.Close()
+
+	var groups []GroupResponse
+	for rows.Next() {
+		var group GroupResponse
+		err := rows.Scan(
+			&group.ID, &group.Name, &group.GradeName, &group.TeacherName,
+			&group.StudentCount, &group.MaxStudents, &group.Room, &group.Schedule,
+			&group.Status, &group.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan group: %w", err)
+		}
+		groups = append(groups, group)
+	}
+
+	return groups, nil
 }
 
 func (r *Repository) CreateGroup(ctx context.Context, tenantID string, req CreateGroupRequest) (*GroupResponse, error) {
-	return &GroupResponse{}, nil
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	schoolYear := time.Now().Format("2006")
+	maxStudents := req.MaxStudents
+	if maxStudents == 0 {
+		maxStudents = 30
+	}
+
+	var groupID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO groups (tenant_id, grade_id, name, school_year, capacity)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id
+	`, tenantID, req.GradeLevelID, req.Name, schoolYear, maxStudents).Scan(&groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create group: %w", err)
+	}
+
+	if req.TeacherID != "" {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO group_teachers (group_id, teacher_id)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
+		`, groupID, req.TeacherID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign teacher to group: %w", err)
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	detail, err := r.GetGroupByID(ctx, tenantID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	return detail.GroupResponse, nil
 }
 
 func (r *Repository) GetGroupByID(ctx context.Context, tenantID, groupID string) (*GroupDetailResponse, error) {
-	return &GroupDetailResponse{}, nil
+	query := `
+		SELECT g.id, g.name, COALESCE(gl.name, '') as grade_name,
+			   COALESCE((
+			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
+			   	FROM group_teachers gt
+			   	INNER JOIN users u ON gt.teacher_id = u.id
+			   	WHERE gt.group_id = g.id
+			   	LIMIT 1
+			   ), '') as teacher_name,
+			   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
+			   COALESCE(g.capacity, 0) as max_students,
+			   '' as room,
+			   g.school_year as schedule,
+			   'active' as status,
+			   g.created_at
+		FROM groups g
+		INNER JOIN grade_levels gl ON g.grade_id = gl.id
+		WHERE g.tenant_id = $1 AND g.id = $2
+	`
+
+	var group GroupDetailResponse
+	group.GroupResponse = &GroupResponse{}
+	err := r.db.QueryRow(ctx, query, tenantID, groupID).Scan(
+		&group.ID, &group.Name, &group.GradeName, &group.TeacherName,
+		&group.StudentCount, &group.MaxStudents, &group.Room, &group.Schedule,
+		&group.Status, &group.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group: %w", err)
+	}
+
+	group.Description = ""
+	group.Students = []StudentResponse{}
+	group.Subjects = []SubjectResponse{}
+	group.RecentActivity = []ActivityItem{}
+	return &group, nil
 }
 
 func (r *Repository) UpdateGroup(ctx context.Context, tenantID, groupID string, req UpdateGroupRequest) (*GroupResponse, error) {
-	return &GroupResponse{}, nil
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	setParts := []string{}
+	args := []interface{}{tenantID, groupID}
+	argCount := 2
+
+	if req.Name != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+		args = append(args, req.Name)
+	}
+	if req.MaxStudents > 0 {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("capacity = $%d", argCount))
+		args = append(args, req.MaxStudents)
+	}
+
+	if len(setParts) > 0 {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argCount))
+		args = append(args, time.Now())
+		_, err = tx.Exec(ctx, fmt.Sprintf(`
+			UPDATE groups
+			SET %s
+			WHERE tenant_id = $1 AND id = $2
+		`, strings.Join(setParts, ", ")), args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update group: %w", err)
+		}
+	}
+
+	if req.TeacherID != "" {
+		_, err = tx.Exec(ctx, "DELETE FROM group_teachers WHERE group_id = $1", groupID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clear group teacher: %w", err)
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO group_teachers (group_id, teacher_id)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
+		`, groupID, req.TeacherID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign teacher to group: %w", err)
+		}
+	}
+
+	if len(setParts) == 0 && req.TeacherID == "" {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	detail, err := r.GetGroupByID(ctx, tenantID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	return detail.GroupResponse, nil
+}
+
+func (r *Repository) DeleteGroup(ctx context.Context, tenantID, groupID string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	_, err = tx.Exec(ctx, "DELETE FROM group_teachers WHERE group_id = $1", groupID)
+	if err != nil {
+		return fmt.Errorf("failed to delete group teachers: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, "DELETE FROM group_students WHERE group_id = $1", groupID)
+	if err != nil {
+		return fmt.Errorf("failed to delete group students: %w", err)
+	}
+
+	result, err := tx.Exec(ctx, "DELETE FROM groups WHERE tenant_id = $1 AND id = $2", tenantID, groupID)
+	if err != nil {
+		return fmt.Errorf("failed to delete group: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("group not found")
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) GetSubjects(ctx context.Context, tenantID string) ([]SubjectResponse, error) {
