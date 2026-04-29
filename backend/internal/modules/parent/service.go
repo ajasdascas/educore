@@ -180,6 +180,50 @@ func (s *Service) GetMessages(ctx context.Context, tenantID, userID, conversatio
 	return messages, total, nil
 }
 
+func (s *Service) GetDocuments(ctx context.Context, tenantID, userID string) ([]ParentDocumentResponse, error) {
+	documents, err := s.repo.GetDocuments(ctx, tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parent documents: %w", err)
+	}
+	return documents, nil
+}
+
+func (s *Service) GetPayments(ctx context.Context, tenantID, userID string) (*ParentPaymentsResponse, error) {
+	payments, err := s.repo.GetPayments(ctx, tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parent payments: %w", err)
+	}
+	return payments, nil
+}
+
+func (s *Service) GetConsents(ctx context.Context, tenantID, userID string) ([]ParentConsentResponse, error) {
+	consents, err := s.repo.GetConsents(ctx, tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parent consents: %w", err)
+	}
+	return consents, nil
+}
+
+func (s *Service) UpdateConsent(ctx context.Context, tenantID, userID, consentID string, req ConsentUpdateRequest) (*ParentConsentResponse, error) {
+	if req.Action != "approved" && req.Action != "rejected" {
+		return nil, fmt.Errorf("invalid consent action")
+	}
+	consent, err := s.repo.UpdateConsent(ctx, tenantID, userID, consentID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update consent: %w", err)
+	}
+	s.bus.Publish("parent.consent_updated", map[string]interface{}{"tenant_id": tenantID, "user_id": userID, "consent_id": consentID, "status": req.Action, "timestamp": time.Now()})
+	return consent, nil
+}
+
+func (s *Service) GetReportSummary(ctx context.Context, tenantID, userID string) (*ParentReportSummaryResponse, error) {
+	summary, err := s.repo.GetReportSummary(ctx, tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parent report summary: %w", err)
+	}
+	return summary, nil
+}
+
 // Calendar & Events use cases
 func (s *Service) GetCalendar(ctx context.Context, tenantID, userID string, month, year int) (*CalendarResponse, error) {
 	calendar, err := s.repo.GetCalendar(ctx, tenantID, userID, month, year)

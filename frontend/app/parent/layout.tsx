@@ -10,6 +10,9 @@ import {
   FileText,
   MessageCircle,
   Bell,
+  ClipboardCheck,
+  CreditCard,
+  FolderOpen,
   Settings,
   Menu,
   X
@@ -26,6 +29,9 @@ const navItems = [
   { href: "/parent/grades", label: "Calificaciones", icon: FileText },
   { href: "/parent/attendance", label: "Asistencia", icon: Calendar },
   { href: "/parent/messages", label: "Mensajes", icon: MessageCircle },
+  { href: "/parent/documents", label: "Documentos", icon: FolderOpen },
+  { href: "/parent/payments", label: "Pagos", icon: CreditCard },
+  { href: "/parent/consents", label: "Permisos", icon: ClipboardCheck },
   { href: "/parent/notifications", label: "Notificaciones", icon: Bell },
   { href: "/parent/settings", label: "Configuración", icon: Settings },
 ];

@@ -1,8 +1,8 @@
 package parent
 
 import (
-	"github.com/gofiber/fiber/v2"
 	"educore/internal/pkg/response"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Handler struct {
@@ -39,6 +39,13 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	api.Put("/notifications/:id/read", h.MarkNotificationRead)
 	api.Post("/messages", h.SendMessage)
 	api.Get("/messages", h.GetMessages)
+
+	// Documents, payments, consents and reports
+	api.Get("/documents", h.GetDocuments)
+	api.Get("/payments", h.GetPayments)
+	api.Get("/consents", h.GetConsents)
+	api.Patch("/consents/:id", h.UpdateConsent)
+	api.Get("/reports/summary", h.GetReportSummary)
 
 	// Calendar & Events
 	api.Get("/calendar", h.GetCalendar)
@@ -292,6 +299,50 @@ func (h *Handler) GetMessages(c *fiber.Ctx) error {
 		PerPage: perPage,
 		Total:   total,
 	})
+}
+
+func (h *Handler) GetDocuments(c *fiber.Ctx) error {
+	documents, err := h.service.GetDocuments(c.Context(), c.Locals("tenant_id").(string), c.Locals("user_id").(string))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, documents, "Success")
+}
+
+func (h *Handler) GetPayments(c *fiber.Ctx) error {
+	payments, err := h.service.GetPayments(c.Context(), c.Locals("tenant_id").(string), c.Locals("user_id").(string))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, payments, "Success")
+}
+
+func (h *Handler) GetConsents(c *fiber.Ctx) error {
+	consents, err := h.service.GetConsents(c.Context(), c.Locals("tenant_id").(string), c.Locals("user_id").(string))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, consents, "Success")
+}
+
+func (h *Handler) UpdateConsent(c *fiber.Ctx) error {
+	var req ConsentUpdateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	consent, err := h.service.UpdateConsent(c.Context(), c.Locals("tenant_id").(string), c.Locals("user_id").(string), c.Params("id"), req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, consent, "Success")
+}
+
+func (h *Handler) GetReportSummary(c *fiber.Ctx) error {
+	summary, err := h.service.GetReportSummary(c.Context(), c.Locals("tenant_id").(string), c.Locals("user_id").(string))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, summary, "Success")
 }
 
 // Calendar & Events handlers

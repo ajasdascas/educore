@@ -151,6 +151,206 @@ func (r *Repository) VerifyParentChild(ctx context.Context, tenantID, userID, ch
 	return exists, err
 }
 
+func (r *Repository) GetDocuments(ctx context.Context, tenantID, userID string) ([]ParentDocumentResponse, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT d.id::text,
+		       s.id::text,
+		       CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+		       d.title,
+		       COALESCE(d.description, ''),
+		       d.category,
+		       COALESCE(d.file_name, ''),
+		       COALESCE(d.file_url, ''),
+		       COALESCE(d.mime_type, ''),
+		       d.status,
+		       d.created_at
+		FROM school_documents d
+		INNER JOIN students s ON s.id = d.student_id AND s.tenant_id = $1
+		INNER JOIN parent_student ps ON ps.student_id = s.id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		WHERE d.tenant_id = $1 AND d.deleted_at IS NULL AND d.status <> 'deleted'
+		ORDER BY d.created_at DESC
+	`, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	documents := []ParentDocumentResponse{}
+	for rows.Next() {
+		var item ParentDocumentResponse
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.Title, &item.Description, &item.Category, &item.FileName, &item.FileURL, &item.MimeType, &item.Status, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		documents = append(documents, item)
+	}
+	return documents, rows.Err()
+}
+
+func (r *Repository) GetPayments(ctx context.Context, tenantID, userID string) (*ParentPaymentsResponse, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT p.id::text,
+		       s.id::text,
+		       CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+		       p.concept,
+		       COALESCE(p.description, ''),
+		       p.amount::float8,
+		       p.currency,
+		       TO_CHAR(p.due_date, 'YYYY-MM-DD'),
+		       p.paid_at,
+		       COALESCE(p.payment_method, ''),
+		       COALESCE(p.receipt_number, ''),
+		       COALESCE(p.receipt_url, ''),
+		       p.status
+		FROM student_payments p
+		INNER JOIN students s ON s.id = p.student_id AND s.tenant_id = $1
+		INNER JOIN parent_student ps ON ps.student_id = s.id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
+		ORDER BY p.due_date DESC
+	`, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	resp := &ParentPaymentsResponse{Summary: ParentPaymentSummary{Currency: "MXN"}}
+	for rows.Next() {
+		var item ParentPaymentResponse
+		var paidAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.Concept, &item.Description, &item.Amount, &item.Currency, &item.DueDate, &paidAt, &item.PaymentMethod, &item.ReceiptNumber, &item.ReceiptURL, &item.Status); err != nil {
+			return nil, err
+		}
+		if paidAt.Valid {
+			item.PaidAt = &paidAt.Time
+		}
+		if item.Currency != "" {
+			resp.Summary.Currency = item.Currency
+		}
+		if item.Status == "paid" {
+			resp.Summary.TotalPaid += item.Amount
+		} else if item.Status != "cancelled" {
+			resp.Summary.TotalDue += item.Amount
+			resp.Summary.PendingCount++
+			if item.Status == "overdue" {
+				resp.Summary.OverdueCount++
+			}
+		}
+		resp.Payments = append(resp.Payments, item)
+	}
+	return resp, rows.Err()
+}
+
+func (r *Repository) GetConsents(ctx context.Context, tenantID, userID string) ([]ParentConsentResponse, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT c.id::text,
+		       s.id::text,
+		       CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+		       c.title,
+		       c.description,
+		       c.category,
+		       COALESCE(TO_CHAR(c.due_date, 'YYYY-MM-DD'), ''),
+		       c.status,
+		       c.signed_at,
+		       COALESCE(c.notes, ''),
+		       c.created_at
+		FROM parent_consents c
+		INNER JOIN students s ON s.id = c.student_id AND s.tenant_id = $1
+		INNER JOIN parent_student ps ON ps.student_id = s.id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		WHERE c.tenant_id = $1 AND c.deleted_at IS NULL
+		ORDER BY CASE WHEN c.status = 'pending' THEN 0 ELSE 1 END, c.due_date NULLS LAST, c.created_at DESC
+	`, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	consents := []ParentConsentResponse{}
+	for rows.Next() {
+		var item ParentConsentResponse
+		var signedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.Title, &item.Description, &item.Category, &item.DueDate, &item.Status, &signedAt, &item.Notes, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		if signedAt.Valid {
+			item.SignedAt = &signedAt.Time
+		}
+		consents = append(consents, item)
+	}
+	return consents, rows.Err()
+}
+
+func (r *Repository) UpdateConsent(ctx context.Context, tenantID, userID, consentID string, req ConsentUpdateRequest) (*ParentConsentResponse, error) {
+	cmd, err := r.db.Exec(ctx, `
+		UPDATE parent_consents c
+		SET status = $4,
+		    signed_by = $2,
+		    signed_at = NOW(),
+		    notes = NULLIF($5, ''),
+		    updated_at = NOW()
+		WHERE c.tenant_id = $1
+		  AND c.id = $3
+		  AND c.status = 'pending'
+		  AND EXISTS (
+		      SELECT 1 FROM parent_student ps
+		      WHERE ps.student_id = c.student_id
+		        AND ps.parent_id = $2
+		        AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		  )
+	`, tenantID, userID, consentID, req.Action, req.Notes)
+	if err != nil {
+		return nil, err
+	}
+	if cmd.RowsAffected() == 0 {
+		return nil, fmt.Errorf("consent not found or already closed")
+	}
+	_, _ = r.db.Exec(ctx, `
+		INSERT INTO parent_teacher_audit_logs (tenant_id, actor_id, actor_role, action, resource, resource_id, metadata)
+		VALUES ($1, $2, 'PARENT', 'consent.update', 'parent_consents', $3, jsonb_build_object('status', $4))
+	`, tenantID, userID, consentID, req.Action)
+	consents, err := r.GetConsents(ctx, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range consents {
+		if item.ID == consentID {
+			return &item, nil
+		}
+	}
+	return nil, fmt.Errorf("consent not found")
+}
+
+func (r *Repository) GetReportSummary(ctx context.Context, tenantID, userID string) (*ParentReportSummaryResponse, error) {
+	children, err := r.GetChildrenByParent(ctx, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	summary := &ParentReportSummaryResponse{ChildrenCount: len(children), LastUpdated: time.Now()}
+	for _, child := range children {
+		summary.AverageAttendance += child.AttendanceRate
+		summary.AverageGrade += child.CurrentGPA
+	}
+	if summary.ChildrenCount > 0 {
+		summary.AverageAttendance = math.Round((summary.AverageAttendance/float64(summary.ChildrenCount))*100) / 100
+		summary.AverageGrade = math.Round((summary.AverageGrade/float64(summary.ChildrenCount))*100) / 100
+	}
+	_ = r.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(CASE WHEN p.status <> 'paid' AND p.status <> 'cancelled' THEN p.amount ELSE 0 END), 0)::float8
+		FROM student_payments p
+		INNER JOIN parent_student ps ON ps.student_id = p.student_id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
+	`, tenantID, userID).Scan(&summary.PendingPayments)
+	_ = r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM parent_consents c
+		INNER JOIN parent_student ps ON ps.student_id = c.student_id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		WHERE c.tenant_id = $1 AND c.status = 'pending' AND c.deleted_at IS NULL
+	`, tenantID, userID).Scan(&summary.PendingConsents)
+	_ = r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM parent_messages WHERE tenant_id = $1 AND recipient_id = $2 AND read_at IS NULL
+	`, tenantID, userID).Scan(&summary.UnreadMessages)
+	_ = r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM school_documents d
+		INNER JOIN parent_student ps ON ps.student_id = d.student_id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		WHERE d.tenant_id = $1 AND d.deleted_at IS NULL
+	`, tenantID, userID).Scan(&summary.DocumentsAvailable)
+	return summary, nil
+}
+
 func (r *Repository) GetChildDetails(ctx context.Context, tenantID, childID string) (*ChildDetailResponse, error) {
 	var child ChildDetailResponse
 	err := r.db.QueryRow(ctx, `
