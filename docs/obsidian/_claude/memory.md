@@ -442,3 +442,13 @@ Se implemento la experiencia de "base de datos virtual" por escuela sin bases fi
 Verificacion realizada: `go test ./...` en backend OK y `npm run build` en frontend OK.
 
 #memory #school_admin #database #security
+
+---
+
+# 29-04-2026 - Cierre Padres y Profesores
+
+Se completo el Teacher Portal con rutas reales para dashboard, clases, asistencia, calificaciones y mensajes. Se amplio Parent Portal con documentos, pagos internos/manuales y consentimientos parentales. Se agrego migracion `014_parent_teacher_portal_completion.sql`, backend `/api/v1/teacher/*`, extensiones `/api/v1/parent/documents|payments|consents|reports/summary`, mocks estaticos y UI responsive.
+
+Verificacion realizada: `go test ./...`, `npm run build`, smoke estatico local de rutas Teacher/Parent nuevas y `git diff --check` pendiente antes de commit.
+
+#memory #teacher_portal #parent_portal #backend #frontend #security

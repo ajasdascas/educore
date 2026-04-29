@@ -184,3 +184,20 @@ EduCore usa una base PostgreSQL compartida multi-tenant. Permitir DDL por tenant
 - Los exports/imports pueden incluir datos virtuales junto a los core.
 
 #architecture #security #database #school_admin
+
+---
+
+# 29-04-2026 - Padres y Profesores se cierran sobre Core existente
+
+## Decision
+El cierre de Padres y Profesores no crea modulos tenant-facing nuevos; Teacher Portal y Parent Portal consumen los 4 Core existentes mas comunicaciones, reportes y billing interno/manual donde aplique.
+
+## Razon
+Evita duplicar Academic Core y Grading System. Los docentes operan sobre grupos, asistencia y calificaciones existentes; los padres ven documentos, pagos y consentimientos filtrados por `parent_student`.
+
+## Impacto
+- Teacher tiene API propia `/api/v1/teacher/*` como fachada segura tenant-scoped.
+- Parent extiende `/api/v1/parent/*` con documentos, pagos, consentimientos y resumen.
+- La regla de 4 Core sigue vigente.
+
+#architecture #teacher_portal #parent_portal #core_modules

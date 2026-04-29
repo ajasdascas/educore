@@ -249,3 +249,16 @@
 - Mocks estaticos Hostinger actualizados para School Admin Database Explorer y provisionamiento demo de escuelas.
 
 #module #school_admin #security #backend #frontend #database
+
+---
+
+# 29-04-2026 - Cierre Padres y Profesores
+
+- Agregado backend Teacher bajo `/api/v1/teacher/*` con dashboard, clases, alumnos por grupo, asistencia, calificaciones y mensajes, filtrado por `tenant_id` y `teacher_id`.
+- Agregada migracion `014_parent_teacher_portal_completion.sql` con documentos escolares, pagos internos/manuales por alumno, consentimientos parentales y auditoria padre-profesor.
+- Parent Portal ampliado con `/parent/documents`, `/parent/payments` y `/parent/consents`.
+- Teacher Portal deja de estar en construccion: nuevas rutas `/teacher/classes`, `/teacher/attendance`, `/teacher/grades` y `/teacher/messages`.
+- `frontend/lib/auth.ts` agrega mocks persistentes para Teacher y para documentos/pagos/consentimientos de Parent en Hostinger static export.
+- Verificacion local: `go test ./...`, `npm run build` y smoke estatico de rutas nuevas OK.
+
+#parent_portal #teacher_portal #frontend #backend #security #ux
