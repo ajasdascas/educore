@@ -397,3 +397,26 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Browser Use local con `padre@educore.mx`: rutas de Parent cargan sin 404 y `/school-admin/students` redirige a `/parent/dashboard`.
 
 #parent_portal #frontend #backend #school_branding #security #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - SuperAdmin Database Admin y doctrina Core
+
+### Contexto leido
+- Se leyo la boveda Obsidian completa disponible en `docs/obsidian`.
+- Fuente mas reciente: `docs/obsidian/03_progress/CONTEXTO_ACTUAL.md`, `CAMBIOS_RECIENTES.md`, `DECISIONES_TECNICAS.md` y `_claude/*`.
+- Se detecto que algunos archivos raiz de Obsidian estan mas viejos que `03_progress`; usar `03_progress` como fuente de verdad operativa.
+
+### Cambios completados
+- Backend: nuevo `backend/internal/modules/super_admin/database_admin.go` con endpoints de introspeccion, rows paginadas, DML auditado, export snapshots e import validation.
+- Backend: nueva migracion `012_database_admin_control_panel.sql` para ocultar tablas sin drop y registrar operaciones internas.
+- Frontend: nueva ruta `/super-admin/database` con Database Admin Panel, export Excel con `xlsx` e import preview.
+- Frontend/Backend: `/super-admin/billing` ampliado para cobranza realista con invoices, recordatorios, reporte mensual y Excel.
+- Frontend: navegacion SuperAdmin incluye Database Admin y `authFetch` responde mocks para static export.
+- Documentacion: nueva arquitectura `docs/obsidian/01_architecture/CORE_MODULES_PRODUCTION_UPGRADE.md`.
+- Registry: creado `.Codex/skills/registry.json` con las 10 skills activas definidas por AGENTS.
+
+### Decision clave
+- EduCore no debe abrir modulos tenant-facing fuera de 4 Core: Auth/Tenant/RBAC, Users, Academic Core y Grading System. Billing y Database Admin son herramientas internas del SuperAdmin Control Plane.
+
+#memory #super_admin #database #architecture #security #frontend #backend

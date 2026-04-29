@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "project": "EduCore",
+  "created_at": "2026-04-29T00:00:00-06:00",
+  "updated_at": "2026-04-29T00:00:00-06:00",
+  "skills": {
+    "backend-architect": { "status": "active", "version": "1.0" },
+    "frontend-ux-master": { "status": "active", "version": "1.0" },
+    "database-optimizer": { "status": "active", "version": "1.0" },
+    "security-auditor": { "status": "active", "version": "1.0" },
+    "test-engineer": { "status": "active", "version": "1.0" },
+    "api-designer": { "status": "active", "version": "1.0" },
+    "deployment-manager": { "status": "active", "version": "1.0" },
+    "grill-me": { "status": "active", "version": "1.0" },
+    "humanizalo": { "status": "active", "version": "1.0" },
+    "mcp-builder": { "status": "active", "version": "1.0" }
+  }
+}

@@ -160,3 +160,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** El panel School Admin puede mostrar logo/nombre de escuela configurada. En modo demo, el archivo se convierte a data URL para no depender de upload real en Hostinger static export.
 
 #architecture #branding #super_admin #school_admin
+
+## 29-04-2026 - Database Admin es submodulo interno, no modulo tenant-facing
+
+**Decision:** Implementar Database Admin dentro del SuperAdmin Control Plane y mantener la regla de 4 modulos Core tenant-facing: Auth/Tenant/RBAC, Users, Academic Core y Grading System.
+
+**Razon:** La plataforma necesita control total de datos, export/import Excel y cobranza para competir con SaaS escolares reales, pero abrir mas modulos funcionales antes de cerrar el Core dispersaria el roadmap y aumentaria riesgo de regresiones.
+
+**Impacto:** SuperAdmin gana inspeccion de tablas, schema, relaciones, filas paginadas, export full DB e import preview. Las operaciones estructurales DDL quedan apagadas por defecto y requieren `EDUCORE_ENABLE_DB_ADMIN_DDL=true`; acciones sensibles quedan auditadas.
+
+#architecture #super_admin #database #security #billing

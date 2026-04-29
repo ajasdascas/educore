@@ -54,5 +54,9 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Branding de escuelas:** SuperAdmin pide logo opcional al crear escuela; en demo se persiste como data URL y School Admin muestra logo/nombre de la escuela configurada.
 - **Verificacion Portal de Padres:** `go test ./...`, `npm run build`, `git diff --check` y smoke Browser Use local OK; `PARENT` redirige fuera de `/school-admin/*`.
 - **Siguiente submodulo:** confirmar deploy productivo y despues avanzar a reportes/analytics o extensiones por nivel educativo.
+- **Doctrina Core actualizada:** EduCore queda limitado a 4 modulos tenant-facing hasta que esten production-ready: Auth/Tenant/RBAC, Users, Academic Core y Grading System. Billing y Database Admin existen solo como submodulos internos del SuperAdmin Control Plane.
+- **SuperAdmin > Database Admin:** agregado panel de control seguro para listar tablas, ver schema/relaciones, inspeccionar filas paginadas, exportar tabla o base completa a Excel e importar Excel en modo preview/validacion. Backend expone contratos `/api/v1/super-admin/database/*` con tablas protegidas, auditoria y DDL apagado por defecto.
+- **SuperAdmin > Billing & Cobranza:** ampliado con estado financiero por institucion, invoices, generar invoice, marcar pagado, recordatorios, reporte mensual y descarga Excel.
+- **Documentacion production upgrade:** nueva especificacion `docs/obsidian/01_architecture/CORE_MODULES_PRODUCTION_UPGRADE.md` con schema, services, endpoints, Excel import/export, validacion y estructura UI.
 
 #module #architecture #super_admin #school_admin

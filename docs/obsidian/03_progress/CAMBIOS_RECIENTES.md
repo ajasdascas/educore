@@ -212,3 +212,25 @@
 - Browser Use local: Parent Portal carga rutas clave sin 404 y un usuario PARENT no permanece dentro de `/school-admin/*`.
 
 #parent_portal #frontend #backend #branding #security
+
+---
+
+## [29-04-2026] - SuperAdmin Database Admin + Core Production Rule
+
+### Backend
+- Nuevo submodulo interno `Database Admin` bajo SuperAdmin con endpoints `/api/v1/super-admin/database/*`.
+- Se agrego introspeccion de tablas, columnas, constraints, relaciones, filas paginadas y snapshots para export Excel.
+- Operaciones de escritura quedan auditadas; tablas sensibles quedan protegidas; DDL real requiere `EDUCORE_ENABLE_DB_ADMIN_DDL=true`.
+- Nueva migracion `012_database_admin_control_panel.sql` para metadata de tablas ocultas y bitacora de operaciones.
+
+### Frontend
+- Nueva ruta `/super-admin/database` con listado de tablas, schema, relaciones, preview de filas, export de tabla, export full DB e import Excel en preview.
+- `frontend/lib/auth.ts` agrega mocks estaticos para que Hostinger static export pueda probar Database Admin sin backend Node.
+- Navegacion SuperAdmin incluye `Database Admin`.
+- `/super-admin/billing` queda ampliado con MRR, cobrado, pendiente, suscripciones, invoices, generar invoice, marcar pagado, recordatorios y export Excel.
+
+### Arquitectura
+- Se formaliza que EduCore solo abre 4 modulos tenant-facing hasta que esten production-ready: Auth/Tenant/RBAC, Users, Academic Core y Grading System.
+- Billing y Database Admin se clasifican como submodulos internos de SuperAdmin Control Plane, no como modulos nuevos para escuelas.
+
+#super_admin #database #security #frontend #backend #architecture
