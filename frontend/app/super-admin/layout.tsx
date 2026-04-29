@@ -35,6 +35,7 @@ const navItems = [
   { href: "/super-admin/billing", label: "Billing", icon: CreditCard },
   { href: "/super-admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/super-admin/health", label: "Health Monitor", icon: HeartPulse },
+  { href: "/super-admin/database", label: "Database Admin", icon: Database },
   { href: "/super-admin/audit", label: "Auditoria", icon: History },
   { href: "/super-admin/support", label: "Soporte", icon: LifeBuoy },
   { href: "/super-admin/storage", label: "Storage", icon: Database },

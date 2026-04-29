@@ -2294,23 +2294,79 @@ async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) 
   }
 
   if (path.endsWith("/super-admin/billing/invoices")) {
+    const invoices = readMockList("mock_enterprise_invoices", defaultMockSchools.map((school, index) => ({
+      id: `invoice-${index + 1}`,
+      tenant_id: school.id,
+      tenant_name: school.name,
+      folio: `EDU-2026-00${index + 1}`,
+      status: index === 1 ? "pending" : "paid",
+      total: index === 1 ? 899 : 1899,
+      due_date: "2026-05-05T00:00:00.000Z",
+      paid_at: index === 1 ? null : "2026-04-29T10:00:00.000Z",
+      created_at: "2026-04-29T10:00:00.000Z",
+    })));
     return {
       success: true,
       data: {
-        invoices: defaultMockSchools.map((school, index) => ({
-          id: `invoice-${index + 1}`,
-          tenant_name: school.name,
-          status: index === 1 ? "pending" : "paid",
-          total: index === 1 ? 899 : 1899,
-          due_date: "2026-05-05T00:00:00.000Z",
-          created_at: "2026-04-29T10:00:00.000Z",
-        })),
+        invoices,
       },
     };
   }
 
+  if (path.endsWith("/super-admin/billing/invoices/generate") && method === "POST") {
+    const body = parseBody(options);
+    const school = defaultMockSchools.find((item) => item.id === body.tenant_id) || defaultMockSchools[0];
+    const invoices = readMockList<any>("mock_enterprise_invoices", []);
+    const created = {
+      id: `invoice-${Date.now()}`,
+      tenant_id: body.tenant_id || school.id,
+      tenant_name: school.name,
+      folio: `EDU-${Date.now()}`,
+      status: "pending",
+      total: Number(body.total || 0),
+      due_date: body.due_date || "2026-05-05T00:00:00.000Z",
+      paid_at: null,
+      created_at: nowIso(),
+    };
+    writeMockList("mock_enterprise_invoices", [created, ...invoices]);
+    return { success: true, data: created, message: "Invoice generado en modo demo" };
+  }
+
+  const markInvoicePaidMatch = path.match(/\/super-admin\/billing\/invoices\/([^/]+)\/mark-paid$/);
+  if (markInvoicePaidMatch && method === "POST") {
+    const id = decodeURIComponent(markInvoicePaidMatch[1]);
+    const invoices = readMockList<any>("mock_enterprise_invoices", []);
+    writeMockList("mock_enterprise_invoices", invoices.map((invoice) => invoice.id === id ? { ...invoice, status: "paid", paid_at: nowIso() } : invoice));
+    return { success: true, message: "Invoice marcado como pagado en modo demo" };
+  }
+
   if (path.endsWith("/super-admin/billing/payments/manual") && method === "POST") {
     return { success: true, data: { id: `payment-${Date.now()}` }, message: "Pago manual registrado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/billing/reminders") && method === "POST") {
+    return { success: true, data: { queued: true }, message: "Recordatorios enviados en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/billing/reports/monthly")) {
+    const invoices = readMockList<any>("mock_enterprise_invoices", []);
+    const invoiceSource = invoices.length > 0 ? invoices : defaultMockSchools.map((school, index) => ({
+      id: `invoice-${index + 1}`,
+      status: index === 1 ? "pending" : "paid",
+      total: index === 1 ? 899 : 1899,
+      created_at: "2026-04-29T10:00:00.000Z",
+    }));
+    const total = invoiceSource.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const paid = invoiceSource.filter((invoice) => invoice.status === "paid").reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    return {
+      success: true,
+      data: {
+        reports: [
+          { month: "2026-04", invoices: invoiceSource.length, total, paid, pending: total - paid },
+          { month: "2026-03", invoices: 3, total: 4697, paid: 4697, pending: 0 },
+        ],
+      },
+    };
   }
 
   if (path.endsWith("/super-admin/analytics/kpis")) {
@@ -2471,6 +2527,139 @@ async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) 
   if (path.includes("/super-admin/system/")) {
     if (method === "PUT") return { success: true, message: "Configuracion global guardada en modo demo" };
     return { success: true, data: { settings: { maintenance_mode: false, platform_name: "EduCore SaaS", timezone: "America/Mexico_City" } } };
+  }
+
+  const databaseTables = [
+    { name: "tenants", estimated_rows: defaultMockSchools.length, is_hidden: false, is_protected: false },
+    { name: "users", estimated_rows: defaultMockUsers.length, is_hidden: false, is_protected: false },
+    { name: "students", estimated_rows: readMockList("mock_school_students", defaultMockStudents).length, is_hidden: false, is_protected: false },
+    { name: "parent_student", estimated_rows: 6, is_hidden: false, is_protected: false },
+    { name: "school_years", estimated_rows: readMockList("mock_school_years", defaultMockSchoolYears).length, is_hidden: false, is_protected: false },
+    { name: "groups", estimated_rows: readMockList("mock_school_groups", mockSchoolGroups).length, is_hidden: false, is_protected: false },
+    { name: "subjects", estimated_rows: readMockList("mock_school_subjects", defaultMockSubjects).length, is_hidden: false, is_protected: false },
+    { name: "attendance_records", estimated_rows: readMockList("mock_school_attendance", []).length, is_hidden: false, is_protected: false },
+    { name: "grade_records", estimated_rows: readMockList("mock_school_grades", []).length, is_hidden: false, is_protected: false },
+    { name: "audit_logs", estimated_rows: enterpriseAuditLogs.length, is_hidden: false, is_protected: true },
+    { name: "invoices", estimated_rows: defaultMockSchools.length, is_hidden: false, is_protected: false },
+  ];
+
+  const databaseRows: Record<string, any[]> = {
+    tenants: readMockList("mock_schools", defaultMockSchools),
+    users: readMockList("mock_users", defaultMockUsers),
+    students: readMockList("mock_school_students", defaultMockStudents),
+    parent_student: [
+      { id: "ps-1", tenant_id: "school-don-bosco", parent_id: "parent-1", student_id: "student-1", relationship: "mother", is_primary: true },
+      { id: "ps-2", tenant_id: "school-don-bosco", parent_id: "parent-2", student_id: "student-2", relationship: "father", is_primary: true },
+    ],
+    school_years: readMockList("mock_school_years", defaultMockSchoolYears),
+    groups: readMockList("mock_school_groups", mockSchoolGroups),
+    subjects: readMockList("mock_school_subjects", defaultMockSubjects),
+    attendance_records: readMockList("mock_school_attendance", []),
+    grade_records: readMockList("mock_school_grades", []),
+    audit_logs: enterpriseAuditLogs,
+    invoices: defaultMockSchools.map((school, index) => ({
+      id: `invoice-${index + 1}`,
+      tenant_id: school.id,
+      tenant_name: school.name,
+      status: index === 1 ? "pending" : "paid",
+      total: index === 1 ? 899 : 1899,
+      due_date: "2026-05-05T00:00:00.000Z",
+      created_at: "2026-04-29T10:00:00.000Z",
+    })),
+  };
+
+  const databaseSchemas: Record<string, any> = {
+    tenants: {
+      columns: [
+        { name: "id", type: "uuid", nullable: false, is_primary: true, is_protected: true },
+        { name: "name", type: "varchar", nullable: false, is_primary: false, is_protected: false },
+        { name: "slug", type: "varchar", nullable: false, is_primary: false, is_protected: false },
+        { name: "status", type: "varchar", nullable: false, is_primary: false, is_protected: false },
+        { name: "plan", type: "varchar", nullable: true, is_primary: false, is_protected: false },
+        { name: "logo_url", type: "text", nullable: true, is_primary: false, is_protected: false },
+        { name: "created_at", type: "timestamptz", nullable: false, is_primary: false, is_protected: true },
+      ],
+      relationships: [],
+    },
+    students: {
+      columns: [
+        { name: "id", type: "uuid", nullable: false, is_primary: true, is_protected: true },
+        { name: "tenant_id", type: "uuid", nullable: false, is_primary: false, is_protected: true },
+        { name: "first_name", type: "varchar", nullable: false, is_primary: false, is_protected: false },
+        { name: "paternal_last_name", type: "varchar", nullable: false, is_primary: false, is_protected: false },
+        { name: "maternal_last_name", type: "varchar", nullable: true, is_primary: false, is_protected: false },
+        { name: "birth_day", type: "integer", nullable: true, is_primary: false, is_protected: false },
+        { name: "birth_month", type: "integer", nullable: true, is_primary: false, is_protected: false },
+        { name: "birth_year", type: "integer", nullable: true, is_primary: false, is_protected: false },
+        { name: "curp", type: "varchar", nullable: true, is_primary: false, is_protected: false },
+      ],
+      relationships: [
+        { column: "tenant_id", foreign_table: "tenants", foreign_column: "id" },
+      ],
+    },
+    parent_student: {
+      columns: [
+        { name: "id", type: "uuid", nullable: false, is_primary: true, is_protected: true },
+        { name: "parent_id", type: "uuid", nullable: false, is_primary: false, is_protected: false },
+        { name: "student_id", type: "uuid", nullable: false, is_primary: false, is_protected: false },
+        { name: "relationship", type: "varchar", nullable: false, is_primary: false, is_protected: false },
+      ],
+      relationships: [
+        { column: "parent_id", foreign_table: "users", foreign_column: "id" },
+        { column: "student_id", foreign_table: "students", foreign_column: "id" },
+      ],
+    },
+  };
+
+  const databaseTableMatch = path.match(/\/super-admin\/database\/tables\/([^/]+)(?:\/(schema|rows|structure|soft-delete))?(?:\/([^/]+))?$/);
+  if (path.endsWith("/super-admin/database/tables")) {
+    if (method === "POST") return { success: false, error: "DDL demo protegido por flag backend" };
+    return { success: true, data: { tables: databaseTables } };
+  }
+  if (databaseTableMatch) {
+    const table = decodeURIComponent(databaseTableMatch[1]);
+    const action = databaseTableMatch[2];
+    const tableRows = databaseRows[table] || [];
+    const schema = databaseSchemas[table] || {
+      columns: Object.keys(tableRows[0] || { id: "" }).map((key) => ({
+        name: key,
+        type: key.endsWith("_at") ? "timestamptz" : "text",
+        nullable: key !== "id",
+        is_primary: key === "id",
+        is_protected: ["id", "tenant_id", "created_at", "updated_at"].includes(key),
+      })),
+      relationships: tableRows[0]?.tenant_id ? [{ column: "tenant_id", foreign_table: "tenants", foreign_column: "id" }] : [],
+    };
+    if (action === "schema") return { success: true, data: { table, is_protected: table === "audit_logs", ...schema, constraints: [] } };
+    if (action === "rows") return { success: true, data: { rows: tableRows.slice(0, 50), page: 1, per_page: 50, total: tableRows.length } };
+    if (action === "structure") return { success: false, error: "DDL demo protegido por flag backend" };
+    if (action === "soft-delete") return { success: true, message: "Tabla marcada como oculta en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/database/export/full")) {
+    return { success: true, data: { generated_at: nowIso(), tables: databaseRows, format: "json-workbook-source" } };
+  }
+
+  const databaseExportMatch = path.match(/\/super-admin\/database\/export\/tables\/([^/]+)$/);
+  if (databaseExportMatch) {
+    const names = decodeURIComponent(databaseExportMatch[1]).split(",");
+    const payload = names.reduce<Record<string, any[]>>((acc, name) => {
+      acc[name] = databaseRows[name] || [];
+      return acc;
+    }, {});
+    return { success: true, data: { generated_at: nowIso(), tables: payload, format: "json-workbook-source" } };
+  }
+
+  if (path.endsWith("/super-admin/database/import/validate") && method === "POST") {
+    return {
+      success: true,
+      data: {
+        valid: true,
+        warnings: ["Preview demo validado. El commit real debe usar endpoints del modulo correspondiente."],
+        required_steps: ["map_columns", "preview", "validate", "commit_with_audit"],
+      },
+      message: "Importacion validada en modo demo",
+    };
   }
 
   if (path.endsWith("/super-admin/plans")) {
