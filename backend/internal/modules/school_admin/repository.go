@@ -26,6 +26,17 @@ func mapBoolStatus(isActive bool) string {
 	return "inactive"
 }
 
+func splitFullName(fullName string) (string, string) {
+	parts := strings.Fields(fullName)
+	if len(parts) == 0 {
+		return "Tutor", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], " ")
+}
+
 // Dashboard & Stats queries
 func (r *Repository) GetDashboardStats(ctx context.Context, tenantID string) (*DashboardStats, error) {
 	query := `
@@ -113,7 +124,7 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 
 	if params.Search != "" {
 		argCount++
-		whereClause += fmt.Sprintf(" AND (s.first_name ILIKE $%d OR s.last_name ILIKE $%d OR s.email ILIKE $%d)", argCount, argCount, argCount)
+		whereClause += fmt.Sprintf(" AND (s.first_name ILIKE $%d OR s.last_name ILIKE $%d OR s.enrollment_number ILIKE $%d)", argCount, argCount, argCount)
 		args = append(args, "%"+params.Search+"%")
 	}
 
@@ -146,14 +157,31 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 	// Data query
 	offset := (params.Page - 1) * params.PerPage
 	dataQuery := fmt.Sprintf(`
-		SELECT DISTINCT s.id, s.first_name, s.last_name, s.email, s.phone,
-			   s.enrollment_id, s.status, COALESCE(g.name, '') as group_name,
-			   COALESCE(gl.name, '') as grade_name, s.parent_name, s.parent_email,
+		SELECT DISTINCT s.id, s.first_name, s.last_name, '' as email, '' as phone,
+			   COALESCE(s.enrollment_number, '') as enrollment_id, s.status,
+			   COALESCE(g.name, '') as group_name,
+			   COALESCE(gl.name, '') as grade_name,
+			   COALESCE((
+			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
+			   	FROM parent_student ps
+			   	INNER JOIN users u ON ps.parent_id = u.id
+			   	WHERE ps.student_id = s.id
+			   	ORDER BY ps.is_primary DESC
+			   	LIMIT 1
+			   ), '') as parent_name,
+			   COALESCE((
+			   	SELECT u.email
+			   	FROM parent_student ps
+			   	INNER JOIN users u ON ps.parent_id = u.id
+			   	WHERE ps.student_id = s.id
+			   	ORDER BY ps.is_primary DESC
+			   	LIMIT 1
+			   ), '') as parent_email,
 			   s.created_at, s.updated_at
 		FROM students s
 		LEFT JOIN group_students gs ON s.id = gs.student_id
 		LEFT JOIN groups g ON gs.group_id = g.id
-		LEFT JOIN grade_levels gl ON g.grade_level_id = gl.id
+		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
 		%s
 		ORDER BY s.created_at DESC
 		LIMIT $%d OFFSET $%d
@@ -195,37 +223,74 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 }
 
 func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req CreateStudentRequest) (*StudentResponse, error) {
-	query := `
-		INSERT INTO students (tenant_id, first_name, last_name, email, phone, birth_date,
-							 address, enrollment_id, parent_name, parent_email, parent_phone, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, COALESCE($12, 'active'))
-		RETURNING id, first_name, last_name, email, phone, enrollment_id, status,
-				  parent_name, parent_email, created_at, updated_at
-	`
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	status := req.Status
+	if status == "" {
+		status = "active"
+	}
 
 	var student StudentResponse
-	err := r.db.QueryRow(ctx, query,
-		tenantID, req.FirstName, req.LastName, req.Email, req.Phone,
-		req.BirthDate, req.Address, req.EnrollmentID, req.ParentName,
-		req.ParentEmail, req.ParentPhone, req.Status,
+	err = tx.QueryRow(ctx, `
+		INSERT INTO students (tenant_id, enrollment_number, first_name, last_name, birth_date, status, notes)
+		VALUES ($1, $2, $3, $4, NULLIF($5, '')::date, $6, $7)
+		RETURNING id, first_name, last_name, COALESCE(enrollment_number, ''), status, created_at, updated_at
+	`,
+		tenantID, req.EnrollmentID, req.FirstName, req.LastName, req.BirthDate, status, req.Address,
 	).Scan(
-		&student.ID, &student.FirstName, &student.LastName, &student.Email,
-		&student.Phone, &student.EnrollmentID, &student.Status,
-		&student.ParentName, &student.ParentEmail, &student.CreatedAt, &student.UpdatedAt,
+		&student.ID, &student.FirstName, &student.LastName, &student.EnrollmentID,
+		&student.Status, &student.CreatedAt, &student.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create student: %w", err)
 	}
 
-	// Assign to group if specified
+	student.Email = req.Email
+	student.Phone = req.Phone
+	student.ParentName = req.ParentName
+	student.ParentEmail = req.ParentEmail
+
 	if req.GroupID != "" {
-		_, err = r.db.Exec(ctx, `
-			INSERT INTO group_students (group_id, student_id, tenant_id)
-			VALUES ($1, $2, $3)
-		`, req.GroupID, student.ID, tenantID)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO group_students (group_id, student_id)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
+		`, req.GroupID, student.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assign student to group: %w", err)
 		}
+	}
+
+	if req.ParentEmail != "" {
+		parentFirstName, parentLastName := splitFullName(req.ParentName)
+		var parentID string
+		err = tx.QueryRow(ctx, `
+			INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
+			VALUES ($1, $2, '', $3, $4, 'PARENT', true)
+			ON CONFLICT (tenant_id, email)
+			DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
+			RETURNING id
+		`, tenantID, req.ParentEmail, parentFirstName, parentLastName).Scan(&parentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create parent user: %w", err)
+		}
+
+		_, err = tx.Exec(ctx, `
+			INSERT INTO parent_student (parent_id, student_id, relationship, is_primary)
+			VALUES ($1, $2, 'guardian', true)
+			ON CONFLICT (parent_id, student_id) DO UPDATE SET is_primary = true
+		`, parentID, student.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to link parent to student: %w", err)
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return &student, nil
@@ -233,18 +298,38 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 
 func (r *Repository) GetStudentByID(ctx context.Context, tenantID, studentID string) (*StudentDetailResponse, error) {
 	query := `
-		SELECT s.id, s.first_name, s.last_name, s.email, s.phone, s.birth_date,
-			   s.address, s.enrollment_id, s.status, s.parent_name, s.parent_email,
-			   s.parent_phone, COALESCE(g.name, '') as group_name,
+		SELECT s.id, s.first_name, s.last_name, '' as email, '' as phone,
+			   COALESCE(to_char(s.birth_date, 'YYYY-MM-DD'), '') as birth_date,
+			   COALESCE(s.notes, '') as address,
+			   COALESCE(s.enrollment_number, '') as enrollment_id,
+			   s.status,
+			   COALESCE((
+			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
+			   	FROM parent_student ps
+			   	INNER JOIN users u ON ps.parent_id = u.id
+			   	WHERE ps.student_id = s.id
+			   	ORDER BY ps.is_primary DESC
+			   	LIMIT 1
+			   ), '') as parent_name,
+			   COALESCE((
+			   	SELECT u.email
+			   	FROM parent_student ps
+			   	INNER JOIN users u ON ps.parent_id = u.id
+			   	WHERE ps.student_id = s.id
+			   	ORDER BY ps.is_primary DESC
+			   	LIMIT 1
+			   ), '') as parent_email,
+			   '' as parent_phone, COALESCE(g.name, '') as group_name,
 			   COALESCE(gl.name, '') as grade_name, s.created_at, s.updated_at
 		FROM students s
 		LEFT JOIN group_students gs ON s.id = gs.student_id
 		LEFT JOIN groups g ON gs.group_id = g.id
-		LEFT JOIN grade_levels gl ON g.grade_level_id = gl.id
+		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
 		WHERE s.tenant_id = $1 AND s.id = $2
 	`
 
 	var student StudentDetailResponse
+	student.StudentResponse = &StudentResponse{}
 	err := r.db.QueryRow(ctx, query, tenantID, studentID).Scan(
 		&student.ID, &student.FirstName, &student.LastName, &student.Email,
 		&student.Phone, &student.BirthDate, &student.Address, &student.EnrollmentID,
@@ -288,6 +373,12 @@ func (r *Repository) GetStudentByID(ctx context.Context, tenantID, studentID str
 }
 
 func (r *Repository) UpdateStudent(ctx context.Context, tenantID, studentID string, req UpdateStudentRequest) (*StudentResponse, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	setParts := []string{}
 	args := []interface{}{tenantID, studentID}
 	argCount := 2
@@ -302,30 +393,15 @@ func (r *Repository) UpdateStudent(ctx context.Context, tenantID, studentID stri
 		setParts = append(setParts, fmt.Sprintf("last_name = $%d", argCount))
 		args = append(args, req.LastName)
 	}
-	if req.Email != "" {
-		argCount++
-		setParts = append(setParts, fmt.Sprintf("email = $%d", argCount))
-		args = append(args, req.Email)
-	}
-	if req.Phone != "" {
-		argCount++
-		setParts = append(setParts, fmt.Sprintf("phone = $%d", argCount))
-		args = append(args, req.Phone)
-	}
 	if req.Address != "" {
 		argCount++
-		setParts = append(setParts, fmt.Sprintf("address = $%d", argCount))
+		setParts = append(setParts, fmt.Sprintf("notes = $%d", argCount))
 		args = append(args, req.Address)
 	}
-	if req.ParentName != "" {
+	if req.EnrollmentID != "" {
 		argCount++
-		setParts = append(setParts, fmt.Sprintf("parent_name = $%d", argCount))
-		args = append(args, req.ParentName)
-	}
-	if req.ParentEmail != "" {
-		argCount++
-		setParts = append(setParts, fmt.Sprintf("parent_email = $%d", argCount))
-		args = append(args, req.ParentEmail)
+		setParts = append(setParts, fmt.Sprintf("enrollment_number = $%d", argCount))
+		args = append(args, req.EnrollmentID)
 	}
 	if req.Status != "" {
 		argCount++
@@ -333,53 +409,53 @@ func (r *Repository) UpdateStudent(ctx context.Context, tenantID, studentID stri
 		args = append(args, req.Status)
 	}
 
-	if len(setParts) == 0 {
-		return nil, fmt.Errorf("no fields to update")
+	if len(setParts) > 0 {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argCount))
+		args = append(args, time.Now())
+
+		query := fmt.Sprintf(`
+			UPDATE students
+			SET %s
+			WHERE tenant_id = $1 AND id = $2
+		`, strings.Join(setParts, ", "))
+
+		_, err = tx.Exec(ctx, query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update student: %w", err)
+		}
 	}
 
-	argCount++
-	setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argCount))
-	args = append(args, time.Now())
-
-	query := fmt.Sprintf(`
-		UPDATE students
-		SET %s
-		WHERE tenant_id = $1 AND id = $2
-		RETURNING id, first_name, last_name, email, phone, enrollment_id,
-				  status, parent_name, parent_email, created_at, updated_at
-	`, strings.Join(setParts, ", "))
-
-	var student StudentResponse
-	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&student.ID, &student.FirstName, &student.LastName, &student.Email,
-		&student.Phone, &student.EnrollmentID, &student.Status,
-		&student.ParentName, &student.ParentEmail, &student.CreatedAt, &student.UpdatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update student: %w", err)
-	}
-
-	// Update group assignment if specified
 	if req.GroupID != "" {
-		// Remove from current group first
-		_, err = r.db.Exec(ctx, `
-			DELETE FROM group_students WHERE student_id = $1 AND tenant_id = $2
-		`, studentID, tenantID)
+		_, err = tx.Exec(ctx, "DELETE FROM group_students WHERE student_id = $1", studentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to remove student from current group: %w", err)
 		}
 
-		// Add to new group
-		_, err = r.db.Exec(ctx, `
-			INSERT INTO group_students (group_id, student_id, tenant_id)
-			VALUES ($1, $2, $3)
-		`, req.GroupID, studentID, tenantID)
+		_, err = tx.Exec(ctx, `
+			INSERT INTO group_students (group_id, student_id)
+			VALUES ($1, $2)
+			ON CONFLICT DO NOTHING
+		`, req.GroupID, studentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assign student to new group: %w", err)
 		}
 	}
 
-	return &student, nil
+	if len(setParts) == 0 && req.GroupID == "" {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	detail, err := r.GetStudentByID(ctx, tenantID, studentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return detail.StudentResponse, nil
 }
 
 func (r *Repository) DeleteStudent(ctx context.Context, tenantID, studentID string) error {
@@ -391,12 +467,12 @@ func (r *Repository) DeleteStudent(ctx context.Context, tenantID, studentID stri
 	defer tx.Rollback(ctx)
 
 	// Delete from related tables first
-	_, err = tx.Exec(ctx, "DELETE FROM group_students WHERE student_id = $1 AND tenant_id = $2", studentID, tenantID)
+	_, err = tx.Exec(ctx, "DELETE FROM group_students WHERE student_id = $1", studentID)
 	if err != nil {
 		return fmt.Errorf("failed to delete group assignments: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, "DELETE FROM parent_student WHERE student_id = $1 AND tenant_id = $2", studentID, tenantID)
+	_, err = tx.Exec(ctx, "DELETE FROM parent_student WHERE student_id = $1", studentID)
 	if err != nil {
 		return fmt.Errorf("failed to delete parent relationships: %w", err)
 	}
@@ -525,25 +601,17 @@ func (r *Repository) CreateTeacher(ctx context.Context, tenantID string, req Cre
 
 // Validation helper functions
 func (r *Repository) StudentEmailExists(ctx context.Context, tenantID, email string) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM students WHERE tenant_id = $1 AND email = $2)",
-		tenantID, email).Scan(&exists)
-	return exists, err
+	return false, nil
 }
 
 func (r *Repository) StudentEmailExistsExcluding(ctx context.Context, tenantID, email, studentID string) (bool, error) {
-	var exists bool
-	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM students WHERE tenant_id = $1 AND email = $2 AND id != $3)",
-		tenantID, email, studentID).Scan(&exists)
-	return exists, err
+	return false, nil
 }
 
 func (r *Repository) GroupExists(ctx context.Context, tenantID, groupID string) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM groups WHERE tenant_id = $1 AND id = $2 AND status = 'active')",
+		"SELECT EXISTS(SELECT 1 FROM groups WHERE tenant_id = $1 AND id = $2)",
 		tenantID, groupID).Scan(&exists)
 	return exists, err
 }
@@ -590,9 +658,14 @@ func (r *Repository) SubjectNameExists(ctx context.Context, tenantID, name strin
 
 func (r *Repository) StudentBelongsToGroup(ctx context.Context, tenantID, studentID, groupID string) (bool, error) {
 	var exists bool
-	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM group_students WHERE tenant_id = $1 AND student_id = $2 AND group_id = $3)",
-		tenantID, studentID, groupID).Scan(&exists)
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM group_students gs
+			INNER JOIN groups g ON gs.group_id = g.id
+			WHERE g.tenant_id = $1 AND gs.student_id = $2 AND gs.group_id = $3
+		)
+	`, tenantID, studentID, groupID).Scan(&exists)
 	return exists, err
 }
 
@@ -601,9 +674,9 @@ func (r *Repository) StudentBelongsToSubject(ctx context.Context, tenantID, stud
 	err := r.db.QueryRow(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM group_students gs
+			INNER JOIN groups g ON gs.group_id = g.id
 			INNER JOIN group_teachers gt ON gs.group_id = gt.group_id
-			INNER JOIN teacher_subjects ts ON gt.teacher_id = ts.teacher_id
-			WHERE gs.tenant_id = $1 AND gs.student_id = $2 AND ts.subject_id = $3
+			WHERE g.tenant_id = $1 AND gs.student_id = $2 AND gt.subject_id = $3
 		)
 	`, tenantID, studentID, subjectID).Scan(&exists)
 	return exists, err

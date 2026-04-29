@@ -177,15 +177,15 @@ export default function SchoolAdminDashboard() {
             <CardTitle>Acciones Rápidas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <button
-              onClick={() => showQueuedModule("Estudiantes")}
-              className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            <Link
+              href="/school-admin/students"
+              className="block w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center">
                 <GraduationCap className="h-4 w-4 mr-3 text-blue-600" />
                 <span className="text-sm font-medium">Matricular Estudiante</span>
               </div>
-            </button>
+            </Link>
             <Link
               href="/school-admin/teachers"
               className="block w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"

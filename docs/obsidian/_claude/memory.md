@@ -143,3 +143,23 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con School Admin > Estudiantes. No avanzar a Grupos/Horarios hasta que Estudiantes tenga CRUD, filtros, detalle y acciones completas.
 
 #school_admin #teachers #frontend #backend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Estudiantes completado
+
+### Cambios completados
+- `frontend/app/school-admin/students/page.tsx`: submodulo de Estudiantes implementado con listado, busqueda, filtros por estado/grupo, matricula, edicion, detalle, activar/pausar y eliminacion con confirmacion.
+- `frontend/lib/auth.ts`: mock demo de estudiantes, grupos y operaciones CRUD persistentes en `localStorage`.
+- `frontend/app/school-admin/dashboard/page.tsx`: accion "Matricular Estudiante" enlaza al modulo real.
+- `backend/internal/modules/school_admin/repository.go`: metodos de estudiantes alineados al schema actual (`enrollment_number`, `groups.grade_id`, `parent_student`, `users` para tutores). Se eliminaron referencias a columnas inexistentes.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `next build` con Node bundled: OK, genera `/school-admin/students`.
+- Prueba headless local con Chrome DevTools: listar, crear, ver detalle, editar, cambiar estado y eliminar estudiante: OK sin errores ni warnings.
+
+### Siguiente paso recomendado
+- Continuar con School Admin > Grupos. No avanzar a Horarios/Reportes hasta que Grupos tenga CRUD, asignacion de profesor y capacidad funcionales.
+
+#school_admin #students #frontend #backend #memory

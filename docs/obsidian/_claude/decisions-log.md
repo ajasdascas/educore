@@ -31,3 +31,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** Los endpoints de School Admin quedan accesibles en rutas limpias como `/api/v1/school-admin/academic/teachers`, compatibles con frontend, mocks y documentacion futura.
 
 #backend #api #school_admin
+
+## 29-04-2026 - Estudiantes usa schema academico existente
+
+**Decision:** El backend de School Admin > Estudiantes se adapto al schema actual en lugar de agregar columnas nuevas para contacto del alumno.
+
+**Razon:** La tabla `students` actual contiene datos academicos base (`enrollment_number`, nombre, fecha nacimiento, estado, notas), mientras que tutores viven en `users` + `parent_student`. Agregar columnas duplicadas para email/telefono/direccion hubiera creado deuda y riesgo de inconsistencia.
+
+**Impacto:** Los endpoints de estudiantes ya no consultan columnas inexistentes. El contacto principal se obtiene desde el tutor relacionado; campos extra de demo se mantienen solo en frontend/mock hasta formalizar una migracion de perfil extendido.
+
+#backend #database #school_admin #students

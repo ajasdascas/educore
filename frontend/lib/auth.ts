@@ -263,6 +263,82 @@ const defaultMockTeachers = [
   },
 ];
 
+const defaultMockStudents = [
+  {
+    id: "student-juan-perez",
+    first_name: "Juan",
+    last_name: "Perez",
+    email: "",
+    phone: "",
+    enrollment_id: "ALU-2026-001",
+    status: "active",
+    group_id: "group-1a",
+    group_name: "1A",
+    grade_name: "Primero",
+    parent_name: "Laura Perez",
+    parent_email: "laura.perez@familia.mx",
+    parent_phone: "777 210 1101",
+    birth_date: "2018-05-12",
+    address: "Jiutepec, Morelos",
+    attendance_rate: 96,
+    average_grade: 91,
+    total_absences: 1,
+    created_at: "2026-01-10T09:00:00.000Z",
+    updated_at: "2026-04-28T09:00:00.000Z",
+  },
+  {
+    id: "student-sofia-garcia",
+    first_name: "Sofia",
+    last_name: "Garcia",
+    email: "",
+    phone: "",
+    enrollment_id: "ALU-2026-002",
+    status: "active",
+    group_id: "group-2b",
+    group_name: "2B",
+    grade_name: "Segundo",
+    parent_name: "Marco Garcia",
+    parent_email: "marco.garcia@familia.mx",
+    parent_phone: "777 210 1102",
+    birth_date: "2017-09-21",
+    address: "Cuernavaca, Morelos",
+    attendance_rate: 93,
+    average_grade: 88,
+    total_absences: 2,
+    created_at: "2026-01-11T09:00:00.000Z",
+    updated_at: "2026-04-28T09:00:00.000Z",
+  },
+  {
+    id: "student-diego-ramirez",
+    first_name: "Diego",
+    last_name: "Ramirez",
+    email: "",
+    phone: "",
+    enrollment_id: "ALU-2026-003",
+    status: "inactive",
+    group_id: "group-3a",
+    group_name: "3A",
+    grade_name: "Tercero",
+    parent_name: "Paola Ramirez",
+    parent_email: "paola.ramirez@familia.mx",
+    parent_phone: "777 210 1103",
+    birth_date: "2016-02-18",
+    address: "Emiliano Zapata, Morelos",
+    attendance_rate: 81,
+    average_grade: 79,
+    total_absences: 6,
+    created_at: "2026-01-12T09:00:00.000Z",
+    updated_at: "2026-04-28T09:00:00.000Z",
+  },
+];
+
+const mockSchoolGroups = [
+  { id: "group-1a", name: "1A", grade_name: "Primero" },
+  { id: "group-2b", name: "2B", grade_name: "Segundo" },
+  { id: "group-3a", name: "3A", grade_name: "Tercero" },
+  { id: "group-4a", name: "4A", grade_name: "Cuarto" },
+];
+
 const modulesCatalog = [
   { key: "students", name: "Alumnos", description: "Expedientes, inscripciones y datos academicos.", is_core: true, price_monthly_mxn: 0 },
   { key: "attendance", name: "Asistencias", description: "Registro diario y reportes de asistencia.", is_core: true, price_monthly_mxn: 0 },
@@ -331,14 +407,15 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
 
   if (path.endsWith("/school-admin/dashboard") || path.endsWith("/school-admin/stats")) {
     const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+    const students = readMockList("mock_school_students", defaultMockStudents);
     return {
       success: true,
       data: {
         stats: {
-          total_students: 245,
+          total_students: students.length,
           total_teachers: teachers.length,
           total_groups: 12,
-          active_students: 236,
+          active_students: students.filter((student) => student.status === "active").length,
           attendance_rate: 92,
           average_grade: 87,
           new_students_month: 12,
@@ -367,6 +444,106 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
         last_updated: nowIso(),
       },
     };
+  }
+
+  if (path.endsWith("/school-admin/academic/groups")) {
+    return { success: true, data: mockSchoolGroups };
+  }
+
+  if (path.endsWith("/school-admin/academic/students")) {
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const group = mockSchoolGroups.find((item) => item.id === body.group_id);
+      const created = {
+        id: `student-${Date.now()}`,
+        first_name: body.first_name,
+        last_name: body.last_name,
+        email: body.email || "",
+        phone: body.phone || "",
+        enrollment_id: body.enrollment_id,
+        status: body.status || "active",
+        group_id: body.group_id || "",
+        group_name: group?.name || "",
+        grade_name: group?.grade_name || "",
+        parent_name: body.parent_name,
+        parent_email: body.parent_email,
+        parent_phone: body.parent_phone,
+        birth_date: body.birth_date,
+        address: body.address || "",
+        attendance_rate: 100,
+        average_grade: 0,
+        total_absences: 0,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      writeMockList("mock_school_students", [created, ...students]);
+      return { success: true, data: created, message: "Estudiante matriculado en modo demo" };
+    }
+
+    const search = (url.searchParams.get("search") || "").toLowerCase();
+    const status = url.searchParams.get("status") || "";
+    const groupID = url.searchParams.get("group_id") || "";
+    const page = Number(url.searchParams.get("page") || "1");
+    const perPage = Number(url.searchParams.get("per_page") || "20");
+    const filtered = students.filter((student) => {
+      const matchesSearch = !search || `${student.first_name} ${student.last_name} ${student.enrollment_id} ${student.parent_name}`.toLowerCase().includes(search);
+      const matchesStatus = !status || status === "all" || student.status === status;
+      const matchesGroup = !groupID || groupID === "all" || student.group_id === groupID;
+      return matchesSearch && matchesStatus && matchesGroup;
+    });
+    const { items, meta } = paginate(filtered, page, perPage);
+    return { success: true, data: items, meta };
+  }
+
+  const studentMatch = path.match(/\/school-admin\/academic\/students\/([^/]+)$/);
+  if (studentMatch) {
+    const id = decodeURIComponent(studentMatch[1]);
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const student = students.find((item) => item.id === id);
+
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const group = mockSchoolGroups.find((item) => item.id === body.group_id);
+      const updated = students.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...body,
+              group_name: group?.name ?? item.group_name,
+              grade_name: group?.grade_name ?? item.grade_name,
+              updated_at: nowIso(),
+            }
+          : item
+      );
+      writeMockList("mock_school_students", updated);
+      return {
+        success: true,
+        data: updated.find((item) => item.id === id),
+        message: "Estudiante actualizado en modo demo",
+      };
+    }
+
+    if (method === "DELETE") {
+      writeMockList("mock_school_students", students.filter((item) => item.id !== id));
+      return { success: true, message: "Estudiante eliminado en modo demo" };
+    }
+
+    return student
+      ? {
+          success: true,
+          data: {
+            ...student,
+            recent_grades: [
+              { id: `${id}-grade-1`, type: "exam", score: student.average_grade || 88, max_score: 100, description: "Evaluacion parcial", weight: 40, date: "2026-04-20", teacher_name: "Maria Lopez", created_at: nowIso() },
+            ],
+            recent_attendance: [
+              { date: "2026-04-28", status: "present", notes: "" },
+              { date: "2026-04-27", status: "present", notes: "" },
+            ],
+          },
+        }
+      : { success: false, message: "Estudiante no encontrado" };
   }
 
   if (path.endsWith("/school-admin/academic/teachers")) {
