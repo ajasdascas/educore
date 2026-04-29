@@ -165,6 +165,11 @@ function formToPayload(form: CommunicationForm, forceScheduled = false) {
     form.sms ? "sms" : "",
   ].filter(Boolean);
 
+  const parsedScheduledDate = form.scheduled_for ? new Date(form.scheduled_for) : null;
+  const scheduledDate = parsedScheduledDate && !Number.isNaN(parsedScheduledDate.getTime())
+    ? parsedScheduledDate
+    : new Date(Date.now() + 60 * 60 * 1000);
+
   return {
     title: form.title.trim(),
     content: form.content.trim(),
@@ -173,7 +178,7 @@ function formToPayload(form: CommunicationForm, forceScheduled = false) {
     recipient_type: form.recipient_type,
     recipient_id: form.recipient_id,
     channels: channels.length ? channels : ["email"],
-    scheduled_for: forceScheduled ? new Date(form.scheduled_for).toISOString() : "",
+    scheduled_for: forceScheduled ? scheduledDate.toISOString() : "",
   };
 }
 
@@ -265,17 +270,12 @@ export default function SchoolAdminCommunicationsPage() {
     setFormOpen(true);
   };
 
-  const submitCommunication = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitCommunication = async (event?: FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
     if (!form.title.trim() || !form.content.trim()) {
       toast({ title: "Faltan datos", description: "Titulo y contenido son obligatorios.", variant: "destructive" });
       return;
     }
-    if (formMode === "schedule" && !form.scheduled_for) {
-      toast({ title: "Programa fecha y hora", description: "El comunicado programado necesita una fecha valida.", variant: "destructive" });
-      return;
-    }
-
     try {
       setSaving(true);
       const endpoint = formMode === "draft" ? "/api/v1/school-admin/communications" : "/api/v1/school-admin/communications/send";
@@ -471,7 +471,7 @@ export default function SchoolAdminCommunicationsPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{formMode === "send" ? "Enviar ahora" : formMode === "schedule" ? "Programar" : "Guardar borrador"}</Button></DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancelar</Button><Button type="button" onClick={() => void submitCommunication()} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{formMode === "send" ? "Enviar ahora" : formMode === "schedule" ? "Programar" : "Guardar borrador"}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
