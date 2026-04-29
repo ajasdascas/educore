@@ -546,6 +546,81 @@ const defaultMockReports = [
   },
 ];
 
+const defaultMockCommunications = [
+  {
+    id: "comm-welcome-parents",
+    title: "Bienvenida al ciclo escolar",
+    content: "Estimadas familias, les damos la bienvenida al nuevo ciclo escolar. En esta semana compartiremos horarios, lineamientos y canales oficiales.",
+    type: "announcement",
+    priority: "normal",
+    status: "sent",
+    recipient_type: "role",
+    recipient_id: "parents",
+    recipient_label: "Padres de familia",
+    channels: ["email", "push"],
+    total_recipients: 226,
+    delivered_count: 221,
+    read_count: 168,
+    created_at: "2026-04-29T08:30:00.000Z",
+    scheduled_for: "",
+    sent_at: "2026-04-29T08:31:00.000Z",
+  },
+  {
+    id: "comm-teachers-meeting",
+    title: "Reunion de consejo tecnico",
+    content: "Recordatorio: el viernes tendremos reunion de consejo tecnico a las 15:00 en sala de maestros.",
+    type: "message",
+    priority: "high",
+    status: "sent",
+    recipient_type: "role",
+    recipient_id: "teachers",
+    recipient_label: "Profesores",
+    channels: ["email"],
+    total_recipients: 18,
+    delivered_count: 18,
+    read_count: 14,
+    created_at: "2026-04-28T12:00:00.000Z",
+    scheduled_for: "",
+    sent_at: "2026-04-28T12:01:00.000Z",
+  },
+  {
+    id: "comm-payment-reminder",
+    title: "Recordatorio administrativo",
+    content: "Se enviara un recordatorio administrativo a familias con documentacion pendiente.",
+    type: "notification",
+    priority: "normal",
+    status: "scheduled",
+    recipient_type: "group",
+    recipient_id: "group-2b",
+    recipient_label: "Segundo 2B",
+    channels: ["email", "sms"],
+    total_recipients: 24,
+    delivered_count: 0,
+    read_count: 0,
+    created_at: "2026-04-27T10:00:00.000Z",
+    scheduled_for: "2026-04-30T09:00:00.000Z",
+    sent_at: "",
+  },
+  {
+    id: "comm-draft-field-trip",
+    title: "Permisos para visita academica",
+    content: "Borrador de aviso para solicitar autorizacion de salida academica. Pendiente validar horario y transporte.",
+    type: "announcement",
+    priority: "normal",
+    status: "draft",
+    recipient_type: "group",
+    recipient_id: "group-1a",
+    recipient_label: "Primero 1A",
+    channels: ["email"],
+    total_recipients: 26,
+    delivered_count: 0,
+    read_count: 0,
+    created_at: "2026-04-29T11:00:00.000Z",
+    scheduled_for: "",
+    sent_at: "",
+  },
+];
+
 const mockGradeLevels = [
   { id: "grade-1", name: "Primero" },
   { id: "grade-2", name: "Segundo" },
@@ -880,6 +955,127 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     }
 
     return report ? { success: true, data: report } : { success: false, message: "Reporte no encontrado" };
+  }
+
+  if (path.endsWith("/school-admin/communications/stats")) {
+    const communications = readMockList("mock_school_communications", defaultMockCommunications);
+    return {
+      success: true,
+      data: {
+        total_messages: communications.length,
+        sent_messages: communications.filter((item) => item.status === "sent").length,
+        scheduled_messages: communications.filter((item) => item.status === "scheduled").length,
+        draft_messages: communications.filter((item) => item.status === "draft").length,
+        delivered_count: communications.reduce((sum, item) => sum + (item.delivered_count || 0), 0),
+        read_count: communications.reduce((sum, item) => sum + (item.read_count || 0), 0),
+      },
+    };
+  }
+
+  if (path.endsWith("/school-admin/communications/send")) {
+    const communications = readMockList("mock_school_communications", defaultMockCommunications);
+    const body = parseBody(options);
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    const group = groups.find((item) => item.id === body.recipient_id);
+    const isScheduled = !!body.scheduled_for;
+    const recipientLabel = body.recipient_type === "group"
+      ? group ? `${group.grade_name} ${group.name}` : "Grupo seleccionado"
+      : body.recipient_id === "teachers"
+        ? "Profesores"
+        : body.recipient_id === "students"
+          ? "Estudiantes"
+          : "Padres de familia";
+    const totalRecipients = body.recipient_type === "group" ? (group?.student_count || 0) : body.recipient_id === "teachers" ? 18 : body.recipient_id === "students" ? 245 : 226;
+    const created = {
+      id: `comm-${Date.now()}`,
+      title: body.title || "",
+      content: body.content || "",
+      type: body.type || "announcement",
+      priority: body.priority || "normal",
+      status: isScheduled ? "scheduled" : "sent",
+      recipient_type: body.recipient_type || "role",
+      recipient_id: body.recipient_id || "parents",
+      recipient_label: recipientLabel,
+      channels: Array.isArray(body.channels) ? body.channels : ["email"],
+      total_recipients: totalRecipients,
+      delivered_count: isScheduled ? 0 : totalRecipients,
+      read_count: isScheduled ? 0 : Math.round(totalRecipients * 0.62),
+      created_at: nowIso(),
+      scheduled_for: body.scheduled_for || "",
+      sent_at: isScheduled ? "" : nowIso(),
+    };
+    writeMockList("mock_school_communications", [created, ...communications]);
+    return { success: true, data: created, message: isScheduled ? "Comunicado programado en modo demo" : "Comunicado enviado en modo demo" };
+  }
+
+  if (path.endsWith("/school-admin/communications")) {
+    const communications = readMockList("mock_school_communications", defaultMockCommunications);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const groups = readMockList("mock_school_groups", mockSchoolGroups);
+      const group = groups.find((item) => item.id === body.recipient_id);
+      const recipientLabel = body.recipient_type === "group"
+        ? group ? `${group.grade_name} ${group.name}` : "Grupo seleccionado"
+        : body.recipient_id === "teachers"
+          ? "Profesores"
+          : body.recipient_id === "students"
+            ? "Estudiantes"
+            : "Padres de familia";
+      const totalRecipients = body.recipient_type === "group" ? (group?.student_count || 0) : body.recipient_id === "teachers" ? 18 : body.recipient_id === "students" ? 245 : 226;
+      const created = {
+        id: `comm-${Date.now()}`,
+        title: body.title || "",
+        content: body.content || "",
+        type: body.type || "announcement",
+        priority: body.priority || "normal",
+        status: "draft",
+        recipient_type: body.recipient_type || "role",
+        recipient_id: body.recipient_id || "parents",
+        recipient_label: recipientLabel,
+        channels: Array.isArray(body.channels) ? body.channels : ["email"],
+        total_recipients: totalRecipients,
+        delivered_count: 0,
+        read_count: 0,
+        created_at: nowIso(),
+        scheduled_for: "",
+        sent_at: "",
+      };
+      writeMockList("mock_school_communications", [created, ...communications]);
+      return { success: true, data: created, message: "Borrador guardado en modo demo" };
+    }
+    const type = url.searchParams.get("type") || "";
+    const status = url.searchParams.get("status") || "";
+    const priority = url.searchParams.get("priority") || "";
+    const search = (url.searchParams.get("search") || "").toLowerCase();
+    const filtered = communications.filter((item) => {
+      const matchesType = !type || type === "all" || item.type === type;
+      const matchesStatus = !status || status === "all" || item.status === status;
+      const matchesPriority = !priority || priority === "all" || item.priority === priority;
+      const matchesSearch = !search || `${item.title} ${item.content} ${item.recipient_label}`.toLowerCase().includes(search);
+      return matchesType && matchesStatus && matchesPriority && matchesSearch;
+    });
+    return { success: true, data: filtered };
+  }
+
+  const communicationMatch = path.match(/\/school-admin\/communications\/([^/]+)$/);
+  if (communicationMatch) {
+    const id = decodeURIComponent(communicationMatch[1]);
+    const communications = readMockList("mock_school_communications", defaultMockCommunications);
+    const item = communications.find((message) => message.id === id);
+
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = communications.map((message) => message.id === id ? { ...message, ...body } : message);
+      writeMockList("mock_school_communications", updated);
+      return { success: true, data: updated.find((message) => message.id === id), message: "Comunicacion actualizada en modo demo" };
+    }
+
+    if (method === "DELETE") {
+      writeMockList("mock_school_communications", communications.filter((message) => message.id !== id));
+      return { success: true, message: "Comunicacion eliminada en modo demo" };
+    }
+
+    return item ? { success: true, data: item } : { success: false, message: "Comunicacion no encontrada" };
   }
 
   const groupMatch = path.match(/\/school-admin\/academic\/groups\/([^/]+)$/);

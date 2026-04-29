@@ -222,3 +222,24 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con School Admin > Comunicaciones. No avanzar a Configuracion hasta que Comunicaciones tenga listado, filtros, crear/enviar demo, detalle y acciones completas.
 
 #school_admin #reports #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - RBAC de perfiles y Comunicaciones completado
+
+### Cambios completados
+- `frontend/components/ui/profile-dropdown.tsx`: navegacion de cuenta corregida por rol. `SUPER_ADMIN`, `SCHOOL_ADMIN`, `TEACHER` y `PARENT` ahora van a sus propias rutas, nunca a `/super-admin/*` salvo Super Admin.
+- `frontend/components/providers/RoleGuard.tsx`: guarda RBAC compartida para redirigir sesiones con rol incorrecto a `getDashboardPath(user.role)`.
+- Layouts protegidos: `super-admin`, `school-admin`, `parent` y `teacher` ahora validan rol antes de renderizar contenido.
+- Paginas propias de cuenta creadas para School Admin, Parent y Teacher: `profile`, `settings`, `notifications` y `security`.
+- `frontend/app/school-admin/communications/page.tsx`: submodulo de Comunicaciones completado con metricas, filtros, busqueda, envio demo, programacion, borradores, detalle, duplicar, reenviar, marcar leido y eliminacion.
+- `frontend/lib/auth.ts`: mock persistente en `localStorage` para Comunicaciones y endpoints demo bajo `/api/v1/school-admin/communications`.
+
+### Verificacion
+- `next build` local: OK despues del fix RBAC y despues de Comunicaciones.
+- Verificacion final pendiente en esta misma sesion: `go test ./...`, browser smoke local/produccion y GitHub Actions verde tras push.
+
+### Siguiente paso recomendado
+- Continuar con School Admin > Configuracion solo despues del smoke test de Comunicaciones y las rutas RBAC.
+
+#school_admin #communications #security #frontend #memory

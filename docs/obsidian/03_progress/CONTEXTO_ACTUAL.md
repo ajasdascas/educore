@@ -36,8 +36,11 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **School Admin > Grupos:** completado con listado, busqueda, crear, editar, detalle, activar/pausar y eliminacion con confirmacion.
 - **School Admin > Horarios:** completado con agenda semanal, filtros por grupo/dia/estado, crear, editar, detalle, activar/pausar, eliminacion con confirmacion y deteccion de cruces por grupo.
 - **School Admin > Reportes:** completado con metricas, historial, filtros, generar reporte, detalle ejecutivo, descarga demo, reprocesar y eliminacion con confirmacion.
+- **Seguridad RBAC frontend:** corregido bug critico donde usuarios `PARENT` podian ver rutas `/school-admin/*`; los layouts ahora redirigen por rol y el dropdown de perfil usa rutas propias por rol.
+- **Paginas de cuenta por rol:** `profile`, `settings`, `notifications` y `security` creadas para School Admin, Parent y Teacher con componente compartido.
+- **School Admin > Comunicaciones:** completado con metricas, filtros por tipo/estado/prioridad, busqueda, crear/enviar, programar, borrador, detalle, duplicar, reenviar, marcar leido y eliminar con confirmacion.
 - **Correccion backend critica:** rutas de School Admin ya no duplican `/api/v1/school-admin`.
 - **Verificacion:** `go test ./...`, `next build` y pruebas headless de Profesores, Estudiantes, Grupos, Horarios y Reportes OK.
-- **Siguiente submodulo:** School Admin > Comunicaciones. No avanzar a Configuracion hasta que Comunicaciones quede 100% funcional.
+- **Siguiente submodulo:** School Admin > Configuracion. No avanzar al siguiente modulo hasta que Configuracion quede 100% funcional y verificada.
 
 #module #architecture #super_admin #school_admin

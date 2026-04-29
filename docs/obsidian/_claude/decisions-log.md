@@ -71,3 +71,23 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** El modulo queda usable en produccion demo y listo para conectar a un motor real de PDF/Excel cuando se formalicen jobs asincronos, almacenamiento de archivos y RLS por tenant.
 
 #frontend #school_admin #reports #architecture
+
+## 29-04-2026 - Navegacion de cuenta y rutas protegidas por rol
+
+**Decision:** Las rutas de cuenta (`profile`, `settings`, `notifications`, `security`) se resuelven por rol desde `ProfileDropdown`, y cada layout principal aplica una guarda RBAC antes de renderizar contenido.
+
+**Razon:** Un usuario `PARENT` estaba entrando a `/school-admin/*` y el dropdown lo llevaba a `/super-admin/*`, lo cual es un bug critico de seguridad y una ruptura clara del modelo RBAC. Convertir automaticamente el usuario a otro rol queda prohibido; si la sesion no coincide, se redirige a su dashboard real.
+
+**Impacto:** `SUPER_ADMIN`, `SCHOOL_ADMIN`, `TEACHER` y `PARENT` quedan aislados a sus areas. La UX de cuenta se comparte con un componente comun, reduciendo duplicacion sin mezclar permisos ni rutas.
+
+#security #frontend #rbac #school_admin
+
+## 29-04-2026 - Comunicaciones opera como modulo demo persistente
+
+**Decision:** School Admin > Comunicaciones queda implementado con estado persistente en `localStorage` y contrato `authFetch` bajo `/api/v1/school-admin/communications`.
+
+**Razon:** Produccion usa static export en Hostinger. Para entregar flujo funcional sin esperar jobs reales de email/SMS, se define primero la experiencia completa: enviar, programar, borrar, duplicar, reenviar y consultar lectura.
+
+**Impacto:** El modulo queda usable en produccion demo y listo para conectar a proveedores reales de comunicacion cuando se formalicen colas, auditoria y tablas multi-tenant.
+
+#frontend #school_admin #communications #architecture
