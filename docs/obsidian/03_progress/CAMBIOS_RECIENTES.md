@@ -186,3 +186,29 @@
 - Smoke browser local autenticado en dashboard, modulos, usuarios, billing, health y auditoria: OK sin errores de consola.
 
 #super_admin #enterprise #billing #health #audit #frontend #backend
+
+---
+
+## [29-04-2026] - Portal de Padres 100% funcional + logo de escuela
+
+### Backend
+- Nueva migracion `011_parent_portal_messages_events.sql`.
+- Se agregan tablas `parent_conversations`, `parent_messages`, `school_events` y `student_assignments`.
+- `parent_student`, `users` y `notifications` reciben columnas aditivas para compatibilidad con el portal.
+- `backend/internal/modules/parent/repository.go` deja placeholders y consulta datos reales de hijos, calificaciones, asistencias, horario, boleta, docentes, tareas, mensajes, calendario y eventos.
+- Password update en Parent ahora hashea con bcrypt.
+
+### Frontend
+- Nuevas rutas reales: `/parent/children`, `/parent/grades`, `/parent/attendance` y `/parent/messages`.
+- Dashboard Parent consume `/api/v1/parent/dashboard` y sus acciones rapidas navegan a rutas funcionales.
+- `frontend/lib/auth.ts` agrega mocks persistentes para todo el contrato Parent en Hostinger static export.
+- SuperAdmin > Nueva Escuela permite logo institucional opcional con preview; en demo se persiste como data URL.
+- School Admin muestra el logo y nombre de la escuela configurada en sidebar/header.
+
+### Verificacion
+- `go test ./...`: OK.
+- `npm run build`: OK.
+- `git diff --check`: OK.
+- Browser Use local: Parent Portal carga rutas clave sin 404 y un usuario PARENT no permanece dentro de `/school-admin/*`.
+
+#parent_portal #frontend #backend #branding #security

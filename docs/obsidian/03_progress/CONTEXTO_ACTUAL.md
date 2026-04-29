@@ -50,6 +50,9 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Nucleo academico base:** los 4 modulos base quedan como prioridad verificada: Auth/Tenant/RBAC, Users, Academic Core y Evaluacion/Calificaciones.
 - **SuperAdmin Enterprise Control Plane:** backend/API contracts, migracion `010`, UI enterprise, mocks estaticos, impersonation auditado, health monitor, usage scoring, billing interno, feature flags, backups y versioning completados en local.
 - **Verificacion SuperAdmin Enterprise:** `go test ./...`, `npm run build`, `git diff --check` y smoke browser local autenticado en dashboard, modulos, usuarios, billing, health y auditoria OK.
-- **Siguiente submodulo:** verificar deploy productivo y despues avanzar a Portal de Padres o extensiones por nivel educativo.
+- **Portal de Padres:** completado con dashboard conectado a `authFetch`, rutas reales de hijos, calificaciones, asistencia y mensajes; backend reemplaza placeholders con consultas reales y migracion `011` para mensajes/eventos/tareas.
+- **Branding de escuelas:** SuperAdmin pide logo opcional al crear escuela; en demo se persiste como data URL y School Admin muestra logo/nombre de la escuela configurada.
+- **Verificacion Portal de Padres:** `go test ./...`, `npm run build`, `git diff --check` y smoke Browser Use local OK; `PARENT` redirige fuera de `/school-admin/*`.
+- **Siguiente submodulo:** confirmar deploy productivo y despues avanzar a reportes/analytics o extensiones por nivel educativo.
 
 #module #architecture #super_admin #school_admin

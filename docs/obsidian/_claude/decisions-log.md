@@ -140,3 +140,23 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** El SuperAdmin ahora tiene contratos para instituciones, modulos, usuarios globales, impersonation auditado, billing interno, analytics, logs, soporte, storage, backups y versioning. Las acciones sensibles quedan auditadas y las destructivas requieren confirmacion o jobs protegidos.
 
 #architecture #super_admin #security #audit #billing
+
+## 29-04-2026 - Parent Portal usa contratos reales y mocks estaticos
+
+**Decision:** Completar Portal de Padres con backend real sobre el Core academico y mocks persistentes para Hostinger static export.
+
+**Razon:** El MVP necesita que padres consulten hijos, calificaciones, asistencias y mensajes sin rutas 404. Duplicar datos por portal aumentaria riesgo de inconsistencias; usar las tablas core conserva una fuente de verdad.
+
+**Impacto:** `PARENT` tiene rutas propias funcionales bajo `/parent/*`, con verificacion padre-hijo en backend y demo estable en produccion estatica. Mensajeria/eventos/tareas quedan modelados con migracion aditiva.
+
+#architecture #parent_portal #security #frontend #backend
+
+## 29-04-2026 - Logo de escuela como parte del tenant
+
+**Decision:** El logo institucional se captura desde SuperAdmin al crear escuela y se guarda como `logo_url` del tenant/mocks.
+
+**Razon:** `tenants.logo_url` ya existe y es el punto natural para branding institucional. Mantenerlo ahi evita tablas paralelas y permite reutilizarlo en School Admin, detalles de escuela y futuras paginas publicas.
+
+**Impacto:** El panel School Admin puede mostrar logo/nombre de escuela configurada. En modo demo, el archivo se convierte a data URL para no depender de upload real en Hostinger static export.
+
+#architecture #branding #super_admin #school_admin

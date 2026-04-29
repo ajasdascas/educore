@@ -376,3 +376,24 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Despues, avanzar a Portal de Padres o extensiones por nivel educativo.
 
 #super_admin #enterprise #backend #frontend #audit #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - Portal de Padres y branding por escuela completados
+
+### Cambios completados
+- Portal de Padres deja de tener rutas 404: se agregaron `/parent/children`, `/parent/grades`, `/parent/attendance` y `/parent/messages`.
+- Dashboard de padres ahora consume `authFetch("/api/v1/parent/dashboard")` y usa acciones rapidas a rutas reales.
+- `frontend/lib/auth.ts` agrega mocks persistentes para dashboard, hijos, detalle, calificaciones, asistencia, horario, boleta, docentes, tareas, mensajes, notificaciones, calendario y eventos.
+- Backend Parent reemplaza stubs por consultas reales sobre `parent_student`, `students`, `attendance_records`, `grade_records`, `class_schedule_blocks`, mensajes, eventos y tareas.
+- Nueva migracion `011_parent_portal_messages_events.sql` agrega mensajeria, eventos, tareas y columnas compatibles para perfil/notificaciones.
+- SuperAdmin > Nueva Escuela mantiene logo opcional, soporta preview/data URL en modo demo y persiste `logo_url`.
+- School Admin muestra el logo/nombre de la escuela configurada en el sidebar/header cuando existe en los mocks.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `npm run build` en frontend: OK.
+- `git diff --check`: OK.
+- Browser Use local con `padre@educore.mx`: rutas de Parent cargan sin 404 y `/school-admin/students` redirige a `/parent/dashboard`.
+
+#parent_portal #frontend #backend #school_branding #security #memory
