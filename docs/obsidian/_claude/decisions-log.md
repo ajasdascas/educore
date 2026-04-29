@@ -170,3 +170,17 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** SuperAdmin gana inspeccion de tablas, schema, relaciones, filas paginadas, export full DB e import preview. Las operaciones estructurales DDL quedan apagadas por defecto y requieren `EDUCORE_ENABLE_DB_ADMIN_DDL=true`; acciones sensibles quedan auditadas.
 
 #architecture #super_admin #database #security #billing
+# 29-04-2026 - Columnas/tablas tenant como virtual schema
+
+## Decision
+Las personalizaciones de base de datos que ve el School Admin se implementan como campos virtuales (`custom_fields` JSONB + `tenant_custom_fields`) y tablas virtuales (`tenant_custom_tables` + `tenant_custom_rows`), no como `ALTER TABLE` fisico por escuela.
+
+## Razon
+EduCore usa una base PostgreSQL compartida multi-tenant. Permitir DDL por tenant romperia migraciones, performance, RLS y mantenibilidad a escala. La capa virtual da la experiencia de "base propia" sin comprometer el schema global.
+
+## Impacto
+- School Admin puede crear campos y tablas propias de forma segura.
+- SuperAdmin conserva el control estructural real.
+- Los exports/imports pueden incluir datos virtuales junto a los core.
+
+#architecture #security #database #school_admin

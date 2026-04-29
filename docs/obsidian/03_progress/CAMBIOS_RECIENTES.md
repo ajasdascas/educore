@@ -239,3 +239,13 @@
 - Adaptada `/super-admin/database` para desktop, tablet y mobile sin tener que recorrer toda la pagina horizontalmente.
 - Las tablas de schema y datos conservan scroll interno dentro de la card cuando el contenido es ancho.
 - Verificacion: `npm run build` y `git diff --check` OK.
+# 29-04-2026 - Virtual Sub-Database Environment por escuela
+
+- Provisionamiento de escuelas reforzado: SuperAdmin ahora crea el tenant con admin demo `admin@educore.mx / admin123`, roles base, ciclo escolar actual, grados, materias base y grupo inicial.
+- Login backend actualizado para resolver `admin@educore.mx` por rol/tenant y evitar colision entre SuperAdmin global y School Admin de tenant.
+- Agregado backend `/api/v1/school-admin/database/*` con explorador tenant-scoped: tablas permitidas, schema, relaciones, filas paginadas, DML auditado, export e import validation.
+- Agregada migracion `013_tenant_virtual_database_environment.sql` con roles tenant, campos virtuales, tablas virtuales, filas custom y audit logs del explorador.
+- Agregado frontend `/school-admin/database` estilo table editor responsive, sin scroll horizontal global, con export Excel, preview de import, edicion de filas y campos/tablas virtuales.
+- Mocks estaticos Hostinger actualizados para School Admin Database Explorer y provisionamiento demo de escuelas.
+
+#module #school_admin #security #backend #frontend #database

@@ -1107,12 +1107,235 @@ async function mockParentFetch(endpoint: string, options: RequestInit = {}) {
   return { success: false, message: "Endpoint Parent demo no implementado" };
 }
 
+const tenantDatabaseTableDefs = [
+  { name: "users", label: "Usuarios", storage: "mock_tenant_users", fallback: [] as any[], is_read_only: false },
+  { name: "students", label: "Alumnos", storage: "mock_school_students", fallback: defaultMockStudents, is_read_only: false },
+  { name: "parent_student", label: "Padres por alumno", storage: "mock_parent_student_links", fallback: [] as any[], is_read_only: true },
+  { name: "school_years", label: "Ciclos escolares", storage: "mock_school_years", fallback: defaultMockSchoolYears, is_read_only: false },
+  { name: "grade_levels", label: "Grados", storage: "mock_grade_levels", fallback: [] as any[], is_read_only: false },
+  { name: "groups", label: "Grupos", storage: "mock_school_groups", fallback: mockSchoolGroups, is_read_only: false },
+  { name: "group_students", label: "Alumnos por grupo", storage: "mock_group_students", fallback: [] as any[], is_read_only: true },
+  { name: "group_teachers", label: "Profesores por grupo", storage: "mock_group_teachers", fallback: [] as any[], is_read_only: true },
+  { name: "subjects", label: "Materias", storage: "mock_school_subjects", fallback: defaultMockSubjects, is_read_only: false },
+  { name: "class_schedule_blocks", label: "Horarios", storage: "mock_school_schedule", fallback: defaultMockScheduleBlocks, is_read_only: false },
+  { name: "attendance_records", label: "Asistencias", storage: "mock_school_attendance_rows", fallback: [] as any[], is_read_only: false },
+  { name: "grade_records", label: "Calificaciones", storage: "mock_school_grades", fallback: [] as any[], is_read_only: false },
+  { name: "student_academic_history", label: "Historial academico", storage: "mock_student_history_rows", fallback: [] as any[], is_read_only: false },
+  { name: "import_batches", label: "Importaciones", storage: "mock_import_batches", fallback: [] as any[], is_read_only: true },
+  { name: "tenant_custom_fields", label: "Campos personalizados", storage: "mock_tenant_custom_fields", fallback: [] as any[], is_read_only: false, is_custom: true },
+  { name: "tenant_custom_tables", label: "Tablas personalizadas", storage: "mock_tenant_custom_tables", fallback: [] as any[], is_read_only: false, is_custom: true },
+  { name: "tenant_custom_rows", label: "Filas personalizadas", storage: "mock_tenant_custom_rows", fallback: [] as any[], is_read_only: false, is_custom: true },
+];
+
+function seedTenantUsers() {
+  return [
+    { id: "tenant-admin-demo", tenant_id: "school-don-bosco", email: "admin@educore.mx", first_name: "Administrador", last_name: "Escuela", role: "SCHOOL_ADMIN", is_active: true, created_at: nowIso(), updated_at: nowIso(), custom_fields: {} },
+    ...defaultMockTeachers.map((teacher) => ({
+      id: teacher.id,
+      tenant_id: "school-don-bosco",
+      email: teacher.email,
+      first_name: teacher.first_name,
+      last_name: teacher.last_name,
+      role: "TEACHER",
+      is_active: teacher.status === "active",
+      created_at: teacher.created_at,
+      updated_at: nowIso(),
+      custom_fields: {},
+    })),
+  ];
+}
+
+function getTenantTableDef(table: string) {
+  return tenantDatabaseTableDefs.find((item) => item.name === table);
+}
+
+function getTenantRows(table: string) {
+  const def = getTenantTableDef(table);
+  if (!def) return [];
+  const fallback = def.name === "users" ? seedTenantUsers() : def.fallback;
+  if (def.name === "parent_student") {
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    return students.map((student: any, index) => ({
+      id: `link-${student.id}`,
+      parent_id: `parent-${student.id}`,
+      student_id: student.id,
+      relationship: index % 2 === 0 ? "mother" : "father",
+      is_primary: true,
+      phone: student.parent_phone || "777 000 0000",
+      parent_name: student.parent_name || "Tutor principal",
+      student_name: `${student.first_name || ""} ${student.last_name || ""}`.trim(),
+      created_at: student.created_at || nowIso(),
+      updated_at: student.updated_at || nowIso(),
+    }));
+  }
+  if (def.name === "group_students") {
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    return students.map((student: any, index) => ({
+      id: `gs-${student.id}`,
+      group_id: groups[index % Math.max(groups.length, 1)]?.id || "group-1a",
+      student_id: student.id,
+      group_name: groups[index % Math.max(groups.length, 1)]?.name || "1A",
+      student_name: `${student.first_name || ""} ${student.last_name || ""}`.trim(),
+      enrolled_at: student.created_at || nowIso(),
+    }));
+  }
+  if (def.name === "group_teachers") {
+    const groups = readMockList("mock_school_groups", mockSchoolGroups);
+    const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+    const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+    return groups.slice(0, 6).map((group: any, index) => ({
+      id: `gt-${group.id}-${index}`,
+      group_id: group.id,
+      teacher_id: teachers[index % Math.max(teachers.length, 1)]?.id || "",
+      subject_id: subjects[index % Math.max(subjects.length, 1)]?.id || "",
+      group_name: group.name,
+      teacher_name: `${teachers[index % Math.max(teachers.length, 1)]?.first_name || ""} ${teachers[index % Math.max(teachers.length, 1)]?.last_name || ""}`.trim(),
+      subject_name: subjects[index % Math.max(subjects.length, 1)]?.name || "",
+    }));
+  }
+  return readMockList(def.storage, fallback);
+}
+
+function writeTenantRows(table: string, rows: any[]) {
+  const def = getTenantTableDef(table);
+  if (!def || def.is_read_only) return;
+  writeMockList(def.storage, rows);
+}
+
+function inferTenantColumns(table: string) {
+  const rows = getTenantRows(table);
+  const first = rows[0] || {};
+  const keys = Object.keys(first);
+  const baseKeys = keys.length > 0 ? keys : ["id", "tenant_id", "name", "created_at", "updated_at"];
+  const customFields = readMockList("mock_tenant_custom_fields", []).filter((field: any) => field.table_name === table);
+  return {
+    columns: baseKeys.map((key) => ({
+      name: key,
+      type: key.endsWith("_at") ? "timestamptz" : key === "custom_fields" || key === "data" ? "jsonb" : "text",
+      nullable: !["id", "tenant_id", "first_name", "last_name", "name"].includes(key),
+      is_primary: key === "id",
+      is_protected: ["id", "tenant_id", "created_at", "updated_at", "password_hash"].includes(key),
+    })),
+    custom_fields: customFields.map((field: any) => ({ ...field, name: field.field_key, type: field.field_type, is_virtual: true })),
+  };
+}
+
 async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {}) {
   await new Promise((resolve) => setTimeout(resolve, 180));
 
   const method = (options.method || "GET").toUpperCase();
   const url = new URL(endpoint, "https://mock.educore.local");
   const path = url.pathname;
+
+  if (path.endsWith("/school-admin/database/tables")) {
+    const tables = tenantDatabaseTableDefs.map((table) => ({
+      name: table.name,
+      label: table.label,
+      description: `${table.label} del tenant actual`,
+      estimated_rows: getTenantRows(table.name).length,
+      tenant_scoped: true,
+      is_read_only: table.is_read_only,
+      is_custom: Boolean(table.is_custom),
+    }));
+    return { success: true, data: { tables } };
+  }
+
+  const tenantDatabaseSchemaMatch = path.match(/\/school-admin\/database\/tables\/([^/]+)\/schema$/);
+  if (tenantDatabaseSchemaMatch) {
+    const table = decodeURIComponent(tenantDatabaseSchemaMatch[1]);
+    const def = getTenantTableDef(table);
+    if (!def) return { success: false, message: "Tabla no permitida" };
+    const schema = inferTenantColumns(table);
+    return {
+      success: true,
+      data: {
+        table,
+        label: def.label,
+        columns: schema.columns,
+        custom_fields: schema.custom_fields,
+        relationships: table === "students" ? [{ column: "tenant_id", foreign_table: "tenants", foreign_column: "id" }] : [],
+        tenant_scoped: true,
+        is_read_only: def.is_read_only,
+      },
+    };
+  }
+
+  const tenantDatabaseRowsMatch = path.match(/\/school-admin\/database\/tables\/([^/]+)\/rows(?:\/([^/]+))?$/);
+  if (tenantDatabaseRowsMatch) {
+    const table = decodeURIComponent(tenantDatabaseRowsMatch[1]);
+    const rowID = tenantDatabaseRowsMatch[2] ? decodeURIComponent(tenantDatabaseRowsMatch[2]) : "";
+    const def = getTenantTableDef(table);
+    if (!def) return { success: false, message: "Tabla no permitida" };
+    let rows = getTenantRows(table);
+
+    if (!rowID && method === "GET") {
+      const search = (url.searchParams.get("search") || "").toLowerCase();
+      if (search) rows = rows.filter((row: any) => JSON.stringify(row).toLowerCase().includes(search));
+      return { success: true, data: { rows, page: 1, per_page: 50, total: rows.length } };
+    }
+
+    if (def.is_read_only) return { success: false, message: "Tabla de solo lectura" };
+
+    const body = parseBody(options);
+    if (!rowID && method === "POST") {
+      const created = {
+        id: `${table}-${Date.now()}`,
+        tenant_id: "school-don-bosco",
+        ...(body.values || {}),
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      writeTenantRows(table, [created, ...rows]);
+      return { success: true, data: { id: created.id }, message: "Fila creada en modo demo" };
+    }
+
+    if (rowID && method === "PUT") {
+      rows = rows.map((row: any) => row.id === rowID ? { ...row, ...(body.values || {}), updated_at: nowIso() } : row);
+      writeTenantRows(table, rows);
+      return { success: true, data: { id: rowID }, message: "Fila actualizada en modo demo" };
+    }
+
+    if (rowID && method === "DELETE") {
+      rows = rows.map((row: any) => row.id === rowID ? { ...row, deleted_at: nowIso(), status: row.status ? "inactive" : row.status, is_active: row.is_active === undefined ? row.is_active : false } : row);
+      writeTenantRows(table, rows);
+      return { success: true, data: { id: rowID }, message: "Soft delete aplicado en modo demo" };
+    }
+  }
+
+  if (path.endsWith("/school-admin/database/custom-fields") && method === "POST") {
+    const body = parseBody(options);
+    const fields = readMockList("mock_tenant_custom_fields", []);
+    const created = { id: `field-${Date.now()}`, ...body, created_at: nowIso(), updated_at: nowIso() };
+    writeMockList("mock_tenant_custom_fields", [created, ...fields.filter((field: any) => !(field.table_name === body.table_name && field.field_key === body.field_key))]);
+    return { success: true, data: { id: created.id }, message: "Campo virtual creado en modo demo" };
+  }
+
+  if (path.endsWith("/school-admin/database/custom-tables") && method === "POST") {
+    const body = parseBody(options);
+    const tables = readMockList("mock_tenant_custom_tables", []);
+    const created = { id: `custom-table-${Date.now()}`, tenant_id: "school-don-bosco", tenant_scoped: true, is_active: true, ...body, created_at: nowIso(), updated_at: nowIso() };
+    writeMockList("mock_tenant_custom_tables", [created, ...tables]);
+    return { success: true, data: { id: created.id }, message: "Tabla virtual creada en modo demo" };
+  }
+
+  const tenantExportTableMatch = path.match(/\/school-admin\/database\/export\/table\/([^/]+)$/);
+  if (tenantExportTableMatch) {
+    const table = decodeURIComponent(tenantExportTableMatch[1]);
+    return { success: true, data: { generated_at: nowIso(), tables: { [table]: getTenantRows(table) }, format: "json-workbook-source" } };
+  }
+
+  if (path.endsWith("/school-admin/database/export/all")) {
+    const tables: Record<string, any[]> = {};
+    tenantDatabaseTableDefs.forEach((table) => {
+      tables[table.name] = getTenantRows(table.name);
+    });
+    return { success: true, data: { generated_at: nowIso(), tables, format: "json-workbook-source" } };
+  }
+
+  if (path.endsWith("/school-admin/database/import/validate") && method === "POST") {
+    return { success: true, data: { valid: true, tenant_scoped: true, required_steps: ["map_columns", "preview", "commit"], warnings: [] }, message: "Import validado en modo demo" };
+  }
 
   if (path.endsWith("/school-admin/dashboard") || path.endsWith("/school-admin/stats")) {
     const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
@@ -2775,8 +2998,51 @@ async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) 
         total_teachers: 0,
         total_parents: 0,
       };
+      const tenantUsers = readMockList("mock_tenant_users", seedTenantUsers());
+      const tenantRoles = readMockList("mock_tenant_roles", []);
+      const schoolYears = readMockList("mock_school_years", defaultMockSchoolYears);
+      const gradeLevels = readMockList("mock_grade_levels", []);
+      const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+      const groups = readMockList("mock_school_groups", mockSchoolGroups);
+      const currentYear = body.school_year || "2026-2027";
       writeMockList("mock_schools", [created, ...schools]);
-      return { success: true, data: { id: created.id }, message: "Escuela creada en modo demo" };
+      if (typeof window !== "undefined") localStorage.setItem("mock_current_school_id", created.id);
+      writeMockList("mock_tenant_users", [
+        {
+          id: `tenant-admin-${created.id}`,
+          tenant_id: created.id,
+          email: "admin@educore.mx",
+          first_name: "Administrador",
+          last_name: "Escuela",
+          role: "SCHOOL_ADMIN",
+          is_active: true,
+          created_at: nowIso(),
+          updated_at: nowIso(),
+          custom_fields: {},
+        },
+        ...tenantUsers,
+      ]);
+      writeMockList("mock_tenant_roles", [
+        ...["admin", "teacher", "parent", "student"].map((key) => ({ id: `${created.id}-${key}`, tenant_id: created.id, key, name: key, is_system: true, created_at: nowIso() })),
+        ...tenantRoles,
+      ]);
+      writeMockList("mock_school_years", [
+        { id: `year-${created.id}`, tenant_id: created.id, name: currentYear, start_date: "2026-08-01", end_date: "2027-07-31", status: "active", is_current: true, notes: "Ciclo creado automaticamente", group_count: 1, student_count: 0, created_at: nowIso(), updated_at: nowIso() },
+        ...schoolYears,
+      ]);
+      writeMockList("mock_grade_levels", [
+        { id: `grade-${created.id}`, tenant_id: created.id, name: (body.levels || ["Primaria"])[0], level: (body.levels || ["primaria"])[0], sort_order: 0, created_at: nowIso(), updated_at: nowIso(), custom_fields: {} },
+        ...gradeLevels,
+      ]);
+      writeMockList("mock_school_subjects", [
+        ...["Español", "Matematicas", "Ciencias", "Historia"].map((name, index) => ({ id: `subject-${created.id}-${index}`, tenant_id: created.id, name, code: name.slice(0, 3).toUpperCase(), description: "Materia base creada automaticamente", credits: 1, status: "active", created_at: nowIso(), updated_at: nowIso(), custom_fields: {} })),
+        ...subjects,
+      ]);
+      writeMockList("mock_school_groups", [
+        { id: `group-${created.id}`, tenant_id: created.id, grade_level_id: `grade-${created.id}`, school_year_id: `year-${created.id}`, name: "A", grade_name: (body.levels || ["Primaria"])[0], school_year: currentYear, capacity: 30, room: "Aula 1", description: "Grupo base creado automaticamente", status: "active", student_count: 0, teacher_count: 0, subject_count: 4, created_at: nowIso(), updated_at: nowIso(), custom_fields: {} },
+        ...groups,
+      ]);
+      return { success: true, data: { id: created.id, tenant_id: created.id, admin_email: "admin@educore.mx", admin_demo: true }, message: "Escuela creada en modo demo" };
     }
     const search = (url.searchParams.get("search") || "").toLowerCase();
     const status = url.searchParams.get("status") || "";

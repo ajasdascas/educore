@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -313,17 +315,52 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusConflict, "Slug already exists or database error")
 	}
 
-	// 3. Create Admin User for the School
-	// Default password for new admins: "Escuela2024!" (bcrypt hash)
+	// 3. Create default tenant admin user for the virtual environment.
+	adminEmail := strings.TrimSpace(req.AdminEmail)
+	if adminEmail == "" {
+		adminEmail = "admin@educore.mx"
+	}
+	adminName := strings.TrimSpace(req.AdminName)
+	if adminName == "" {
+		adminName = "Administrador Escuela"
+	}
+	nameParts := strings.Fields(adminName)
+	adminFirstName := "Administrador"
+	adminLastName := "Escuela"
+	if len(nameParts) == 1 {
+		adminFirstName = nameParts[0]
+	} else if len(nameParts) > 1 {
+		adminFirstName = nameParts[0]
+		adminLastName = strings.Join(nameParts[1:], " ")
+	}
 	passwordHash := "$2a$10$MJsfnrvcdfz1LtAsrYyiYeKhFbK/LdUbGuKMhfEu0rxfaKjzpVMV." // "admin123" for testing, or use a better default
 
 	_, err = tx.Exec(c.UserContext(),
-		`INSERT INTO users (tenant_id, email, password_hash, first_name, role, is_active)
-		 VALUES ($1, $2, $3, $4, 'SCHOOL_ADMIN', true)`,
-		tenantID, req.AdminEmail, passwordHash, req.AdminName)
+		`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
+		 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true)
+		 ON CONFLICT (tenant_id, email)
+		 DO UPDATE SET password_hash = EXCLUDED.password_hash,
+		               first_name = EXCLUDED.first_name,
+		               last_name = EXCLUDED.last_name,
+		               role = 'SCHOOL_ADMIN',
+		               is_active = true,
+		               updated_at = NOW()`,
+		tenantID, adminEmail, passwordHash, adminFirstName, adminLastName)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error creating admin user")
+	}
+
+	_, err = tx.Exec(c.UserContext(), `
+		INSERT INTO tenant_roles (tenant_id, key, name, description, permissions, is_system)
+		VALUES
+			($1, 'admin', 'Administrador', 'Control operativo de la escuela', '["users:*","academic:*","database:tenant"]'::jsonb, true),
+			($1, 'teacher', 'Profesor', 'Gestion docente y captura academica', '["groups:read","attendance:write","grades:write"]'::jsonb, true),
+			($1, 'parent', 'Padre/Tutor', 'Consulta de hijos y comunicacion escolar', '["children:read","messages:write"]'::jsonb, true),
+			($1, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]'::jsonb, true)
+		ON CONFLICT (tenant_id, key) DO NOTHING`, tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error seeding tenant roles")
 	}
 
 	// 4. Activate core modules and selected premium modules
@@ -364,12 +401,78 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		}
 	}
 
-	// 5. Seed grade levels based on selection
-	for i, level := range req.Levels {
-		if _, err := tx.Exec(c.UserContext(),
-			"INSERT INTO grade_levels (tenant_id, name, level, sort_order) VALUES ($1, $2, $3, $4)",
-			tenantID, level, level, i); err != nil {
+	// 5. Seed virtual tenant academic environment.
+	schoolYearName := strings.TrimSpace(req.SchoolYear)
+	if schoolYearName == "" {
+		now := time.Now()
+		schoolYearName = strconv.Itoa(now.Year()) + "-" + strconv.Itoa(now.Year()+1)
+	}
+	var schoolYearID string
+	if err := tx.QueryRow(c.UserContext(), `
+		INSERT INTO school_years (tenant_id, name, start_date, end_date, status, is_current, notes)
+		VALUES ($1, $2, make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, 8, 1),
+		        make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int + 1, 7, 31),
+		        'active', true, 'Ciclo creado automaticamente al provisionar tenant')
+		RETURNING id`, tenantID, schoolYearName).Scan(&schoolYearID); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error seeding school year")
+	}
+
+	if _, err := tx.Exec(c.UserContext(), `
+		INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
+		VALUES ($1, $2, '[]'::jsonb, '{"min":0,"max":100,"passing":60}'::jsonb, '#4f46e5', NOW())
+		ON CONFLICT (tenant_id)
+		DO UPDATE SET school_year = EXCLUDED.school_year, updated_at = NOW()`, tenantID, schoolYearName); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error seeding school settings")
+	}
+
+	seedLevels := req.Levels
+	if len(seedLevels) == 0 {
+		seedLevels = []string{"Primaria"}
+	}
+	var firstGradeID string
+	for i, level := range seedLevels {
+		normalizedLevel := normalizeEducationLevel(level)
+		gradeName := level
+		if strings.TrimSpace(gradeName) == "" {
+			gradeName = "Grado inicial"
+		}
+		var gradeID string
+		if err := tx.QueryRow(c.UserContext(),
+			`INSERT INTO grade_levels (tenant_id, name, level, sort_order)
+			 VALUES ($1, $2, $3, $4)
+			 RETURNING id`,
+			tenantID, gradeName, normalizedLevel, i).Scan(&gradeID); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Error seeding grade level: "+level)
+		}
+		if firstGradeID == "" {
+			firstGradeID = gradeID
+		}
+	}
+
+	defaultSubjects := []struct {
+		Name string
+		Code string
+	}{
+		{"Español", "ESP"},
+		{"Matematicas", "MAT"},
+		{"Ciencias", "CIE"},
+		{"Historia", "HIS"},
+	}
+	for _, subject := range defaultSubjects {
+		if _, err := tx.Exec(c.UserContext(), `
+			INSERT INTO subjects (tenant_id, grade_id, name, code, description, credits, status)
+			VALUES ($1, NULLIF($2, '')::uuid, $3, $4, 'Materia base creada automaticamente', 1, 'active')
+			ON CONFLICT DO NOTHING`, tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error seeding subject: "+subject.Name)
+		}
+	}
+
+	if firstGradeID != "" {
+		if _, err := tx.Exec(c.UserContext(), `
+			INSERT INTO groups (tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
+			VALUES ($1, $2, 'A', $3, $4, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')
+			ON CONFLICT DO NOTHING`, tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error seeding default group")
 		}
 	}
 
@@ -377,7 +480,12 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not commit transaction")
 	}
 
-	return response.Success(c, fiber.Map{"id": tenantID}, "School created successfully")
+	return response.Success(c, fiber.Map{
+		"id":          tenantID,
+		"tenant_id":   tenantID,
+		"admin_email": adminEmail,
+		"admin_demo":  true,
+	}, "School created successfully")
 }
 
 func (h *Handler) GetSchool(c *fiber.Ctx) error {

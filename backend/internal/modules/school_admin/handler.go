@@ -26,6 +26,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	api.Get("/settings", h.GetSettings)
 	api.Put("/settings", h.UpdateSettings)
 	api.Get("/modules/enabled", h.GetEnabledModules)
+	h.registerDatabaseExplorerRoutes(api)
 
 	// Academic management
 	academic := api.Group("/academic")

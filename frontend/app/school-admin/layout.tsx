@@ -13,6 +13,7 @@ import {
   NotebookPen,
   FileText,
   MessageCircle,
+  Database,
   Settings,
   Menu,
   X
@@ -36,6 +37,7 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: Modu
   { href: "/school-admin/grades", label: "Calificaciones", icon: NotebookPen, moduleKey: "grades" },
   { href: "/school-admin/reports", label: "Reportes", icon: FileText, moduleKey: "reports" },
   { href: "/school-admin/communications", label: "Comunicaciones", icon: MessageCircle, moduleKey: "communications" },
+  { href: "/school-admin/database", label: "Base de datos", icon: Database },
   { href: "/school-admin/settings", label: "Configuracion", icon: Settings },
 ];
 

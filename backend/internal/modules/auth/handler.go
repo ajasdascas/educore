@@ -2,10 +2,11 @@ package auth
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"educore/internal/pkg/jwt"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
+	"encoding/hex"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,11 +15,11 @@ import (
 )
 
 type Handler struct {
-	db             *pgxpool.Pool
-	jwtSecret      string
-	jwtExpiry      time.Duration
-	refreshExpiry  time.Duration
-	redis          *redis.Client
+	db            *pgxpool.Pool
+	jwtSecret     string
+	jwtExpiry     time.Duration
+	refreshExpiry time.Duration
+	redis         *redis.Client
 }
 
 func NewHandler(db *pgxpool.Pool, secret string, expiry, refreshExpiry time.Duration, redisClient *redis.Client) *Handler {
@@ -43,8 +44,11 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 // --- DTOs ---
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	Role       string `json:"role"`
+	TenantID   string `json:"tenant_id"`
+	TenantSlug string `json:"tenant_slug"`
 }
 
 type RefreshRequest struct {
@@ -79,10 +83,33 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 
 	var id, role, hash, email string
 	var tenantIDPtr *string
+	tenantScope := req.TenantID
+	if tenantScope == "" && req.TenantSlug != "" {
+		_ = h.db.QueryRow(c.Context(), "SELECT id FROM tenants WHERE slug = $1 AND status = 'active'", req.TenantSlug).Scan(&tenantScope)
+	}
 
-	err := h.db.QueryRow(c.Context(),
-		"SELECT id, tenant_id, role, password_hash, email FROM users WHERE email = $1 AND is_active = true",
-		req.Email).Scan(&id, &tenantIDPtr, &role, &hash, &email)
+	query := `SELECT id, tenant_id, role, password_hash, email
+		FROM users
+		WHERE email = $1 AND is_active = true`
+	args := []interface{}{req.Email}
+	argCount := 1
+	if req.Role != "" {
+		argCount++
+		query += ` AND role = $` + strconv.Itoa(argCount)
+		args = append(args, req.Role)
+	}
+	if tenantScope != "" {
+		argCount++
+		query += ` AND tenant_id = $` + strconv.Itoa(argCount)
+		args = append(args, tenantScope)
+	} else if req.Role == "SUPER_ADMIN" {
+		query += ` AND tenant_id IS NULL`
+	} else if req.Role != "" && req.Role != "SUPER_ADMIN" {
+		query += ` AND tenant_id IS NOT NULL`
+	}
+	query += ` ORDER BY CASE WHEN tenant_id IS NULL THEN 0 ELSE 1 END, created_at DESC LIMIT 1`
+
+	err := h.db.QueryRow(c.Context(), query, args...).Scan(&id, &tenantIDPtr, &role, &hash, &email)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Invalid credentials")

@@ -58,5 +58,6 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **SuperAdmin > Database Admin:** agregado panel de control seguro para listar tablas, ver schema/relaciones, inspeccionar filas paginadas, exportar tabla o base completa a Excel e importar Excel en modo preview/validacion. Backend expone contratos `/api/v1/super-admin/database/*` con tablas protegidas, auditoria y DDL apagado por defecto.
 - **SuperAdmin > Billing & Cobranza:** ampliado con estado financiero por institucion, invoices, generar invoice, marcar pagado, recordatorios, reporte mensual y descarga Excel.
 - **Documentacion production upgrade:** nueva especificacion `docs/obsidian/01_architecture/CORE_MODULES_PRODUCTION_UPGRADE.md` con schema, services, endpoints, Excel import/export, validacion y estructura UI.
+- **Virtual Sub-Database Environment:** al crear escuela se provisiona tenant con admin demo `admin@educore.mx / admin123`, roles base, ciclo actual, grados, materias y grupo inicial. School Admin ahora tiene `/school-admin/database` para explorar y gestionar solo datos de su tenant, con campos/tablas virtuales seguras, export Excel e import preview.
 
 #module #architecture #super_admin #school_admin

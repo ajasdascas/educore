@@ -27,12 +27,33 @@ export default function LoginPage() {
 
     // --- MOCK PARA USUARIOS DEMO (Bypass temporal para diseño/pruebas) ---
     const demoUsers: Record<string, { role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT"; token: string }> = {
-      "admin@educore.mx": { role: "SUPER_ADMIN", token: "mock-token-admin" },
       "school@educore.mx": { role: "SCHOOL_ADMIN", token: "mock-token-school" },
       "profe@educore.mx": { role: "TEACHER", token: "mock-token-teacher" },
       "padre@educore.mx": { role: "PARENT", token: "mock-token-parent" },
     };
 
+    const selectedDemoRole = selectedRole?.id as "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | undefined;
+    const fixedAdminDemo = email === "admin@educore.mx" && password === "admin123" && selectedDemoRole;
+    if (fixedAdminDemo) {
+      const tokenByRole: Record<string, string> = {
+        SUPER_ADMIN: "mock-token-admin",
+        SCHOOL_ADMIN: "mock-token-school",
+        TEACHER: "mock-token-teacher",
+        PARENT: "mock-token-parent",
+      };
+      const mockUser = {
+        id: `mock-${selectedDemoRole.toLowerCase()}`,
+        email,
+        role: selectedDemoRole,
+        is_active: true,
+        tenant_id: selectedDemoRole === "SUPER_ADMIN" ? "" : "school-don-bosco",
+      };
+
+      login(tokenByRole[selectedDemoRole], mockUser);
+      router.push(getDashboardPath(mockUser.role));
+      setLoading(false);
+      return;
+    }
 
     if (demoUsers[email] && password === email.split('@')[0] + '123') {
       const mockUser = {
@@ -40,7 +61,7 @@ export default function LoginPage() {
         email: email,
         role: demoUsers[email].role,
         is_active: true,
-        tenant_id: null
+        tenant_id: demoUsers[email].role === "SUPER_ADMIN" ? "" : "school-don-bosco"
       };
       
       login(demoUsers[email].token, mockUser);
@@ -54,7 +75,7 @@ export default function LoginPage() {
     try {
       const data = await apiRequest("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, role: selectedRole?.id }),
       });
 
       if (data.success) {

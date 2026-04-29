@@ -435,3 +435,10 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Browser Use local en mobile/narrow viewport: Database Admin renderiza sin scrollbar horizontal global visible.
 
 #memory #super_admin #database #responsive #frontend
+# 29-04-2026 - Virtual Sub-Database Environment
+
+Se implemento la experiencia de "base de datos virtual" por escuela sin bases fisicas separadas. El alta de escuelas provisiona admin demo `admin@educore.mx / admin123`, roles base y estructura academica inicial. Se agrego backend `/api/v1/school-admin/database/*`, migracion `013`, UI `/school-admin/database`, mocks estaticos y login tenant-aware por rol para evitar colision entre SuperAdmin global y School Admin.
+
+Verificacion realizada: `go test ./...` en backend OK y `npm run build` en frontend OK.
+
+#memory #school_admin #database #security
