@@ -48,6 +48,32 @@ func (s *Service) GetStats(ctx context.Context, tenantID string) (*StatsResponse
 	return stats, nil
 }
 
+func (s *Service) GetSchoolYears(ctx context.Context, tenantID string) ([]SchoolYearResponse, error) {
+	years, err := s.repo.GetSchoolYears(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get school years: %w", err)
+	}
+	return years, nil
+}
+
+func (s *Service) CreateSchoolYear(ctx context.Context, tenantID, userID string, req CreateSchoolYearRequest) (*SchoolYearResponse, error) {
+	year, err := s.repo.CreateSchoolYear(ctx, tenantID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create school year: %w", err)
+	}
+	s.bus.Publish("school_year.created", map[string]interface{}{"tenant_id": tenantID, "school_year_id": year.ID, "created_by": userID, "timestamp": time.Now()})
+	return year, nil
+}
+
+func (s *Service) UpdateSchoolYear(ctx context.Context, tenantID, userID, yearID string, req UpdateSchoolYearRequest) (*SchoolYearResponse, error) {
+	year, err := s.repo.UpdateSchoolYear(ctx, tenantID, yearID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update school year: %w", err)
+	}
+	s.bus.Publish("school_year.updated", map[string]interface{}{"tenant_id": tenantID, "school_year_id": yearID, "updated_by": userID, "timestamp": time.Now()})
+	return year, nil
+}
+
 // Student management use cases
 func (s *Service) GetStudents(ctx context.Context, tenantID string, params GetStudentsParams) ([]StudentResponse, int, error) {
 	students, total, err := s.repo.GetStudentsPaginated(ctx, tenantID, params)
@@ -299,6 +325,65 @@ func (s *Service) CreateSubject(ctx context.Context, tenantID, userID string, re
 	})
 
 	return subject, nil
+}
+
+func (s *Service) UpdateSubject(ctx context.Context, tenantID, userID, subjectID string, req UpdateSubjectRequest) (*SubjectResponse, error) {
+	subject, err := s.repo.UpdateSubject(ctx, tenantID, subjectID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update subject: %w", err)
+	}
+	s.bus.Publish("subject.updated", map[string]interface{}{"tenant_id": tenantID, "subject_id": subjectID, "updated_by": userID, "timestamp": time.Now()})
+	return subject, nil
+}
+
+func (s *Service) DeleteSubject(ctx context.Context, tenantID, userID, subjectID string) error {
+	if err := s.repo.DeleteSubject(ctx, tenantID, subjectID); err != nil {
+		return fmt.Errorf("failed to delete subject: %w", err)
+	}
+	s.bus.Publish("subject.deleted", map[string]interface{}{"tenant_id": tenantID, "subject_id": subjectID, "deleted_by": userID, "timestamp": time.Now()})
+	return nil
+}
+
+func (s *Service) GetSchedule(ctx context.Context, tenantID, groupID string) ([]ScheduleBlockResponse, error) {
+	blocks, err := s.repo.GetSchedule(ctx, tenantID, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schedule: %w", err)
+	}
+	return blocks, nil
+}
+
+func (s *Service) CreateScheduleBlock(ctx context.Context, tenantID, userID string, req CreateScheduleBlockRequest) (*ScheduleBlockResponse, error) {
+	block, err := s.repo.CreateScheduleBlock(ctx, tenantID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create schedule block: %w", err)
+	}
+	s.bus.Publish("schedule.created", map[string]interface{}{"tenant_id": tenantID, "schedule_id": block.ID, "created_by": userID, "timestamp": time.Now()})
+	return block, nil
+}
+
+func (s *Service) GetScheduleBlock(ctx context.Context, tenantID, blockID string) (*ScheduleBlockResponse, error) {
+	block, err := s.repo.GetScheduleBlock(ctx, tenantID, blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schedule block: %w", err)
+	}
+	return block, nil
+}
+
+func (s *Service) UpdateScheduleBlock(ctx context.Context, tenantID, userID, blockID string, req UpdateScheduleBlockRequest) (*ScheduleBlockResponse, error) {
+	block, err := s.repo.UpdateScheduleBlock(ctx, tenantID, blockID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update schedule block: %w", err)
+	}
+	s.bus.Publish("schedule.updated", map[string]interface{}{"tenant_id": tenantID, "schedule_id": blockID, "updated_by": userID, "timestamp": time.Now()})
+	return block, nil
+}
+
+func (s *Service) DeleteScheduleBlock(ctx context.Context, tenantID, userID, blockID string) error {
+	if err := s.repo.DeleteScheduleBlock(ctx, tenantID, blockID); err != nil {
+		return fmt.Errorf("failed to delete schedule block: %w", err)
+	}
+	s.bus.Publish("schedule.deleted", map[string]interface{}{"tenant_id": tenantID, "schedule_id": blockID, "deleted_by": userID, "timestamp": time.Now()})
+	return nil
 }
 
 // Attendance use cases

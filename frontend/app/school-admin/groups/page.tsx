@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BookOpen, Eye, Loader2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { BookOpen, CalendarDays, Eye, Loader2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +21,14 @@ type Group = {
   name: string;
   grade_level_id?: string;
   grade_name: string;
+  school_year_id?: string;
+  school_year?: string;
+  generation?: string;
   teacher_id?: string;
+  teacher_ids?: string[];
   teacher_name: string;
+  subject_ids?: string[];
+  student_ids?: string[];
   student_count: number;
   max_students: number;
   room: string;
@@ -30,7 +36,9 @@ type Group = {
   status: GroupStatus;
   description?: string;
   created_at: string;
-  students?: Array<{ id: string; first_name: string; last_name: string; enrollment_id: string; status: string }>;
+  students?: Array<{ id: string; first_name: string; last_name: string; enrollment_id: string; status: string; grade_name?: string; group_name?: string }>;
+  teachers?: Teacher[];
+  subjects?: Subject[];
 };
 
 type Teacher = {
@@ -38,12 +46,43 @@ type Teacher = {
   first_name: string;
   last_name: string;
   status: string;
+  specialties?: string[];
+  email?: string;
+};
+
+type Student = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  enrollment_id: string;
+  status: string;
+  group_id?: string;
+  group_name?: string;
+  grade_name?: string;
+};
+
+type Subject = {
+  id: string;
+  name: string;
+  code: string;
+  status: string;
+};
+
+type SchoolYear = {
+  id: string;
+  name: string;
+  is_current: boolean;
+  status: string;
 };
 
 type GroupFormState = {
   name: string;
   grade_level_id: string;
-  teacher_id: string;
+  school_year_id: string;
+  generation: string;
+  teacher_ids: string[];
+  student_ids: string[];
+  subject_ids: string[];
   max_students: string;
   room: string;
   schedule: string;
@@ -63,7 +102,11 @@ const gradeLevels = [
 const emptyForm: GroupFormState = {
   name: "",
   grade_level_id: "grade-1",
-  teacher_id: "",
+  school_year_id: "",
+  generation: "",
+  teacher_ids: [],
+  student_ids: [],
+  subject_ids: [],
   max_students: "30",
   room: "",
   schedule: "Lun-Vie 08:00-13:30",
@@ -81,11 +124,30 @@ function normalizeTeachers(response: any): Teacher[] {
   return Array.isArray(raw) ? raw : [];
 }
 
+function normalizeStudents(response: any): Student[] {
+  const raw = response?.data?.students || response?.data || [];
+  return Array.isArray(raw) ? raw : [];
+}
+
+function normalizeSubjects(response: any): Subject[] {
+  const raw = response?.data?.subjects || response?.data || [];
+  return Array.isArray(raw) ? raw : [];
+}
+
+function normalizeSchoolYears(response: any): SchoolYear[] {
+  const raw = response?.data?.school_years || response?.data || [];
+  return Array.isArray(raw) ? raw : [];
+}
+
 function toForm(group: Group): GroupFormState {
   return {
     name: group.name || "",
     grade_level_id: group.grade_level_id || gradeLevels.find((item) => item.name === group.grade_name)?.id || "grade-1",
-    teacher_id: group.teacher_id || "",
+    school_year_id: group.school_year_id || "",
+    generation: group.generation || "",
+    teacher_ids: group.teacher_ids || (group.teacher_id ? [group.teacher_id] : []),
+    student_ids: group.student_ids || group.students?.map((student) => student.id) || [],
+    subject_ids: group.subject_ids || group.subjects?.map((subject) => subject.id) || [],
     max_students: String(group.max_students || 30),
     room: group.room || "",
     schedule: group.schedule || "",
@@ -98,7 +160,12 @@ function toPayload(form: GroupFormState) {
   return {
     name: form.name.trim(),
     grade_level_id: form.grade_level_id,
-    teacher_id: form.teacher_id === "none" ? "" : form.teacher_id,
+    school_year_id: form.school_year_id,
+    generation: form.generation.trim(),
+    teacher_ids: form.teacher_ids,
+    student_ids: form.student_ids,
+    subject_ids: form.subject_ids,
+    teacher_id: form.teacher_ids[0] || "",
     max_students: Number(form.max_students || 30),
     room: form.room.trim(),
     schedule: form.schedule.trim(),
@@ -115,6 +182,9 @@ export default function SchoolGroupsPage() {
   const { toast } = useToast();
   const [groups, setGroups] = useState<Group[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
@@ -129,12 +199,18 @@ export default function SchoolGroupsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [groupsResponse, teachersResponse] = await Promise.all([
+      const [groupsResponse, teachersResponse, studentsResponse, subjectsResponse, yearsResponse] = await Promise.all([
         authFetch("/api/v1/school-admin/academic/groups"),
         authFetch("/api/v1/school-admin/academic/teachers"),
+        authFetch("/api/v1/school-admin/academic/students?per_page=500"),
+        authFetch("/api/v1/school-admin/academic/subjects"),
+        authFetch("/api/v1/school-admin/academic/school-years"),
       ]);
       setGroups(normalizeGroups(groupsResponse));
       setTeachers(normalizeTeachers(teachersResponse).filter((teacher) => teacher.status === "active"));
+      setStudents(normalizeStudents(studentsResponse));
+      setSubjects(normalizeSubjects(subjectsResponse).filter((subject) => subject.status === "active"));
+      setSchoolYears(normalizeSchoolYears(yearsResponse));
     } catch (error) {
       toast({
         title: "No se pudieron cargar grupos",
@@ -167,9 +243,11 @@ export default function SchoolGroupsPage() {
     return { total: groups.length, active, assigned, occupancy: capacity ? Math.round((students / capacity) * 100) : 0 };
   }, [groups]);
 
+  const currentYear = useMemo(() => schoolYears.find((year) => year.is_current) || schoolYears[0], [schoolYears]);
+
   const openCreate = () => {
     setEditingGroup(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, school_year_id: currentYear?.id || "", generation: `Generacion ${new Date().getFullYear() + 6}` });
     setFormOpen(true);
   };
 
@@ -264,7 +342,7 @@ export default function SchoolGroupsPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Grupos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Organiza grados, cupos, salones y profesor titular.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Organiza grados, generaciones, profesores, alumnos y materias por grupo.</p>
         </div>
         <Button onClick={openCreate} className="w-full md:w-auto"><Plus className="mr-2 h-4 w-4" />Nuevo grupo</Button>
       </div>
@@ -272,7 +350,7 @@ export default function SchoolGroupsPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total</CardTitle><BookOpen className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.total}</div><p className="text-xs text-muted-foreground">Grupos registrados</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Activos</CardTitle><Users className="h-4 w-4 text-green-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.active}</div><p className="text-xs text-muted-foreground">En ciclo actual</p></CardContent></Card>
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Con titular</CardTitle><Users className="h-4 w-4 text-blue-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.assigned}</div><p className="text-xs text-muted-foreground">Profesor asignado</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ciclo actual</CardTitle><CalendarDays className="h-4 w-4 text-blue-600" /></CardHeader><CardContent><div className="text-lg font-bold">{currentYear?.name || "Sin ciclo"}</div><p className="text-xs text-muted-foreground">{stats.assigned} grupos con profesor</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Ocupacion</CardTitle><BookOpen className="h-4 w-4 text-amber-600" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.occupancy}%</div><p className="text-xs text-muted-foreground">Cupos utilizados</p></CardContent></Card>
       </div>
 
@@ -294,15 +372,16 @@ export default function SchoolGroupsPage() {
             <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center"><BookOpen className="h-10 w-10 text-muted-foreground" /><div><p className="font-medium">No hay grupos con esos filtros</p><p className="text-sm text-muted-foreground">Ajusta la busqueda o crea un grupo.</p></div><Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Nuevo grupo</Button></div>
           ) : (
             <Table>
-              <TableHeader><TableRow><TableHead>Grupo</TableHead><TableHead>Titular</TableHead><TableHead>Cupo</TableHead><TableHead>Salon</TableHead><TableHead>Horario</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Grupo</TableHead><TableHead>Ciclo / generacion</TableHead><TableHead>Profesores</TableHead><TableHead>Materias</TableHead><TableHead>Cupo</TableHead><TableHead>Salon</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
                 {filteredGroups.map((group) => (
                   <TableRow key={group.id}>
                     <TableCell><div className="font-medium">{group.grade_name} {group.name}</div><div className="text-xs text-muted-foreground">{group.description || "Sin descripcion"}</div></TableCell>
-                    <TableCell>{group.teacher_name || <span className="text-muted-foreground">Sin titular</span>}</TableCell>
+                    <TableCell><div className="font-medium">{group.school_year || currentYear?.name || "Sin ciclo"}</div><div className="text-xs text-muted-foreground">{group.generation || "Sin generacion"}</div></TableCell>
+                    <TableCell>{group.teacher_name || <span className="text-muted-foreground">Sin profesor</span>}</TableCell>
+                    <TableCell>{(group.subject_ids || []).length || group.subjects?.length || 0}</TableCell>
                     <TableCell>{group.student_count}/{group.max_students}</TableCell>
                     <TableCell>{group.room || "No asignado"}</TableCell>
-                    <TableCell>{group.schedule || "No asignado"}</TableCell>
                     <TableCell><Badge variant={group.status === "active" ? "default" : "outline"}>{group.status === "active" ? "Activo" : "Pausado"}</Badge></TableCell>
                     <TableCell><div className="flex justify-end gap-1"><Button variant="ghost" size="icon-sm" title="Ver detalle" onClick={() => openDetail(group)}><Eye className="h-4 w-4" /></Button><Button variant="ghost" size="icon-sm" title="Editar" onClick={() => openEdit(group)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon-sm" title={group.status === "active" ? "Pausar" : "Activar"} onClick={() => changeStatus(group)}><Users className="h-4 w-4" /></Button><Button variant="ghost" size="icon-sm" title="Eliminar" onClick={() => { setSelectedGroup(group); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
                   </TableRow>
@@ -320,11 +399,45 @@ export default function SchoolGroupsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2"><Label htmlFor="name">Nombre</Label><Input id="name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div>
               <div className="space-y-2"><Label>Grado</Label><Select value={form.grade_level_id} onValueChange={(value) => setForm((current) => ({ ...current, grade_level_id: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{gradeLevels.map((grade) => <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Profesor titular</Label><Select value={form.teacher_id || "none"} onValueChange={(value) => setForm((current) => ({ ...current, teacher_id: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin titular</SelectItem>{teachers.map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacherName(teacher)}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Ciclo escolar</Label><Select value={form.school_year_id || currentYear?.id || "none"} onValueChange={(value) => setForm((current) => ({ ...current, school_year_id: value === "none" ? "" : value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin ciclo</SelectItem>{schoolYears.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label htmlFor="generation">Generacion</Label><Input id="generation" value={form.generation} onChange={(event) => setForm((current) => ({ ...current, generation: event.target.value }))} placeholder="Generacion 2031" /></div>
               <div className="space-y-2"><Label htmlFor="max_students">Cupo maximo</Label><Input id="max_students" type="number" min="1" value={form.max_students} onChange={(event) => setForm((current) => ({ ...current, max_students: event.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="room">Salon</Label><Input id="room" value={form.room} onChange={(event) => setForm((current) => ({ ...current, room: event.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="schedule">Horario</Label><Input id="schedule" value={form.schedule} onChange={(event) => setForm((current) => ({ ...current, schedule: event.target.value }))} /></div>
               <div className="space-y-2 md:col-span-2"><Label htmlFor="description">Descripcion</Label><Textarea id="description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /></div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Profesores asociados</Label>
+                <div className="grid max-h-36 gap-2 overflow-auto rounded-md border p-3 sm:grid-cols-2">
+                  {teachers.map((teacher) => (
+                    <label key={teacher.id} className="flex items-start gap-2 rounded-md p-2 text-sm hover:bg-muted">
+                      <input type="checkbox" checked={form.teacher_ids.includes(teacher.id)} onChange={(event) => setForm((current) => ({ ...current, teacher_ids: event.target.checked ? Array.from(new Set([...current.teacher_ids, teacher.id])) : current.teacher_ids.filter((id) => id !== teacher.id) }))} />
+                      <span><span className="font-medium">{teacherName(teacher)}</span><span className="block text-xs text-muted-foreground">{teacher.specialties?.join(", ") || teacher.email || "Profesor activo"}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Materias del grupo</Label>
+                <div className="grid max-h-36 gap-2 overflow-auto rounded-md border p-3 sm:grid-cols-2">
+                  {subjects.map((subject) => (
+                    <label key={subject.id} className="flex items-center gap-2 rounded-md p-2 text-sm hover:bg-muted">
+                      <input type="checkbox" checked={form.subject_ids.includes(subject.id)} onChange={(event) => setForm((current) => ({ ...current, subject_ids: event.target.checked ? Array.from(new Set([...current.subject_ids, subject.id])) : current.subject_ids.filter((id) => id !== subject.id) }))} />
+                      <span>{subject.name} <span className="text-xs text-muted-foreground">({subject.code})</span></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Alumnos asignados</Label>
+                <div className="grid max-h-44 gap-2 overflow-auto rounded-md border p-3 sm:grid-cols-2">
+                  {students.map((student) => (
+                    <label key={student.id} className="flex items-start gap-2 rounded-md p-2 text-sm hover:bg-muted">
+                      <input type="checkbox" checked={form.student_ids.includes(student.id)} onChange={(event) => setForm((current) => ({ ...current, student_ids: event.target.checked ? Array.from(new Set([...current.student_ids, student.id])) : current.student_ids.filter((id) => id !== student.id) }))} />
+                      <span><span className="font-medium">{student.first_name} {student.last_name}</span><span className="block text-xs text-muted-foreground">{student.enrollment_id} · {student.grade_name || "Sin grado"}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button></DialogFooter>
           </form>
@@ -334,7 +447,7 @@ export default function SchoolGroupsPage() {
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader><DialogTitle>{selectedGroup ? `${selectedGroup.grade_name} ${selectedGroup.name}` : "Detalle del grupo"}</DialogTitle><DialogDescription>Resumen operativo del grupo.</DialogDescription></DialogHeader>
-          {selectedGroup && <div className="space-y-4"><div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Titular</p><p className="font-medium">{selectedGroup.teacher_name || "Sin titular"}</p></div><div><p className="text-xs text-muted-foreground">Salon</p><p className="font-medium">{selectedGroup.room || "No asignado"}</p></div><div><p className="text-xs text-muted-foreground">Horario</p><p className="font-medium">{selectedGroup.schedule || "No asignado"}</p></div><div><p className="text-xs text-muted-foreground">Cupo</p><p className="font-medium">{selectedGroup.student_count}/{selectedGroup.max_students}</p></div></div><div><p className="mb-2 text-sm font-medium">Estudiantes asignados</p><div className="space-y-2">{(selectedGroup.students || []).length > 0 ? selectedGroup.students?.map((student) => <div key={student.id} className="rounded-md border p-3 text-sm">{student.first_name} {student.last_name} - {student.enrollment_id}</div>) : <p className="text-sm text-muted-foreground">Sin estudiantes asignados.</p>}</div></div></div>}
+          {selectedGroup && <div className="space-y-4"><div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">Ciclo</p><p className="font-medium">{selectedGroup.school_year || currentYear?.name || "Sin ciclo"}</p></div><div><p className="text-xs text-muted-foreground">Generacion</p><p className="font-medium">{selectedGroup.generation || "Sin generacion"}</p></div><div><p className="text-xs text-muted-foreground">Salon</p><p className="font-medium">{selectedGroup.room || "No asignado"}</p></div><div><p className="text-xs text-muted-foreground">Cupo</p><p className="font-medium">{selectedGroup.student_count}/{selectedGroup.max_students}</p></div></div><div><p className="mb-2 text-sm font-medium">Profesores asociados</p><div className="space-y-2">{(selectedGroup.teachers || []).length > 0 ? selectedGroup.teachers?.map((teacher) => <div key={teacher.id} className="rounded-md border p-3 text-sm">{teacherName(teacher)}<span className="block text-xs text-muted-foreground">{teacher.email || teacher.specialties?.join(", ") || "Profesor"}</span></div>) : <p className="text-sm text-muted-foreground">Sin profesores asociados.</p>}</div></div><div><p className="mb-2 text-sm font-medium">Materias del grupo</p><div className="grid gap-2 sm:grid-cols-2">{(selectedGroup.subjects || []).length > 0 ? selectedGroup.subjects?.map((subject) => <div key={subject.id} className="rounded-md border p-3 text-sm">{subject.name}<span className="ml-2 text-xs text-muted-foreground">{subject.code}</span></div>) : <p className="text-sm text-muted-foreground">Sin materias asignadas.</p>}</div></div><div><p className="mb-2 text-sm font-medium">Estudiantes asignados</p><div className="space-y-2">{(selectedGroup.students || []).length > 0 ? selectedGroup.students?.map((student) => <div key={student.id} className="rounded-md border p-3 text-sm">{student.first_name} {student.last_name} - {student.enrollment_id}</div>) : <p className="text-sm text-muted-foreground">Sin estudiantes asignados.</p>}</div></div></div>}
           <DialogFooter><Button variant="outline" onClick={() => setDetailOpen(false)}>Cerrar</Button>{selectedGroup && <Button onClick={() => { setDetailOpen(false); openEdit(selectedGroup); }}><Pencil className="mr-2 h-4 w-4" />Editar</Button>}</DialogFooter>
         </DialogContent>
       </Dialog>

@@ -332,14 +332,72 @@ const defaultMockStudents = [
   },
 ];
 
+const defaultMockSchoolYears = [
+  {
+    id: "year-2025-2026",
+    name: "Ciclo 2025-2026",
+    start_date: "2025-08-25",
+    end_date: "2026-07-10",
+    status: "active",
+    is_current: true,
+    notes: "Ciclo escolar actual.",
+    group_count: 4,
+    student_count: 71,
+    created_at: "2025-08-01T09:00:00.000Z",
+    updated_at: "2026-04-29T09:00:00.000Z",
+  },
+  {
+    id: "year-2024-2025",
+    name: "Ciclo 2024-2025",
+    start_date: "2024-08-26",
+    end_date: "2025-07-11",
+    status: "closed",
+    is_current: false,
+    notes: "Ciclo cerrado y disponible para historial.",
+    group_count: 3,
+    student_count: 64,
+    created_at: "2024-08-01T09:00:00.000Z",
+    updated_at: "2025-07-11T14:00:00.000Z",
+  },
+  {
+    id: "year-2023-2024",
+    name: "Ciclo 2023-2024",
+    start_date: "2023-08-28",
+    end_date: "2024-07-12",
+    status: "archived",
+    is_current: false,
+    notes: "Archivado para consulta historica.",
+    group_count: 3,
+    student_count: 59,
+    created_at: "2023-08-01T09:00:00.000Z",
+    updated_at: "2024-07-12T14:00:00.000Z",
+  },
+];
+
+const defaultMockSubjects = [
+  { id: "subject-math", name: "Matematicas", code: "MAT", description: "Pensamiento matematico, algebra basica y resolucion de problemas.", credits: 5, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 1, student_count: 71, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-reading", name: "Lectura", code: "LEC", description: "Comprension lectora, fluidez y expresion oral.", credits: 4, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 1, student_count: 50, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-spanish", name: "Espanol", code: "ESP", description: "Lenguaje, escritura y comunicacion.", credits: 5, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 1, student_count: 71, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-science", name: "Ciencias", code: "CIE", description: "Exploracion natural, laboratorio y pensamiento cientifico.", credits: 4, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 1, student_count: 47, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-history", name: "Historia", code: "HIS", description: "Historia de Mexico, civismo y contexto social.", credits: 3, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 1, student_count: 24, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-english", name: "Ingles", code: "ING", description: "Vocabulario, lectura y conversacion.", credits: 4, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 1, student_count: 21, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-art", name: "Arte", code: "ART", description: "Expresion artistica y apreciacion cultural.", credits: 2, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 0, student_count: 0, created_at: "2025-08-01T09:00:00.000Z" },
+  { id: "subject-pe", name: "Educacion fisica", code: "EDF", description: "Desarrollo motriz, salud y trabajo en equipo.", credits: 2, grade_level_id: "", grade_name: "Todos", status: "active", teacher_count: 0, student_count: 0, created_at: "2025-08-01T09:00:00.000Z" },
+];
+
 const mockSchoolGroups = [
   {
     id: "group-1a",
     name: "1A",
     grade_level_id: "grade-1",
     grade_name: "Primero",
+    school_year_id: "year-2025-2026",
+    school_year: "Ciclo 2025-2026",
+    generation: "Generacion 2031",
     teacher_id: "teacher-maria-lopez",
     teacher_name: "Maria Lopez",
+    teacher_ids: ["teacher-maria-lopez"],
+    subject_ids: ["subject-math", "subject-reading", "subject-spanish", "subject-science"],
     student_count: 26,
     max_students: 30,
     room: "A-101",
@@ -353,8 +411,13 @@ const mockSchoolGroups = [
     name: "2B",
     grade_level_id: "grade-2",
     grade_name: "Segundo",
+    school_year_id: "year-2025-2026",
+    school_year: "Ciclo 2025-2026",
+    generation: "Generacion 2030",
     teacher_id: "teacher-carlos-rivera",
     teacher_name: "Carlos Rivera",
+    teacher_ids: ["teacher-carlos-rivera"],
+    subject_ids: ["subject-math", "subject-spanish", "subject-history", "subject-science"],
     student_count: 24,
     max_students: 30,
     room: "B-204",
@@ -368,8 +431,13 @@ const mockSchoolGroups = [
     name: "3A",
     grade_level_id: "grade-3",
     grade_name: "Tercero",
+    school_year_id: "year-2025-2026",
+    school_year: "Ciclo 2025-2026",
+    generation: "Generacion 2029",
     teacher_id: "teacher-ana-martinez",
     teacher_name: "Ana Martinez",
+    teacher_ids: ["teacher-ana-martinez"],
+    subject_ids: ["subject-english", "subject-spanish", "subject-math"],
     student_count: 21,
     max_students: 28,
     room: "C-301",
@@ -383,8 +451,13 @@ const mockSchoolGroups = [
     name: "4A",
     grade_level_id: "grade-4",
     grade_name: "Cuarto",
+    school_year_id: "year-2025-2026",
+    school_year: "Ciclo 2025-2026",
+    generation: "Generacion 2028",
     teacher_id: "",
     teacher_name: "",
+    teacher_ids: [],
+    subject_ids: ["subject-math", "subject-spanish", "subject-science"],
     student_count: 0,
     max_students: 30,
     room: "D-401",
@@ -403,6 +476,7 @@ const defaultMockScheduleBlocks = [
     grade_name: "Primero",
     teacher_id: "teacher-maria-lopez",
     teacher_name: "Maria Lopez",
+    subject_id: "subject-math",
     subject: "Matematicas",
     day: "monday",
     start_time: "08:00",
@@ -420,6 +494,7 @@ const defaultMockScheduleBlocks = [
     grade_name: "Primero",
     teacher_id: "teacher-maria-lopez",
     teacher_name: "Maria Lopez",
+    subject_id: "subject-reading",
     subject: "Lectura",
     day: "monday",
     start_time: "09:00",
@@ -437,6 +512,7 @@ const defaultMockScheduleBlocks = [
     grade_name: "Segundo",
     teacher_id: "teacher-carlos-rivera",
     teacher_name: "Carlos Rivera",
+    subject_id: "subject-history",
     subject: "Historia",
     day: "tuesday",
     start_time: "10:00",
@@ -454,6 +530,7 @@ const defaultMockScheduleBlocks = [
     grade_name: "Tercero",
     teacher_id: "teacher-ana-martinez",
     teacher_name: "Ana Martinez",
+    subject_id: "subject-english",
     subject: "Ingles",
     day: "wednesday",
     start_time: "11:00",
@@ -737,21 +814,120 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     };
   }
 
+  if (path.endsWith("/school-admin/academic/school-years")) {
+    const years = readMockList("mock_school_years", defaultMockSchoolYears);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = {
+        id: `year-${Date.now()}`,
+        name: body.name,
+        start_date: body.start_date,
+        end_date: body.end_date,
+        status: body.status || (body.is_current ? "active" : "planned"),
+        is_current: !!body.is_current,
+        notes: body.notes || "",
+        group_count: 0,
+        student_count: 0,
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      };
+      const normalized = created.is_current
+        ? years.map((year) => ({ ...year, is_current: false, status: year.status === "active" ? "closed" : year.status }))
+        : years;
+      writeMockList("mock_school_years", [created, ...normalized]);
+      return { success: true, data: created, message: "Ciclo escolar creado en modo demo" };
+    }
+    return { success: true, data: years };
+  }
+
+  const schoolYearMatch = path.match(/\/school-admin\/academic\/school-years\/([^/]+)$/);
+  if (schoolYearMatch) {
+    const id = decodeURIComponent(schoolYearMatch[1]);
+    const years = readMockList("mock_school_years", defaultMockSchoolYears);
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = years.map((year) => {
+        if (body.is_current && year.id !== id) {
+          return { ...year, is_current: false, status: year.status === "active" ? "closed" : year.status, updated_at: nowIso() };
+        }
+        return year.id === id ? { ...year, ...body, updated_at: nowIso() } : year;
+      });
+      writeMockList("mock_school_years", updated);
+      return { success: true, data: updated.find((year) => year.id === id), message: "Ciclo escolar actualizado en modo demo" };
+    }
+    const item = years.find((year) => year.id === id);
+    return item ? { success: true, data: item } : { success: false, message: "Ciclo escolar no encontrado" };
+  }
+
+  if (path.endsWith("/school-admin/academic/subjects")) {
+    const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const grade = mockGradeLevels.find((item) => item.id === body.grade_level_id);
+      const created = {
+        id: `subject-${Date.now()}`,
+        name: body.name,
+        code: body.code,
+        description: body.description || "",
+        credits: Number(body.credits || 1),
+        grade_level_id: body.grade_level_id || "",
+        grade_name: grade?.name || "Todos",
+        status: body.status || "active",
+        teacher_count: 0,
+        student_count: 0,
+        created_at: nowIso(),
+      };
+      writeMockList("mock_school_subjects", [created, ...subjects]);
+      return { success: true, data: created, message: "Materia creada en modo demo" };
+    }
+    return { success: true, data: subjects };
+  }
+
+  const subjectMatch = path.match(/\/school-admin\/academic\/subjects\/([^/]+)$/);
+  if (subjectMatch) {
+    const id = decodeURIComponent(subjectMatch[1]);
+    const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const grade = mockGradeLevels.find((item) => item.id === body.grade_level_id);
+      const updated = subjects.map((subject) => subject.id === id ? { ...subject, ...body, grade_name: grade?.name || subject.grade_name } : subject);
+      writeMockList("mock_school_subjects", updated);
+      return { success: true, data: updated.find((subject) => subject.id === id), message: "Materia actualizada en modo demo" };
+    }
+    if (method === "DELETE") {
+      writeMockList("mock_school_subjects", subjects.filter((subject) => subject.id !== id));
+      const groups = readMockList("mock_school_groups", mockSchoolGroups);
+      writeMockList("mock_school_groups", groups.map((group) => ({ ...group, subject_ids: (group.subject_ids || []).filter((subjectID: string) => subjectID !== id) })));
+      return { success: true, message: "Materia eliminada en modo demo" };
+    }
+    const item = subjects.find((subject) => subject.id === id);
+    return item ? { success: true, data: item } : { success: false, message: "Materia no encontrada" };
+  }
+
   if (path.endsWith("/school-admin/academic/groups")) {
     const groups = readMockList("mock_school_groups", mockSchoolGroups);
     if (method === "POST") {
       const body = parseBody(options);
       const grade = mockGradeLevels.find((item) => item.id === body.grade_level_id);
+      const years = readMockList("mock_school_years", defaultMockSchoolYears);
+      const year = years.find((item) => item.id === body.school_year_id) || years.find((item) => item.is_current);
       const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
-      const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const teacherIDs = Array.isArray(body.teacher_ids) ? body.teacher_ids : body.teacher_id ? [body.teacher_id] : [];
+      const primaryTeacher = teachers.find((item) => item.id === teacherIDs[0]);
       const created = {
         id: `group-${Date.now()}`,
         name: body.name,
         grade_level_id: body.grade_level_id,
         grade_name: grade?.name || "",
-        teacher_id: body.teacher_id || "",
-        teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : "",
-        student_count: 0,
+        school_year_id: year?.id || "",
+        school_year: year?.name || "",
+        generation: body.generation || `Generacion ${Number(new Date().getFullYear()) + 6}`,
+        teacher_id: primaryTeacher?.id || "",
+        teacher_ids: teacherIDs,
+        teacher_name: primaryTeacher ? `${primaryTeacher.first_name} ${primaryTeacher.last_name}` : "",
+        subject_ids: Array.isArray(body.subject_ids) ? body.subject_ids : [],
+        student_count: Array.isArray(body.student_ids) ? body.student_ids.length : 0,
+        student_ids: Array.isArray(body.student_ids) ? body.student_ids : [],
         max_students: Number(body.max_students || 30),
         room: body.room || "",
         schedule: body.schedule || "",
@@ -773,6 +949,8 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
       const group = groups.find((item) => item.id === body.group_id);
       const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+      const subject = subjects.find((item) => item.id === body.subject_id);
       const created = {
         id: `schedule-${Date.now()}`,
         group_id: body.group_id || "",
@@ -780,7 +958,8 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
         grade_name: group?.grade_name || "",
         teacher_id: body.teacher_id || "",
         teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : "",
-        subject: body.subject || "",
+        subject_id: body.subject_id || subject?.id || "",
+        subject: subject?.name || body.subject || "",
         day: body.day || "monday",
         start_time: body.start_time || "08:00",
         end_time: body.end_time || "08:50",
@@ -820,6 +999,8 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
       const group = groups.find((item) => item.id === body.group_id);
       const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+      const subject = subjects.find((item) => item.id === body.subject_id);
       const updated = blocks.map((item) =>
         item.id === id
           ? {
@@ -828,6 +1009,7 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
               group_name: group?.name ?? item.group_name,
               grade_name: group?.grade_name ?? item.grade_name,
               teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : item.teacher_name,
+              subject: subject?.name ?? body.subject ?? item.subject,
               room: body.room ?? item.room,
               updated_at: nowIso(),
             }
@@ -1087,16 +1269,23 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     if (method === "PUT") {
       const body = parseBody(options);
       const grade = mockGradeLevels.find((item) => item.id === body.grade_level_id);
+      const years = readMockList("mock_school_years", defaultMockSchoolYears);
+      const year = years.find((item) => item.id === body.school_year_id);
       const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
-      const teacher = teachers.find((item) => item.id === body.teacher_id);
+      const teacherIDs = Array.isArray(body.teacher_ids) ? body.teacher_ids : body.teacher_id ? [body.teacher_id] : undefined;
+      const primaryTeacher = teacherIDs ? teachers.find((item) => item.id === teacherIDs[0]) : undefined;
       const updated = groups.map((item) =>
         item.id === id
           ? {
               ...item,
               ...body,
               grade_name: grade?.name ?? item.grade_name,
-              teacher_name: teacher ? `${teacher.first_name} ${teacher.last_name}` : item.teacher_name,
+              school_year: year?.name ?? item.school_year,
+              teacher_ids: teacherIDs ?? item.teacher_ids,
+              teacher_id: primaryTeacher?.id ?? item.teacher_id,
+              teacher_name: primaryTeacher ? `${primaryTeacher.first_name} ${primaryTeacher.last_name}` : item.teacher_name,
               max_students: body.max_students !== undefined ? Number(body.max_students) : item.max_students,
+              student_count: Array.isArray(body.student_ids) ? body.student_ids.length : item.student_count,
             }
           : item
       );
@@ -1114,8 +1303,9 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
           success: true,
           data: {
             ...group,
-            students: readMockList("mock_school_students", defaultMockStudents).filter((student) => student.group_id === id),
-            subjects: [],
+            students: readMockList("mock_school_students", defaultMockStudents).filter((student) => (group.student_ids || []).includes(student.id) || student.group_id === id),
+            teachers: readMockList("mock_school_teachers", defaultMockTeachers).filter((teacher) => (group.teacher_ids || (group.teacher_id ? [group.teacher_id] : [])).includes(teacher.id)),
+            subjects: readMockList("mock_school_subjects", defaultMockSubjects).filter((subject) => (group.subject_ids || []).includes(subject.id)),
             recent_activity: [],
           },
         }

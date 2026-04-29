@@ -823,7 +823,15 @@ func (r *Repository) UpdateTeacher(ctx context.Context, tenantID, teacherID stri
 
 func (r *Repository) GetGroups(ctx context.Context, tenantID string) ([]GroupResponse, error) {
 	query := `
-		SELECT g.id, g.name, COALESCE(gl.name, '') as grade_name,
+		SELECT g.id, g.name, g.grade_id, COALESCE(gl.name, '') as grade_name,
+			   COALESCE(g.school_year_id::text, '') as school_year_id,
+			   COALESCE(sy.name, g.school_year) as school_year,
+			   COALESCE((
+			       SELECT gt.teacher_id::text
+			       FROM group_teachers gt
+			       WHERE gt.group_id = g.id
+			       LIMIT 1
+			   ), '') as teacher_id,
 			   COALESCE((
 			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
 			   	FROM group_teachers gt
@@ -833,12 +841,13 @@ func (r *Repository) GetGroups(ctx context.Context, tenantID string) ([]GroupRes
 			   ), '') as teacher_name,
 			   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
 			   COALESCE(g.capacity, 0) as max_students,
-			   '' as room,
+			   COALESCE(g.room, '') as room,
 			   g.school_year as schedule,
-			   'active' as status,
+			   COALESCE(g.status, 'active') as status,
 			   g.created_at
 		FROM groups g
 		INNER JOIN grade_levels gl ON g.grade_id = gl.id
+		LEFT JOIN school_years sy ON g.school_year_id = sy.id
 		WHERE g.tenant_id = $1
 		ORDER BY gl.sort_order, g.name
 	`
@@ -853,7 +862,8 @@ func (r *Repository) GetGroups(ctx context.Context, tenantID string) ([]GroupRes
 	for rows.Next() {
 		var group GroupResponse
 		err := rows.Scan(
-			&group.ID, &group.Name, &group.GradeName, &group.TeacherName,
+			&group.ID, &group.Name, &group.GradeLevelID, &group.GradeName,
+			&group.SchoolYearID, &group.SchoolYear, &group.TeacherID, &group.TeacherName,
 			&group.StudentCount, &group.MaxStudents, &group.Room, &group.Schedule,
 			&group.Status, &group.CreatedAt,
 		)
@@ -878,25 +888,45 @@ func (r *Repository) CreateGroup(ctx context.Context, tenantID string, req Creat
 	if maxStudents == 0 {
 		maxStudents = 30
 	}
+	status := req.Status
+	if status == "" {
+		status = "active"
+	}
 
 	var groupID string
 	err = tx.QueryRow(ctx, `
-		INSERT INTO groups (tenant_id, grade_id, name, school_year, capacity)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO groups (tenant_id, grade_id, name, school_year, capacity, school_year_id, room, description, status)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, '')::uuid, $7, $8, $9)
 		RETURNING id
-	`, tenantID, req.GradeLevelID, req.Name, schoolYear, maxStudents).Scan(&groupID)
+	`, tenantID, req.GradeLevelID, req.Name, schoolYear, maxStudents, req.SchoolYearID, req.Room, req.Description, status).Scan(&groupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create group: %w", err)
 	}
 
-	if req.TeacherID != "" {
+	teacherIDs := req.TeacherIDs
+	if req.TeacherID != "" && len(teacherIDs) == 0 {
+		teacherIDs = []string{req.TeacherID}
+	}
+	for _, teacherID := range teacherIDs {
 		_, err = tx.Exec(ctx, `
 			INSERT INTO group_teachers (group_id, teacher_id)
 			VALUES ($1, $2)
 			ON CONFLICT DO NOTHING
-		`, groupID, req.TeacherID)
+		`, groupID, teacherID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to assign teacher to group: %w", err)
+		}
+	}
+	for _, studentID := range req.StudentIDs {
+		_, err = tx.Exec(ctx, `INSERT INTO group_students (group_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, studentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign student to group: %w", err)
+		}
+	}
+	for _, subjectID := range req.SubjectIDs {
+		_, err = tx.Exec(ctx, `INSERT INTO group_subjects (group_id, subject_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, subjectID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to assign subject to group: %w", err)
 		}
 	}
 
@@ -913,7 +943,15 @@ func (r *Repository) CreateGroup(ctx context.Context, tenantID string, req Creat
 
 func (r *Repository) GetGroupByID(ctx context.Context, tenantID, groupID string) (*GroupDetailResponse, error) {
 	query := `
-		SELECT g.id, g.name, COALESCE(gl.name, '') as grade_name,
+		SELECT g.id, g.name, g.grade_id, COALESCE(gl.name, '') as grade_name,
+			   COALESCE(g.school_year_id::text, '') as school_year_id,
+			   COALESCE(sy.name, g.school_year) as school_year,
+			   COALESCE((
+			       SELECT gt.teacher_id::text
+			       FROM group_teachers gt
+			       WHERE gt.group_id = g.id
+			       LIMIT 1
+			   ), '') as teacher_id,
 			   COALESCE((
 			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
 			   	FROM group_teachers gt
@@ -923,29 +961,32 @@ func (r *Repository) GetGroupByID(ctx context.Context, tenantID, groupID string)
 			   ), '') as teacher_name,
 			   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
 			   COALESCE(g.capacity, 0) as max_students,
-			   '' as room,
+			   COALESCE(g.room, '') as room,
 			   g.school_year as schedule,
-			   'active' as status,
-			   g.created_at
+			   COALESCE(g.status, 'active') as status,
+			   g.created_at,
+			   COALESCE(g.description, '') as description
 		FROM groups g
 		INNER JOIN grade_levels gl ON g.grade_id = gl.id
+		LEFT JOIN school_years sy ON g.school_year_id = sy.id
 		WHERE g.tenant_id = $1 AND g.id = $2
 	`
 
 	var group GroupDetailResponse
 	group.GroupResponse = &GroupResponse{}
 	err := r.db.QueryRow(ctx, query, tenantID, groupID).Scan(
-		&group.ID, &group.Name, &group.GradeName, &group.TeacherName,
+		&group.ID, &group.Name, &group.GradeLevelID, &group.GradeName,
+		&group.SchoolYearID, &group.SchoolYear, &group.TeacherID, &group.TeacherName,
 		&group.StudentCount, &group.MaxStudents, &group.Room, &group.Schedule,
-		&group.Status, &group.CreatedAt,
+		&group.Status, &group.CreatedAt, &group.Description,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group: %w", err)
 	}
 
-	group.Description = ""
-	group.Students = []StudentResponse{}
-	group.Subjects = []SubjectResponse{}
+	group.Students, _ = r.getGroupStudents(ctx, tenantID, groupID)
+	group.Teachers, _ = r.getGroupTeachers(ctx, tenantID, groupID)
+	group.Subjects, _ = r.getGroupSubjects(ctx, tenantID, groupID)
 	group.RecentActivity = []ActivityItem{}
 	return &group, nil
 }
@@ -966,10 +1007,35 @@ func (r *Repository) UpdateGroup(ctx context.Context, tenantID, groupID string, 
 		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
 		args = append(args, req.Name)
 	}
+	if req.GradeLevelID != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("grade_id = $%d", argCount))
+		args = append(args, req.GradeLevelID)
+	}
+	if req.SchoolYearID != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("school_year_id = $%d", argCount))
+		args = append(args, req.SchoolYearID)
+	}
 	if req.MaxStudents > 0 {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("capacity = $%d", argCount))
 		args = append(args, req.MaxStudents)
+	}
+	if req.Room != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("room = $%d", argCount))
+		args = append(args, req.Room)
+	}
+	if req.Description != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
+		args = append(args, req.Description)
+	}
+	if req.Status != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("status = $%d", argCount))
+		args = append(args, req.Status)
 	}
 
 	if len(setParts) > 0 {
@@ -986,22 +1052,48 @@ func (r *Repository) UpdateGroup(ctx context.Context, tenantID, groupID string, 
 		}
 	}
 
-	if req.TeacherID != "" {
+	teacherIDs := req.TeacherIDs
+	if req.TeacherID != "" && len(teacherIDs) == 0 {
+		teacherIDs = []string{req.TeacherID}
+	}
+	if len(teacherIDs) > 0 {
 		_, err = tx.Exec(ctx, "DELETE FROM group_teachers WHERE group_id = $1", groupID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to clear group teacher: %w", err)
 		}
-		_, err = tx.Exec(ctx, `
-			INSERT INTO group_teachers (group_id, teacher_id)
-			VALUES ($1, $2)
-			ON CONFLICT DO NOTHING
-		`, groupID, req.TeacherID)
+		for _, teacherID := range teacherIDs {
+			_, err = tx.Exec(ctx, `INSERT INTO group_teachers (group_id, teacher_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, teacherID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to assign teacher to group: %w", err)
+			}
+		}
+	}
+	if req.StudentIDs != nil {
+		_, err = tx.Exec(ctx, "DELETE FROM group_students WHERE group_id = $1", groupID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to assign teacher to group: %w", err)
+			return nil, fmt.Errorf("failed to clear group students: %w", err)
+		}
+		for _, studentID := range req.StudentIDs {
+			_, err = tx.Exec(ctx, `INSERT INTO group_students (group_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, studentID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to assign student to group: %w", err)
+			}
+		}
+	}
+	if req.SubjectIDs != nil {
+		_, err = tx.Exec(ctx, "DELETE FROM group_subjects WHERE group_id = $1", groupID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to clear group subjects: %w", err)
+		}
+		for _, subjectID := range req.SubjectIDs {
+			_, err = tx.Exec(ctx, `INSERT INTO group_subjects (group_id, subject_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, groupID, subjectID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to assign subject to group: %w", err)
+			}
 		}
 	}
 
-	if len(setParts) == 0 && req.TeacherID == "" {
+	if len(setParts) == 0 && len(teacherIDs) == 0 && req.StudentIDs == nil && req.SubjectIDs == nil {
 		return nil, fmt.Errorf("no fields to update")
 	}
 
@@ -1027,6 +1119,10 @@ func (r *Repository) DeleteGroup(ctx context.Context, tenantID, groupID string) 
 	if err != nil {
 		return fmt.Errorf("failed to delete group teachers: %w", err)
 	}
+	_, err = tx.Exec(ctx, "DELETE FROM group_subjects WHERE group_id = $1", groupID)
+	if err != nil {
+		return fmt.Errorf("failed to delete group subjects: %w", err)
+	}
 
 	_, err = tx.Exec(ctx, "DELETE FROM group_students WHERE group_id = $1", groupID)
 	if err != nil {
@@ -1047,12 +1143,475 @@ func (r *Repository) DeleteGroup(ctx context.Context, tenantID, groupID string) 
 	return nil
 }
 
+func (r *Repository) getGroupStudents(ctx context.Context, tenantID, groupID string) ([]StudentResponse, error) {
+	query := `
+		SELECT s.id, s.first_name, s.last_name, '' as email, '' as phone,
+		       COALESCE(s.enrollment_number, ''), s.status, COALESCE(g.name, ''), COALESCE(gl.name, ''),
+		       '' as parent_name, '' as parent_email, s.created_at, s.updated_at
+		FROM group_students gs
+		INNER JOIN students s ON gs.student_id = s.id
+		INNER JOIN groups g ON gs.group_id = g.id
+		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
+		WHERE g.tenant_id = $1 AND gs.group_id = $2
+		ORDER BY s.first_name, s.last_name
+	`
+	rows, err := r.db.Query(ctx, query, tenantID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	students := []StudentResponse{}
+	for rows.Next() {
+		var student StudentResponse
+		if err := rows.Scan(&student.ID, &student.FirstName, &student.LastName, &student.Email, &student.Phone, &student.EnrollmentID, &student.Status, &student.GroupName, &student.GradeName, &student.ParentName, &student.ParentEmail, &student.CreatedAt, &student.UpdatedAt); err != nil {
+			return nil, err
+		}
+		students = append(students, student)
+	}
+	return students, nil
+}
+
+func (r *Repository) getGroupTeachers(ctx context.Context, tenantID, groupID string) ([]TeacherResponse, error) {
+	query := `
+		SELECT u.id, u.first_name, u.last_name, u.email, COALESCE(tp.phone, ''),
+		       COALESCE(tp.employee_id, ''), CASE WHEN u.is_active THEN 'active' ELSE 'inactive' END,
+		       COALESCE(tp.specialization, ''), to_char(u.created_at, 'YYYY-MM-DD'), u.created_at
+		FROM group_teachers gt
+		INNER JOIN users u ON gt.teacher_id = u.id
+		LEFT JOIN teacher_profiles tp ON u.id = tp.user_id
+		INNER JOIN groups g ON gt.group_id = g.id
+		WHERE g.tenant_id = $1 AND gt.group_id = $2
+		ORDER BY u.first_name, u.last_name
+	`
+	rows, err := r.db.Query(ctx, query, tenantID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	teachers := []TeacherResponse{}
+	for rows.Next() {
+		var teacher TeacherResponse
+		var specialization string
+		if err := rows.Scan(&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email, &teacher.Phone, &teacher.EmployeeID, &teacher.Status, &specialization, &teacher.HireDate, &teacher.CreatedAt); err != nil {
+			return nil, err
+		}
+		if specialization != "" {
+			teacher.Specialties = []string{specialization}
+		} else {
+			teacher.Specialties = []string{}
+		}
+		teachers = append(teachers, teacher)
+	}
+	return teachers, nil
+}
+
+func (r *Repository) getGroupSubjects(ctx context.Context, tenantID, groupID string) ([]SubjectResponse, error) {
+	query := `
+		SELECT s.id, s.name, COALESCE(s.code, ''), COALESCE(s.description, ''),
+		       COALESCE(s.credits, 1), COALESCE(s.grade_id::text, ''),
+		       COALESCE(gl.name, ''), COALESCE(s.status, 'active'), 0, 0, s.created_at
+		FROM group_subjects gs
+		INNER JOIN subjects s ON gs.subject_id = s.id
+		LEFT JOIN grade_levels gl ON s.grade_id = gl.id
+		WHERE s.tenant_id = $1 AND gs.group_id = $2
+		ORDER BY s.name
+	`
+	rows, err := r.db.Query(ctx, query, tenantID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	subjects := []SubjectResponse{}
+	for rows.Next() {
+		var subject SubjectResponse
+		if err := rows.Scan(&subject.ID, &subject.Name, &subject.Code, &subject.Description, &subject.Credits, &subject.GradeLevelID, &subject.GradeName, &subject.Status, &subject.TeacherCount, &subject.StudentCount, &subject.CreatedAt); err != nil {
+			return nil, err
+		}
+		subjects = append(subjects, subject)
+	}
+	return subjects, nil
+}
+
 func (r *Repository) GetSubjects(ctx context.Context, tenantID string) ([]SubjectResponse, error) {
-	return []SubjectResponse{}, nil
+	query := `
+		SELECT s.id, s.name, COALESCE(s.code, ''), COALESCE(s.description, ''),
+		       COALESCE(s.credits, 1), COALESCE(s.grade_id::text, ''),
+		       COALESCE(gl.name, ''), COALESCE(s.status, 'active'),
+		       (SELECT COUNT(DISTINCT gt.teacher_id) FROM group_teachers gt WHERE gt.subject_id = s.id) as teacher_count,
+		       (SELECT COUNT(DISTINCT gs.student_id)
+		        FROM group_subjects gsub
+		        INNER JOIN group_students gs ON gsub.group_id = gs.group_id
+		        WHERE gsub.subject_id = s.id) as student_count,
+		       s.created_at
+		FROM subjects s
+		LEFT JOIN grade_levels gl ON s.grade_id = gl.id
+		WHERE s.tenant_id = $1
+		ORDER BY s.name
+	`
+	rows, err := r.db.Query(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subjects: %w", err)
+	}
+	defer rows.Close()
+	var subjects []SubjectResponse
+	for rows.Next() {
+		var subject SubjectResponse
+		if err := rows.Scan(&subject.ID, &subject.Name, &subject.Code, &subject.Description, &subject.Credits, &subject.GradeLevelID, &subject.GradeName, &subject.Status, &subject.TeacherCount, &subject.StudentCount, &subject.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan subject: %w", err)
+		}
+		subjects = append(subjects, subject)
+	}
+	return subjects, nil
 }
 
 func (r *Repository) CreateSubject(ctx context.Context, tenantID string, req CreateSubjectRequest) (*SubjectResponse, error) {
-	return &SubjectResponse{}, nil
+	status := req.Status
+	if status == "" {
+		status = "active"
+	}
+	credits := req.Credits
+	if credits == 0 {
+		credits = 1
+	}
+	var id string
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO subjects (tenant_id, grade_id, name, code, description, credits, status)
+		VALUES ($1, NULLIF($2, '')::uuid, $3, $4, $5, $6, $7)
+		RETURNING id
+	`, tenantID, req.GradeLevelID, req.Name, req.Code, req.Description, credits, status).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subject: %w", err)
+	}
+	return r.GetSubjectByID(ctx, tenantID, id)
+}
+
+func (r *Repository) GetSubjectByID(ctx context.Context, tenantID, subjectID string) (*SubjectResponse, error) {
+	query := `
+		SELECT s.id, s.name, COALESCE(s.code, ''), COALESCE(s.description, ''),
+		       COALESCE(s.credits, 1), COALESCE(s.grade_id::text, ''),
+		       COALESCE(gl.name, ''), COALESCE(s.status, 'active'), 0, 0, s.created_at
+		FROM subjects s
+		LEFT JOIN grade_levels gl ON s.grade_id = gl.id
+		WHERE s.tenant_id = $1 AND s.id = $2
+	`
+	var subject SubjectResponse
+	if err := r.db.QueryRow(ctx, query, tenantID, subjectID).Scan(&subject.ID, &subject.Name, &subject.Code, &subject.Description, &subject.Credits, &subject.GradeLevelID, &subject.GradeName, &subject.Status, &subject.TeacherCount, &subject.StudentCount, &subject.CreatedAt); err != nil {
+		return nil, fmt.Errorf("failed to get subject: %w", err)
+	}
+	return &subject, nil
+}
+
+func (r *Repository) UpdateSubject(ctx context.Context, tenantID, subjectID string, req UpdateSubjectRequest) (*SubjectResponse, error) {
+	setParts := []string{}
+	args := []interface{}{tenantID, subjectID}
+	argCount := 2
+	if req.Name != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+		args = append(args, req.Name)
+	}
+	if req.Code != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("code = $%d", argCount))
+		args = append(args, req.Code)
+	}
+	if req.Description != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
+		args = append(args, req.Description)
+	}
+	if req.Credits > 0 {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("credits = $%d", argCount))
+		args = append(args, req.Credits)
+	}
+	if req.GradeLevelID != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("grade_id = $%d", argCount))
+		args = append(args, req.GradeLevelID)
+	}
+	if req.Status != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("status = $%d", argCount))
+		args = append(args, req.Status)
+	}
+	if len(setParts) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+	argCount++
+	setParts = append(setParts, fmt.Sprintf("updated_at = $%d", argCount))
+	args = append(args, time.Now())
+	_, err := r.db.Exec(ctx, fmt.Sprintf(`UPDATE subjects SET %s WHERE tenant_id = $1 AND id = $2`, strings.Join(setParts, ", ")), args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update subject: %w", err)
+	}
+	return r.GetSubjectByID(ctx, tenantID, subjectID)
+}
+
+func (r *Repository) DeleteSubject(ctx context.Context, tenantID, subjectID string) error {
+	result, err := r.db.Exec(ctx, "DELETE FROM subjects WHERE tenant_id = $1 AND id = $2", tenantID, subjectID)
+	if err != nil {
+		return fmt.Errorf("failed to delete subject: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("subject not found")
+	}
+	return nil
+}
+
+func (r *Repository) GetSchoolYears(ctx context.Context, tenantID string) ([]SchoolYearResponse, error) {
+	query := `
+		SELECT sy.id, sy.name, to_char(sy.start_date, 'YYYY-MM-DD'), to_char(sy.end_date, 'YYYY-MM-DD'),
+		       sy.status, sy.is_current, COALESCE(sy.notes, ''),
+		       (SELECT COUNT(*) FROM groups g WHERE g.school_year_id = sy.id),
+		       (SELECT COUNT(DISTINCT gs.student_id) FROM groups g INNER JOIN group_students gs ON gs.group_id = g.id WHERE g.school_year_id = sy.id),
+		       sy.created_at, sy.updated_at
+		FROM school_years sy
+		WHERE sy.tenant_id = $1
+		ORDER BY sy.is_current DESC, sy.start_date DESC
+	`
+	rows, err := r.db.Query(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get school years: %w", err)
+	}
+	defer rows.Close()
+	var years []SchoolYearResponse
+	for rows.Next() {
+		var year SchoolYearResponse
+		if err := rows.Scan(&year.ID, &year.Name, &year.StartDate, &year.EndDate, &year.Status, &year.IsCurrent, &year.Notes, &year.GroupCount, &year.StudentCount, &year.CreatedAt, &year.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan school year: %w", err)
+		}
+		years = append(years, year)
+	}
+	return years, nil
+}
+
+func (r *Repository) CreateSchoolYear(ctx context.Context, tenantID string, req CreateSchoolYearRequest) (*SchoolYearResponse, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if req.IsCurrent {
+		if _, err = tx.Exec(ctx, `UPDATE school_years SET is_current = false, status = CASE WHEN status = 'active' THEN 'closed' ELSE status END WHERE tenant_id = $1`, tenantID); err != nil {
+			return nil, err
+		}
+	}
+	status := req.Status
+	if status == "" {
+		if req.IsCurrent {
+			status = "active"
+		} else {
+			status = "planned"
+		}
+	}
+	var id string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO school_years (tenant_id, name, start_date, end_date, status, is_current, notes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id
+	`, tenantID, req.Name, req.StartDate, req.EndDate, status, req.IsCurrent, req.Notes).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create school year: %w", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return r.GetSchoolYearByID(ctx, tenantID, id)
+}
+
+func (r *Repository) GetSchoolYearByID(ctx context.Context, tenantID, yearID string) (*SchoolYearResponse, error) {
+	years, err := r.GetSchoolYears(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	for _, year := range years {
+		if year.ID == yearID {
+			return &year, nil
+		}
+	}
+	return nil, fmt.Errorf("school year not found")
+}
+
+func (r *Repository) UpdateSchoolYear(ctx context.Context, tenantID, yearID string, req UpdateSchoolYearRequest) (*SchoolYearResponse, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if req.IsCurrent != nil && *req.IsCurrent {
+		if _, err = tx.Exec(ctx, `UPDATE school_years SET is_current = false, status = CASE WHEN status = 'active' THEN 'closed' ELSE status END WHERE tenant_id = $1 AND id <> $2`, tenantID, yearID); err != nil {
+			return nil, err
+		}
+	}
+	setParts := []string{}
+	args := []interface{}{tenantID, yearID}
+	argCount := 2
+	if req.Name != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+		args = append(args, req.Name)
+	}
+	if req.StartDate != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("start_date = $%d", argCount))
+		args = append(args, req.StartDate)
+	}
+	if req.EndDate != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("end_date = $%d", argCount))
+		args = append(args, req.EndDate)
+	}
+	if req.Status != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("status = $%d", argCount))
+		args = append(args, req.Status)
+	}
+	if req.IsCurrent != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("is_current = $%d", argCount))
+		args = append(args, *req.IsCurrent)
+	}
+	if req.Notes != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("notes = $%d", argCount))
+		args = append(args, req.Notes)
+	}
+	if len(setParts) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+	_, err = tx.Exec(ctx, fmt.Sprintf(`UPDATE school_years SET %s WHERE tenant_id = $1 AND id = $2`, strings.Join(setParts, ", ")), args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update school year: %w", err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return r.GetSchoolYearByID(ctx, tenantID, yearID)
+}
+
+func (r *Repository) GetSchedule(ctx context.Context, tenantID, groupID string) ([]ScheduleBlockResponse, error) {
+	where := "WHERE cs.tenant_id = $1"
+	args := []interface{}{tenantID}
+	if groupID != "" && groupID != "all" {
+		where += " AND cs.group_id = $2"
+		args = append(args, groupID)
+	}
+	query := fmt.Sprintf(`
+		SELECT cs.id, cs.group_id, g.name, COALESCE(gl.name, ''), COALESCE(cs.subject_id::text, ''),
+		       COALESCE(s.name, ''), COALESCE(cs.teacher_id::text, ''),
+		       COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''),
+		       cs.day, to_char(cs.start_time, 'HH24:MI'), to_char(cs.end_time, 'HH24:MI'),
+		       COALESCE(cs.room, ''), cs.status, COALESCE(cs.notes, ''), cs.created_at, cs.updated_at
+		FROM class_schedule_blocks cs
+		INNER JOIN groups g ON cs.group_id = g.id
+		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
+		LEFT JOIN subjects s ON cs.subject_id = s.id
+		LEFT JOIN users u ON cs.teacher_id = u.id
+		%s
+		ORDER BY cs.day, cs.start_time
+	`, where)
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schedule: %w", err)
+	}
+	defer rows.Close()
+	var blocks []ScheduleBlockResponse
+	for rows.Next() {
+		var block ScheduleBlockResponse
+		if err := rows.Scan(&block.ID, &block.GroupID, &block.GroupName, &block.GradeName, &block.SubjectID, &block.Subject, &block.TeacherID, &block.TeacherName, &block.Day, &block.StartTime, &block.EndTime, &block.Room, &block.Status, &block.Notes, &block.CreatedAt, &block.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan schedule block: %w", err)
+		}
+		blocks = append(blocks, block)
+	}
+	return blocks, nil
+}
+
+func (r *Repository) CreateScheduleBlock(ctx context.Context, tenantID string, req CreateScheduleBlockRequest) (*ScheduleBlockResponse, error) {
+	status := req.Status
+	if status == "" {
+		status = "active"
+	}
+	var id string
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO class_schedule_blocks (tenant_id, group_id, subject_id, teacher_id, day, start_time, end_time, room, status, notes)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, NULLIF($4, '')::uuid, $5, $6, $7, $8, $9, $10)
+		RETURNING id
+	`, tenantID, req.GroupID, req.SubjectID, req.TeacherID, req.Day, req.StartTime, req.EndTime, req.Room, status, req.Notes).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create schedule block: %w", err)
+	}
+	return r.GetScheduleBlock(ctx, tenantID, id)
+}
+
+func (r *Repository) GetScheduleBlock(ctx context.Context, tenantID, blockID string) (*ScheduleBlockResponse, error) {
+	blocks, err := r.GetSchedule(ctx, tenantID, "")
+	if err != nil {
+		return nil, err
+	}
+	for _, block := range blocks {
+		if block.ID == blockID {
+			return &block, nil
+		}
+	}
+	return nil, fmt.Errorf("schedule block not found")
+}
+
+func (r *Repository) UpdateScheduleBlock(ctx context.Context, tenantID, blockID string, req UpdateScheduleBlockRequest) (*ScheduleBlockResponse, error) {
+	setParts := []string{}
+	args := []interface{}{tenantID, blockID}
+	argCount := 2
+	add := func(column string, value interface{}) {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("%s = $%d", column, argCount))
+		args = append(args, value)
+	}
+	if req.GroupID != "" {
+		add("group_id", req.GroupID)
+	}
+	if req.SubjectID != "" {
+		add("subject_id", req.SubjectID)
+	}
+	if req.TeacherID != "" {
+		add("teacher_id", req.TeacherID)
+	}
+	if req.Day != "" {
+		add("day", req.Day)
+	}
+	if req.StartTime != "" {
+		add("start_time", req.StartTime)
+	}
+	if req.EndTime != "" {
+		add("end_time", req.EndTime)
+	}
+	if req.Room != "" {
+		add("room", req.Room)
+	}
+	if req.Status != "" {
+		add("status", req.Status)
+	}
+	if req.Notes != "" {
+		add("notes", req.Notes)
+	}
+	if len(setParts) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+	_, err := r.db.Exec(ctx, fmt.Sprintf(`UPDATE class_schedule_blocks SET %s WHERE tenant_id = $1 AND id = $2`, strings.Join(setParts, ", ")), args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update schedule block: %w", err)
+	}
+	return r.GetScheduleBlock(ctx, tenantID, blockID)
+}
+
+func (r *Repository) DeleteScheduleBlock(ctx context.Context, tenantID, blockID string) error {
+	result, err := r.db.Exec(ctx, "DELETE FROM class_schedule_blocks WHERE tenant_id = $1 AND id = $2", tenantID, blockID)
+	if err != nil {
+		return fmt.Errorf("failed to delete schedule block: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("schedule block not found")
+	}
+	return nil
 }
 
 func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID string) (*AttendanceResponse, error) {

@@ -91,3 +91,12 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** El modulo queda usable en produccion demo y listo para conectar a proveedores reales de comunicacion cuando se formalicen colas, auditoria y tablas multi-tenant.
 
 #frontend #school_admin #communications #architecture
+## 29-04-2026 — Estructura academica School Admin
+
+**Decision:** Implementar Ciclos Escolares como entidad propia (`school_years`) y mantener `groups.school_year` como compatibilidad legacy.
+
+**Razon:** La app ya usaba `school_year` textual en grupos y calificaciones. Agregar `school_year_id` permite gestion formal de ciclos actuales/anteriores sin romper datos existentes ni builds estaticos.
+
+**Impacto:** Grupos, horarios y materias pueden operar con ciclos reales. Se evita una migracion destructiva y se mantiene compatibilidad con produccion actual.
+
+#architecture #school_admin #database

@@ -23,6 +23,7 @@ type ScheduleBlock = {
   grade_name: string;
   teacher_id: string;
   teacher_name: string;
+  subject_id?: string;
   subject: string;
   day: string;
   start_time: string;
@@ -49,9 +50,17 @@ type Teacher = {
   status: string;
 };
 
+type Subject = {
+  id: string;
+  name: string;
+  code: string;
+  status: string;
+};
+
 type ScheduleFormState = {
   group_id: string;
   teacher_id: string;
+  subject_id: string;
   subject: string;
   day: string;
   start_time: string;
@@ -69,22 +78,11 @@ const days = [
   { value: "friday", label: "Viernes", short: "Vie" },
 ];
 
-const subjects = [
-  "Matematicas",
-  "Lectura",
-  "Espanol",
-  "Ciencias",
-  "Historia",
-  "Ingles",
-  "Arte",
-  "Educacion fisica",
-  "Computacion",
-];
-
 const emptyForm: ScheduleFormState = {
   group_id: "",
   teacher_id: "",
-  subject: "Matematicas",
+  subject_id: "",
+  subject: "",
   day: "monday",
   start_time: "08:00",
   end_time: "08:50",
@@ -105,6 +103,11 @@ function normalizeGroups(response: any): SchoolGroup[] {
 
 function normalizeTeachers(response: any): Teacher[] {
   const raw = response?.data?.teachers || response?.data || [];
+  return Array.isArray(raw) ? raw : [];
+}
+
+function normalizeSubjects(response: any): Subject[] {
+  const raw = response?.data?.subjects || response?.data || [];
   return Array.isArray(raw) ? raw : [];
 }
 
@@ -133,7 +136,8 @@ function toForm(block: ScheduleBlock): ScheduleFormState {
   return {
     group_id: block.group_id || "",
     teacher_id: block.teacher_id || "",
-    subject: block.subject || "Matematicas",
+    subject_id: block.subject_id || "",
+    subject: block.subject || "",
     day: block.day || "monday",
     start_time: block.start_time || "08:00",
     end_time: block.end_time || "08:50",
@@ -147,6 +151,7 @@ function toPayload(form: ScheduleFormState) {
   return {
     group_id: form.group_id,
     teacher_id: form.teacher_id,
+    subject_id: form.subject_id,
     subject: form.subject.trim(),
     day: form.day,
     start_time: form.start_time,
@@ -162,6 +167,7 @@ export default function SchoolSchedulePage() {
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
   const [groups, setGroups] = useState<SchoolGroup[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
@@ -178,14 +184,16 @@ export default function SchoolSchedulePage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [scheduleResponse, groupsResponse, teachersResponse] = await Promise.all([
+      const [scheduleResponse, groupsResponse, teachersResponse, subjectsResponse] = await Promise.all([
         authFetch("/api/v1/school-admin/academic/schedule"),
         authFetch("/api/v1/school-admin/academic/groups"),
         authFetch("/api/v1/school-admin/academic/teachers"),
+        authFetch("/api/v1/school-admin/academic/subjects"),
       ]);
       setBlocks(normalizeBlocks(scheduleResponse));
       setGroups(normalizeGroups(groupsResponse));
       setTeachers(normalizeTeachers(teachersResponse));
+      setSubjects(normalizeSubjects(subjectsResponse).filter((subject) => subject.status === "active"));
     } catch (error) {
       toast({
         title: "No se pudo cargar horarios",
@@ -237,6 +245,7 @@ export default function SchoolSchedulePage() {
 
   const activeTeachers = useMemo(() => teachers.filter((teacher) => teacher.status === "active"), [teachers]);
   const activeGroups = useMemo(() => groups.filter((group) => group.status === "active"), [groups]);
+  const activeSubjects = useMemo(() => subjects.filter((subject) => subject.status === "active"), [subjects]);
 
   const updateGroup = (groupID: string) => {
     const normalizedGroupID = groupID === "none" ? "" : groupID;
@@ -251,9 +260,10 @@ export default function SchoolSchedulePage() {
   const openCreate = (day = dayFilter !== "all" ? dayFilter : "monday") => {
     const defaultGroup = activeGroups[0]?.id || "";
     const defaultTeacher = activeTeachers[0]?.id || "";
+    const defaultSubject = activeSubjects[0];
     const group = activeGroups.find((item) => item.id === defaultGroup);
     setEditingBlock(null);
-    setForm({ ...emptyForm, day, group_id: defaultGroup, teacher_id: defaultTeacher, room: group?.room || "" });
+    setForm({ ...emptyForm, day, group_id: defaultGroup, teacher_id: defaultTeacher, subject_id: defaultSubject?.id || "", subject: defaultSubject?.name || "", room: group?.room || "" });
     setFormOpen(true);
   };
 
@@ -277,7 +287,7 @@ export default function SchoolSchedulePage() {
   const validateForm = () => {
     if (!form.group_id) return "Selecciona un grupo.";
     if (!form.teacher_id) return "Selecciona un profesor.";
-    if (!form.subject.trim()) return "La materia es obligatoria.";
+    if (!form.subject_id && !form.subject.trim()) return "Selecciona una materia.";
     if (toMinutes(form.start_time) >= toMinutes(form.end_time)) return "La hora final debe ser mayor a la hora inicial.";
     return "";
   };
@@ -481,7 +491,7 @@ export default function SchoolSchedulePage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2"><Label>Grupo</Label><Select value={form.group_id || "none"} onValueChange={updateGroup}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Selecciona grupo</SelectItem>{activeGroups.map((group) => <SelectItem key={group.id} value={group.id}>{groupLabel(group)}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>Profesor</Label><Select value={form.teacher_id || "none"} onValueChange={(value) => setForm((current) => ({ ...current, teacher_id: value === "none" ? "" : value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Selecciona profesor</SelectItem>{activeTeachers.map((teacher) => <SelectItem key={teacher.id} value={teacher.id}>{teacherName(teacher)}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Materia</Label><Select value={form.subject} onValueChange={(value) => setForm((current) => ({ ...current, subject: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{subjects.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Materia</Label><Select value={form.subject_id || "none"} onValueChange={(value) => { const subject = activeSubjects.find((item) => item.id === value); setForm((current) => ({ ...current, subject_id: value === "none" ? "" : value, subject: subject?.name || current.subject })); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Selecciona materia</SelectItem>{activeSubjects.map((subject) => <SelectItem key={subject.id} value={subject.id}>{subject.name} ({subject.code})</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>Dia</Label><Select value={form.day} onValueChange={(value) => setForm((current) => ({ ...current, day: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{days.map((day) => <SelectItem key={day.value} value={day.value}>{day.label}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label htmlFor="start_time">Inicio</Label><Input id="start_time" type="time" value={form.start_time} onChange={(event) => setForm((current) => ({ ...current, start_time: event.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="end_time">Fin</Label><Input id="end_time" type="time" value={form.end_time} onChange={(event) => setForm((current) => ({ ...current, end_time: event.target.value }))} /></div>

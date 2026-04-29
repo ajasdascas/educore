@@ -26,6 +26,10 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 
 	// Academic management
 	academic := api.Group("/academic")
+	academic.Get("/school-years", h.GetSchoolYears)
+	academic.Post("/school-years", h.CreateSchoolYear)
+	academic.Put("/school-years/:id", h.UpdateSchoolYear)
+
 	academic.Get("/students", h.GetStudents)
 	academic.Post("/students", h.CreateStudent)
 	academic.Get("/students/:id", h.GetStudent)
@@ -45,6 +49,14 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 
 	academic.Get("/subjects", h.GetSubjects)
 	academic.Post("/subjects", h.CreateSubject)
+	academic.Put("/subjects/:id", h.UpdateSubject)
+	academic.Delete("/subjects/:id", h.DeleteSubject)
+
+	academic.Get("/schedule", h.GetSchedule)
+	academic.Post("/schedule", h.CreateScheduleBlock)
+	academic.Get("/schedule/:id", h.GetScheduleBlock)
+	academic.Put("/schedule/:id", h.UpdateScheduleBlock)
+	academic.Delete("/schedule/:id", h.DeleteScheduleBlock)
 
 	// Attendance management
 	attendance := api.Group("/attendance")
@@ -59,6 +71,44 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	grades.Post("/grades/bulk", h.BulkUpdateGrades)
 	grades.Get("/students/:studentId/report-card", h.GetStudentReportCard)
 	grades.Get("/groups/:groupId/final-grades", h.GetGroupFinalGrades)
+}
+
+func (h *Handler) GetSchoolYears(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	years, err := h.service.GetSchoolYears(c.Context(), tenantID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, years, "Success")
+}
+
+func (h *Handler) CreateSchoolYear(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req CreateSchoolYearRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	year, err := h.service.CreateSchoolYear(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, year, "Success")
+}
+
+func (h *Handler) UpdateSchoolYear(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	yearID := c.Params("id")
+	var req UpdateSchoolYearRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	year, err := h.service.UpdateSchoolYear(c.Context(), tenantID, userID, yearID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, year, "Success")
 }
 
 // Dashboard handlers
@@ -331,6 +381,95 @@ func (h *Handler) CreateSubject(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, subject, "Success")
+}
+
+func (h *Handler) UpdateSubject(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	subjectID := c.Params("id")
+
+	var req UpdateSubjectRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+
+	subject, err := h.service.UpdateSubject(c.Context(), tenantID, userID, subjectID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+
+	return response.Success(c, subject, "Success")
+}
+
+func (h *Handler) DeleteSubject(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	subjectID := c.Params("id")
+
+	if err := h.service.DeleteSubject(c.Context(), tenantID, userID, subjectID); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+
+	return response.SuccessMessage(c, "Subject deleted successfully")
+}
+
+func (h *Handler) GetSchedule(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	groupID := c.Query("group_id")
+	blocks, err := h.service.GetSchedule(c.Context(), tenantID, groupID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, blocks, "Success")
+}
+
+func (h *Handler) CreateScheduleBlock(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req CreateScheduleBlockRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	block, err := h.service.CreateScheduleBlock(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, block, "Success")
+}
+
+func (h *Handler) GetScheduleBlock(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	blockID := c.Params("id")
+	block, err := h.service.GetScheduleBlock(c.Context(), tenantID, blockID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
+	}
+	return response.Success(c, block, "Success")
+}
+
+func (h *Handler) UpdateScheduleBlock(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	blockID := c.Params("id")
+	var req UpdateScheduleBlockRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	block, err := h.service.UpdateScheduleBlock(c.Context(), tenantID, userID, blockID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, block, "Success")
+}
+
+func (h *Handler) DeleteScheduleBlock(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	blockID := c.Params("id")
+	if err := h.service.DeleteScheduleBlock(c.Context(), tenantID, userID, blockID); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.SuccessMessage(c, "Schedule block deleted successfully")
 }
 
 // Attendance handlers

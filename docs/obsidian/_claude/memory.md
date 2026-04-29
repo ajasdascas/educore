@@ -243,3 +243,24 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con School Admin > Configuracion solo despues del smoke test de Comunicaciones y las rutas RBAC.
 
 #school_admin #communications #security #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Estructura Academica y Horarios ampliados
+
+### Cambios completados
+- `backend/migrations/007_school_admin_academic_structure.sql`: agrega ciclos escolares, materias globales extendidas, relacion grupo-materia y bloques de horario por grupo/profesor/materia.
+- Backend School Admin: endpoints para ciclos escolares, materias CRUD, horarios CRUD y respuestas enriquecidas de grupos con ciclo, generacion, profesores, alumnos y materias asociadas.
+- `frontend/app/school-admin/academic/page.tsx`: nueva vista de Estructura Academica con ciclo actual, ciclos anteriores, catalogo global de materias y alumnos organizados por grado/generacion.
+- `frontend/app/school-admin/groups/page.tsx`: grupos ahora permiten asignar/desasignar profesores, alumnos y materias; el detalle muestra listas asociadas.
+- `frontend/app/school-admin/schedule/page.tsx`: creador/visor de horarios usa materias del catalogo institucional y conserva validacion de cruces por grupo.
+- `frontend/lib/auth.ts`: mocks persistentes en `localStorage` para ciclos, materias, grupos enriquecidos y horarios con `subject_id`.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `npm run build` en frontend: OK, genera `/school-admin/academic`, `/school-admin/groups` y `/school-admin/schedule`.
+
+### Siguiente paso recomendado
+- Continuar con Configuracion School Admin solo despues de smoke test productivo de Estructura, Grupos y Horarios.
+
+#school_admin #academic_structure #schedule #backend #frontend #memory

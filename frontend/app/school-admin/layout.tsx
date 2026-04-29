@@ -8,6 +8,7 @@ import {
   Users,
   GraduationCap,
   Calendar,
+  BookOpen,
   FileText,
   MessageCircle,
   Settings,
@@ -22,6 +23,7 @@ import { RoleGuard } from "@/components/providers/RoleGuard";
 
 const navItems = [
   { href: "/school-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/school-admin/academic", label: "Estructura", icon: BookOpen },
   { href: "/school-admin/students", label: "Estudiantes", icon: GraduationCap },
   { href: "/school-admin/teachers", label: "Profesores", icon: Users },
   { href: "/school-admin/groups", label: "Grupos", icon: Users },
