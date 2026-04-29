@@ -44,7 +44,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y lftp
-        lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
+        timeout 60s lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; set net:timeout 15; set net:max-retries 1; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
 
     # 6. Deploy with lftp. We upload the static export directly to the real web root.
     - name: 🚀 Deploy to FTP Server
