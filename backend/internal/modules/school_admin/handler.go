@@ -1,9 +1,8 @@
 package school_admin
 
 import (
-
-	"github.com/gofiber/fiber/v2"
 	"educore/internal/pkg/response"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Handler struct {
@@ -18,8 +17,8 @@ func NewHandler(service *Service) *Handler {
 
 // RegisterRoutes sets up all school admin routes with proper middleware
 func (h *Handler) RegisterRoutes(app fiber.Router) {
-	// School Admin routes - require SCHOOL_ADMIN or TEACHER role
-	api := app.Group("/api/v1/school-admin")
+	// The parent router is already mounted at /api/v1/school-admin in main.go.
+	api := app
 
 	// Dashboard & stats
 	api.Get("/dashboard", h.GetDashboard)

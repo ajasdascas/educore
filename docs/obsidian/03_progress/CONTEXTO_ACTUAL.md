@@ -30,4 +30,10 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Frontend:** Next.js 14 (Static Export).
 - **Despliegue:** FTP Sync a `onlineu.mx/educore`.
 
-#module #architecture #super_admin
+## Avance 29-04-2026
+- **School Admin > Profesores:** completado con listado, filtros, crear, editar, detalle, activar/pausar, mock demo para produccion estatica y backend alineado al schema real.
+- **Correccion backend critica:** rutas de School Admin ya no duplican `/api/v1/school-admin`.
+- **Verificacion:** `go test ./...`, `next build` y prueba headless del flujo de profesores OK.
+- **Siguiente submodulo:** School Admin > Estudiantes. No avanzar a Grupos/Horarios hasta que Estudiantes quede 100% funcional.
+
+#module #architecture #super_admin #school_admin

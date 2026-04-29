@@ -22,3 +22,12 @@ Separar los handlers de `super_admin` en archivos específicos (`plans.go`, `sch
 Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, facilitando la navegación por código según la entidad (Planes vs Escuelas).
 
 #architecture #decision #database #backend
+## 29-04-2026 - School Admin se monta sobre router padre
+
+**Decision:** El handler de School Admin debe registrar rutas relativas al router recibido, no crear de nuevo `/api/v1/school-admin`.
+
+**Razon:** `cmd/server/main.go` ya monta el grupo protegido en `/api/v1/school-admin`. Repetir el prefijo dejaba endpoints reales bajo `/api/v1/school-admin/api/v1/school-admin/...`, rompiendo frontend y contratos REST.
+
+**Impacto:** Los endpoints de School Admin quedan accesibles en rutas limpias como `/api/v1/school-admin/academic/teachers`, compatibles con frontend, mocks y documentacion futura.
+
+#backend #api #school_admin

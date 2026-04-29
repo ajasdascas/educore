@@ -116,3 +116,30 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - El ultimo `git push origin master` fue bloqueado por limite de uso/red del entorno. Cuando sea posible, ejecutar `git push origin master` desde `C:\Users\gioes\OneDrive\Desktop\Educore` para desplegar esos commits pendientes.
 
 #frontend #deployment #super_admin #production #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Profesores completado
+
+### Estado verificado
+- El commit pendiente de produccion ya estaba alineado con `origin/master`; solo quedaban archivos no rastreados de contexto local (`AGENTS.md`, `.agents/`) que no se incluyeron.
+- Super Admin quedo estable y se avanzo al siguiente modulo sin saltar fases: School Admin > Profesores.
+
+### Cambios completados
+- `backend/internal/modules/school_admin/handler.go`: corregido el doble prefijo de rutas. El handler ahora usa el router montado en `/api/v1/school-admin`.
+- `backend/internal/modules/school_admin/repository.go`: consultas de profesores alineadas al schema real (`users.is_active`, `teacher_profiles.specialization`, sin `teacher_profiles.tenant_id`).
+- `backend/internal/modules/school_admin/service.go`: validacion de email duplicado al actualizar profesor.
+- `frontend/lib/auth.ts`: mock demo para School Admin con dashboard y CRUD de profesores persistente en `localStorage`.
+- `frontend/app/school-admin/teachers/page.tsx`: modulo de profesores funcional con listado, busqueda, filtros, crear, editar, ver detalle y activar/pausar.
+- `frontend/app/school-admin/dashboard/page.tsx`: dashboard consume `authFetch` y la accion "Registrar Profesor" navega al modulo real.
+- `frontend/components/ui/button.tsx` y `frontend/components/ui/toaster.tsx`: warnings de consola corregidos para dialog/toast.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `next build` con Node bundled: OK, genera `/school-admin/teachers` como pagina estatica.
+- Prueba headless con Chrome DevTools: crear profesor, ver detalle, editar telefono y cambiar estado: OK sin errores ni warnings de consola.
+
+### Siguiente paso recomendado
+- Continuar con School Admin > Estudiantes. No avanzar a Grupos/Horarios hasta que Estudiantes tenga CRUD, filtros, detalle y acciones completas.
+
+#school_admin #teachers #frontend #backend #memory

@@ -19,6 +19,13 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	}
 }
 
+func mapBoolStatus(isActive bool) string {
+	if isActive {
+		return "active"
+	}
+	return "inactive"
+}
+
 // Dashboard & Stats queries
 func (r *Repository) GetDashboardStats(ctx context.Context, tenantID string) (*DashboardStats, error) {
 	query := `
@@ -26,8 +33,8 @@ func (r *Repository) GetDashboardStats(ctx context.Context, tenantID string) (*D
 			(SELECT COUNT(*) FROM students WHERE tenant_id = $1 AND status = 'active') as total_students,
 			(SELECT COUNT(*) FROM users u
 			 INNER JOIN teacher_profiles tp ON u.id = tp.user_id
-			 WHERE u.tenant_id = $1 AND u.status = 'active') as total_teachers,
-			(SELECT COUNT(*) FROM groups WHERE tenant_id = $1 AND status = 'active') as total_groups,
+			 WHERE u.tenant_id = $1 AND u.is_active = true) as total_teachers,
+			(SELECT COUNT(*) FROM groups WHERE tenant_id = $1) as total_groups,
 			(SELECT COUNT(*) FROM students WHERE tenant_id = $1 AND status = 'active') as active_students,
 			(SELECT COALESCE(AVG(
 				CASE WHEN status = 'present' THEN 100.0
@@ -416,13 +423,19 @@ func (r *Repository) DeleteStudent(ctx context.Context, tenantID, studentID stri
 // Teacher queries
 func (r *Repository) GetTeachers(ctx context.Context, tenantID string) ([]TeacherResponse, error) {
 	query := `
-		SELECT u.id, u.first_name, u.last_name, u.email, u.phone,
-			   tp.employee_id, u.status, tp.specialties, tp.hire_date,
-			   (SELECT COUNT(*) FROM group_teachers gt WHERE gt.teacher_id = u.id) as group_count,
+		SELECT u.id, u.first_name, u.last_name, u.email, COALESCE(tp.phone, '') as phone,
+			   COALESCE(tp.employee_id, '') as employee_id,
+			   CASE WHEN u.is_active THEN 'active' ELSE 'inactive' END as status,
+			   COALESCE(tp.specialization, '') as specialization,
+			   to_char(u.created_at, 'YYYY-MM-DD') as hire_date,
+			   (SELECT COUNT(*)
+			    FROM group_teachers gt
+			    INNER JOIN groups g ON gt.group_id = g.id
+			    WHERE gt.teacher_id = u.id AND g.tenant_id = $1) as group_count,
 			   u.created_at
 		FROM users u
 		INNER JOIN teacher_profiles tp ON u.id = tp.user_id
-		WHERE u.tenant_id = $1 AND u.role IN ('SCHOOL_ADMIN', 'TEACHER')
+		WHERE u.tenant_id = $1 AND u.role = 'TEACHER'
 		ORDER BY u.first_name, u.last_name
 	`
 
@@ -435,18 +448,22 @@ func (r *Repository) GetTeachers(ctx context.Context, tenantID string) ([]Teache
 	var teachers []TeacherResponse
 	for rows.Next() {
 		var teacher TeacherResponse
-		var specialties []string
+		var specialization string
 
 		err := rows.Scan(
 			&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email,
-			&teacher.Phone, &teacher.EmployeeID, &teacher.Status, &specialties,
+			&teacher.Phone, &teacher.EmployeeID, &teacher.Status, &specialization,
 			&teacher.HireDate, &teacher.GroupCount, &teacher.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan teacher: %w", err)
 		}
 
-		teacher.Specialties = specialties
+		if specialization != "" {
+			teacher.Specialties = []string{specialization}
+		} else {
+			teacher.Specialties = []string{}
+		}
 		teachers = append(teachers, teacher)
 	}
 
@@ -463,22 +480,23 @@ func (r *Repository) CreateTeacher(ctx context.Context, tenantID string, req Cre
 
 	// Create user
 	var userID string
+	isActive := req.Status != "inactive"
 	err = tx.QueryRow(ctx, `
-		INSERT INTO users (tenant_id, first_name, last_name, email, phone,
-						  password_hash, role, status)
-		VALUES ($1, $2, $3, $4, $5, '', 'TEACHER', COALESCE($6, 'active'))
+		INSERT INTO users (tenant_id, first_name, last_name, email,
+						  password_hash, role, is_active)
+		VALUES ($1, $2, $3, $4, '', 'TEACHER', $5)
 		RETURNING id
-	`, tenantID, req.FirstName, req.LastName, req.Email, req.Phone, req.Status).Scan(&userID)
+	`, tenantID, req.FirstName, req.LastName, req.Email, isActive).Scan(&userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Create teacher profile
+	specialization := strings.Join(req.Specialties, ", ")
 	_, err = tx.Exec(ctx, `
-		INSERT INTO teacher_profiles (tenant_id, user_id, employee_id, hire_date,
-									 salary, specialties, address)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, tenantID, userID, req.EmployeeID, req.HireDate, req.Salary, req.Specialties, req.Address)
+		INSERT INTO teacher_profiles (user_id, employee_id, specialization, phone)
+		VALUES ($1, $2, $3, $4)
+	`, userID, req.EmployeeID, specialization, req.Phone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create teacher profile: %w", err)
 	}
@@ -490,16 +508,16 @@ func (r *Repository) CreateTeacher(ctx context.Context, tenantID string, req Cre
 
 	// Return teacher data
 	teacher := &TeacherResponse{
-		ID:         userID,
-		FirstName:  req.FirstName,
-		LastName:   req.LastName,
-		Email:      req.Email,
-		Phone:      req.Phone,
-		EmployeeID: req.EmployeeID,
-		Status:     req.Status,
+		ID:          userID,
+		FirstName:   req.FirstName,
+		LastName:    req.LastName,
+		Email:       req.Email,
+		Phone:       req.Phone,
+		EmployeeID:  req.EmployeeID,
+		Status:      mapBoolStatus(isActive),
 		Specialties: req.Specialties,
-		HireDate:   req.HireDate,
-		CreatedAt:  time.Now(),
+		HireDate:    req.HireDate,
+		CreatedAt:   time.Now(),
 	}
 
 	return teacher, nil
@@ -541,8 +559,16 @@ func (r *Repository) StudentHasGrades(ctx context.Context, tenantID, studentID s
 func (r *Repository) TeacherEmailExists(ctx context.Context, tenantID, email string) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM users WHERE tenant_id = $1 AND email = $2 AND role IN ('SCHOOL_ADMIN', 'TEACHER'))",
+		"SELECT EXISTS(SELECT 1 FROM users WHERE tenant_id = $1 AND email = $2 AND role = 'TEACHER')",
 		tenantID, email).Scan(&exists)
+	return exists, err
+}
+
+func (r *Repository) TeacherEmailExistsExcluding(ctx context.Context, tenantID, email, teacherID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM users WHERE tenant_id = $1 AND email = $2 AND role = 'TEACHER' AND id != $3)",
+		tenantID, email, teacherID).Scan(&exists)
 	return exists, err
 }
 
@@ -589,11 +615,137 @@ func (r *Repository) GetDetailedStats(ctx context.Context, tenantID string) (*St
 }
 
 func (r *Repository) GetTeacherByID(ctx context.Context, tenantID, teacherID string) (*TeacherDetailResponse, error) {
-	return &TeacherDetailResponse{}, nil
+	query := `
+		SELECT u.id, u.first_name, u.last_name, u.email, COALESCE(tp.phone, '') as phone,
+			   COALESCE(tp.employee_id, '') as employee_id,
+			   CASE WHEN u.is_active THEN 'active' ELSE 'inactive' END as status,
+			   COALESCE(tp.specialization, '') as specialization,
+			   to_char(u.created_at, 'YYYY-MM-DD') as hire_date,
+			   (SELECT COUNT(*)
+			    FROM group_teachers gt
+			    INNER JOIN groups g ON gt.group_id = g.id
+			    WHERE gt.teacher_id = u.id AND g.tenant_id = $1) as group_count,
+			   u.created_at
+		FROM users u
+		INNER JOIN teacher_profiles tp ON u.id = tp.user_id
+		WHERE u.tenant_id = $1 AND u.id = $2 AND u.role = 'TEACHER'
+	`
+
+	var teacher TeacherDetailResponse
+	teacher.TeacherResponse = &TeacherResponse{}
+	var specialization string
+	err := r.db.QueryRow(ctx, query, tenantID, teacherID).Scan(
+		&teacher.ID, &teacher.FirstName, &teacher.LastName, &teacher.Email,
+		&teacher.Phone, &teacher.EmployeeID, &teacher.Status, &specialization,
+		&teacher.HireDate, &teacher.GroupCount, &teacher.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get teacher: %w", err)
+	}
+
+	if specialization != "" {
+		teacher.Specialties = []string{specialization}
+	} else {
+		teacher.Specialties = []string{}
+	}
+
+	teacher.Address = ""
+	teacher.Salary = 0
+	teacher.Groups = []GroupResponse{}
+	teacher.Subjects = []SubjectResponse{}
+	teacher.Performance = &TeacherPerformance{
+		StudentCount:        0,
+		AttendanceRate:      0,
+		AverageGrade:        0,
+		StudentSatisfaction: 0,
+	}
+
+	return &teacher, nil
 }
 
 func (r *Repository) UpdateTeacher(ctx context.Context, tenantID, teacherID string, req UpdateTeacherRequest) (*TeacherResponse, error) {
-	return &TeacherResponse{}, nil
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	userSetParts := []string{}
+	userArgs := []interface{}{tenantID, teacherID}
+	userArgCount := 2
+
+	if req.FirstName != "" {
+		userArgCount++
+		userSetParts = append(userSetParts, fmt.Sprintf("first_name = $%d", userArgCount))
+		userArgs = append(userArgs, req.FirstName)
+	}
+	if req.LastName != "" {
+		userArgCount++
+		userSetParts = append(userSetParts, fmt.Sprintf("last_name = $%d", userArgCount))
+		userArgs = append(userArgs, req.LastName)
+	}
+	if req.Email != "" {
+		userArgCount++
+		userSetParts = append(userSetParts, fmt.Sprintf("email = $%d", userArgCount))
+		userArgs = append(userArgs, req.Email)
+	}
+	if req.Status != "" {
+		userArgCount++
+		userSetParts = append(userSetParts, fmt.Sprintf("is_active = $%d", userArgCount))
+		userArgs = append(userArgs, req.Status != "inactive")
+	}
+	if len(userSetParts) > 0 {
+		userArgCount++
+		userSetParts = append(userSetParts, fmt.Sprintf("updated_at = $%d", userArgCount))
+		userArgs = append(userArgs, time.Now())
+		_, err = tx.Exec(ctx, fmt.Sprintf(`
+			UPDATE users
+			SET %s
+			WHERE tenant_id = $1 AND id = $2 AND role = 'TEACHER'
+		`, strings.Join(userSetParts, ", ")), userArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update teacher user: %w", err)
+		}
+	}
+
+	profileSetParts := []string{}
+	profileArgs := []interface{}{teacherID}
+	profileArgCount := 1
+
+	if req.Phone != "" {
+		profileArgCount++
+		profileSetParts = append(profileSetParts, fmt.Sprintf("phone = $%d", profileArgCount))
+		profileArgs = append(profileArgs, req.Phone)
+	}
+	if req.Specialties != nil {
+		profileArgCount++
+		profileSetParts = append(profileSetParts, fmt.Sprintf("specialization = $%d", profileArgCount))
+		profileArgs = append(profileArgs, strings.Join(req.Specialties, ", "))
+	}
+	if len(profileSetParts) > 0 {
+		_, err = tx.Exec(ctx, fmt.Sprintf(`
+			UPDATE teacher_profiles
+			SET %s
+			WHERE user_id = $1
+		`, strings.Join(profileSetParts, ", ")), profileArgs...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update teacher profile: %w", err)
+		}
+	}
+
+	if len(userSetParts) == 0 && len(profileSetParts) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	detail, err := r.GetTeacherByID(ctx, tenantID, teacherID)
+	if err != nil {
+		return nil, err
+	}
+	return detail.TeacherResponse, nil
 }
 
 func (r *Repository) GetGroups(ctx context.Context, tenantID string) ([]GroupResponse, error) {

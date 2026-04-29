@@ -175,6 +175,10 @@ func (s *Service) GetTeacher(ctx context.Context, tenantID, teacherID string) (*
 }
 
 func (s *Service) UpdateTeacher(ctx context.Context, tenantID, userID, teacherID string, req UpdateTeacherRequest) (*TeacherResponse, error) {
+	if err := s.validateUpdateTeacher(ctx, tenantID, teacherID, req); err != nil {
+		return nil, err
+	}
+
 	teacher, err := s.repo.UpdateTeacher(ctx, tenantID, teacherID, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update teacher: %w", err)
@@ -304,12 +308,12 @@ func (s *Service) BulkUpdateAttendance(ctx context.Context, tenantID, userID, gr
 
 	// Publish domain event
 	s.bus.Publish("attendance.bulk_updated", map[string]interface{}{
-		"tenant_id":    tenantID,
-		"group_id":     groupID,
-		"updated_by":   userID,
+		"tenant_id":     tenantID,
+		"group_id":      groupID,
+		"updated_by":    userID,
 		"student_count": len(req.Records),
-		"date":         req.Date,
-		"timestamp":    time.Now(),
+		"date":          req.Date,
+		"timestamp":     time.Now(),
 	})
 
 	return nil
@@ -439,6 +443,22 @@ func (s *Service) validateDeleteStudent(ctx context.Context, tenantID, studentID
 func (s *Service) validateCreateTeacher(ctx context.Context, tenantID string, req CreateTeacherRequest) error {
 	// Check if teacher with same email already exists
 	exists, err := s.repo.TeacherEmailExists(ctx, tenantID, req.Email)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return fmt.Errorf("teacher with email %s already exists", req.Email)
+	}
+
+	return nil
+}
+
+func (s *Service) validateUpdateTeacher(ctx context.Context, tenantID, teacherID string, req UpdateTeacherRequest) error {
+	if req.Email == "" {
+		return nil
+	}
+
+	exists, err := s.repo.TeacherEmailExistsExcluding(ctx, tenantID, req.Email, teacherID)
 	if err != nil {
 		return err
 	}

@@ -61,7 +61,7 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
 
   // --- DEMO INTERCEPTOR ---
   if (token && token.startsWith("mock-")) {
-    return mockSuperAdminFetch(endpoint, options);
+    return mockDemoFetch(endpoint, options);
   }
   // ------------------------
 
@@ -215,6 +215,54 @@ const defaultMockUsers = [
   },
 ];
 
+const defaultMockTeachers = [
+  {
+    id: "teacher-maria-lopez",
+    first_name: "Maria",
+    last_name: "Lopez",
+    email: "maria.lopez@donbosco.mx",
+    phone: "777 101 2201",
+    employee_id: "PROF-001",
+    status: "active",
+    specialties: ["Matematicas", "Fisica"],
+    group_count: 3,
+    hire_date: "2023-08-15",
+    created_at: "2023-08-15T09:00:00.000Z",
+    address: "Jiutepec, Morelos",
+    salary: 18500,
+  },
+  {
+    id: "teacher-carlos-rivera",
+    first_name: "Carlos",
+    last_name: "Rivera",
+    email: "carlos.rivera@donbosco.mx",
+    phone: "777 101 2202",
+    employee_id: "PROF-002",
+    status: "active",
+    specialties: ["Historia", "Civismo"],
+    group_count: 2,
+    hire_date: "2022-01-10",
+    created_at: "2022-01-10T09:00:00.000Z",
+    address: "Cuernavaca, Morelos",
+    salary: 17200,
+  },
+  {
+    id: "teacher-ana-martinez",
+    first_name: "Ana",
+    last_name: "Martinez",
+    email: "ana.martinez@donbosco.mx",
+    phone: "777 101 2203",
+    employee_id: "PROF-003",
+    status: "inactive",
+    specialties: ["Ingles"],
+    group_count: 1,
+    hire_date: "2024-03-04",
+    created_at: "2024-03-04T09:00:00.000Z",
+    address: "Emiliano Zapata, Morelos",
+    salary: 15800,
+  },
+];
+
 const modulesCatalog = [
   { key: "students", name: "Alumnos", description: "Expedientes, inscripciones y datos academicos.", is_core: true, price_monthly_mxn: 0 },
   { key: "attendance", name: "Asistencias", description: "Registro diario y reportes de asistencia.", is_core: true, price_monthly_mxn: 0 },
@@ -264,6 +312,133 @@ function paginate<T>(items: T[], page: number, perPage: number) {
     items: items.slice(start, start + perPage),
     meta: { total, page, per_page: perPage, pages },
   };
+}
+
+async function mockDemoFetch(endpoint: string, options: RequestInit = {}) {
+  const url = new URL(endpoint, "https://mock.educore.local");
+  if (url.pathname.includes("/school-admin")) {
+    return mockSchoolAdminFetch(endpoint, options);
+  }
+  return mockSuperAdminFetch(endpoint, options);
+}
+
+async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {}) {
+  await new Promise((resolve) => setTimeout(resolve, 180));
+
+  const method = (options.method || "GET").toUpperCase();
+  const url = new URL(endpoint, "https://mock.educore.local");
+  const path = url.pathname;
+
+  if (path.endsWith("/school-admin/dashboard") || path.endsWith("/school-admin/stats")) {
+    const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+    return {
+      success: true,
+      data: {
+        stats: {
+          total_students: 245,
+          total_teachers: teachers.length,
+          total_groups: 12,
+          active_students: 236,
+          attendance_rate: 92,
+          average_grade: 87,
+          new_students_month: 12,
+          graduations_month: 0,
+        },
+        recent_activity: [
+          {
+            id: "act-1",
+            type: "teacher",
+            title: "Plantilla actualizada",
+            description: "Se sincronizo el directorio de profesores",
+            user_name: "Direccion",
+            timestamp: nowIso(),
+            metadata: {},
+          },
+          {
+            id: "act-2",
+            type: "attendance",
+            title: "Asistencia capturada",
+            description: "Reporte diario generado correctamente",
+            user_name: "Coordinacion",
+            timestamp: nowIso(),
+            metadata: {},
+          },
+        ],
+        last_updated: nowIso(),
+      },
+    };
+  }
+
+  if (path.endsWith("/school-admin/academic/teachers")) {
+    const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = {
+        id: `teacher-${Date.now()}`,
+        first_name: body.first_name,
+        last_name: body.last_name,
+        email: body.email,
+        phone: body.phone,
+        employee_id: body.employee_id,
+        status: body.status || "active",
+        specialties: Array.isArray(body.specialties) ? body.specialties : [],
+        group_count: 0,
+        hire_date: body.hire_date || new Date().toISOString().slice(0, 10),
+        created_at: nowIso(),
+        address: body.address || "",
+        salary: Number(body.salary || 0),
+      };
+      writeMockList("mock_school_teachers", [created, ...teachers]);
+      return { success: true, data: created, message: "Profesor registrado en modo demo" };
+    }
+    return { success: true, data: teachers };
+  }
+
+  const teacherMatch = path.match(/\/school-admin\/academic\/teachers\/([^/]+)$/);
+  if (teacherMatch) {
+    const id = decodeURIComponent(teacherMatch[1]);
+    const teachers = readMockList("mock_school_teachers", defaultMockTeachers);
+    const teacher = teachers.find((item) => item.id === id);
+
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = teachers.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...body,
+              specialties: Array.isArray(body.specialties) ? body.specialties : item.specialties,
+              salary: body.salary !== undefined ? Number(body.salary) : item.salary,
+            }
+          : item
+      );
+      writeMockList("mock_school_teachers", updated);
+      return {
+        success: true,
+        data: updated.find((item) => item.id === id),
+        message: "Profesor actualizado en modo demo",
+      };
+    }
+
+    return teacher
+      ? {
+          success: true,
+          data: {
+            ...teacher,
+            groups: [],
+            subjects: [],
+            performance: {
+              student_count: teacher.group_count * 24,
+              attendance_rate: 94,
+              average_grade: 88,
+              student_satisfaction: 4.6,
+            },
+          },
+        }
+      : { success: false, message: "Profesor no encontrado" };
+  }
+
+  return { success: false, message: "Endpoint School Admin demo no implementado" };
 }
 
 async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) {

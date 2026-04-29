@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { authFetch } from "@/lib/auth";
 import {
   Users,
   GraduationCap,
@@ -14,6 +17,7 @@ import {
 } from "lucide-react";
 
 export default function SchoolAdminDashboard() {
+  const { toast } = useToast();
   const [stats, setStats] = useState({
     totalStudents: 245,
     totalTeachers: 18,
@@ -27,6 +31,50 @@ export default function SchoolAdminDashboard() {
     { id: 3, type: "attendance", message: "Reporte de asistencia del día generado", time: "hace 6h" },
     { id: 4, type: "message", message: "Nuevo mensaje de padres recibido", time: "hace 1d" },
   ]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadDashboard = async () => {
+      try {
+        const response = await authFetch("/api/v1/school-admin/dashboard");
+        const data = response?.data;
+        if (!mounted || !data?.stats) return;
+
+        setStats({
+          totalStudents: data.stats.total_students ?? 0,
+          totalTeachers: data.stats.total_teachers ?? 0,
+          totalGroups: data.stats.total_groups ?? 0,
+          attendance: Math.round(data.stats.attendance_rate ?? 0),
+        });
+
+        if (Array.isArray(data.recent_activity) && data.recent_activity.length > 0) {
+          setRecentActivity(
+            data.recent_activity.slice(0, 4).map((item: any, index: number) => ({
+              id: item.id || index + 1,
+              type: item.type || "student",
+              message: item.description || item.title || "Actividad escolar registrada",
+              time: "reciente",
+            }))
+          );
+        }
+      } catch {
+        // Keep local fallback values so the dashboard remains usable in demo/static mode.
+      }
+    };
+
+    loadDashboard();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const showQueuedModule = (moduleName: string) => {
+    toast({
+      title: `${moduleName} esta en la siguiente fase`,
+      description: "Profesores se terminara primero para mantener cada modulo estable.",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -129,25 +177,37 @@ export default function SchoolAdminDashboard() {
             <CardTitle>Acciones Rápidas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+            <button
+              onClick={() => showQueuedModule("Estudiantes")}
+              className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            >
               <div className="flex items-center">
                 <GraduationCap className="h-4 w-4 mr-3 text-blue-600" />
                 <span className="text-sm font-medium">Matricular Estudiante</span>
               </div>
             </button>
-            <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+            <Link
+              href="/school-admin/teachers"
+              className="block w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            >
               <div className="flex items-center">
                 <Users className="h-4 w-4 mr-3 text-green-600" />
                 <span className="text-sm font-medium">Registrar Profesor</span>
               </div>
-            </button>
-            <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+            </Link>
+            <button
+              onClick={() => showQueuedModule("Asistencia")}
+              className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            >
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-3 text-orange-600" />
                 <span className="text-sm font-medium">Tomar Asistencia</span>
               </div>
             </button>
-            <button className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+            <button
+              onClick={() => showQueuedModule("Comunicaciones")}
+              className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            >
               <div className="flex items-center">
                 <MessageCircle className="h-4 w-4 mr-3 text-purple-600" />
                 <span className="text-sm font-medium">Enviar Comunicado</span>
