@@ -88,3 +88,31 @@ Se completó la infraestructura para gestionar planes de suscripción. El backen
 ### 🎯 SIGUIENTE FASE: School Admin Module
 El módulo Super Admin está **100% completado** y listo para producción. 
 Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
+---
+
+## SESION 28-04-2026 (America/Mexico_City) - Correccion real de produccion Super Admin
+
+### Estado verificado
+- Se reprodujo el error `Application error: a client-side exception has occurred` en produccion con sesion demo `mock-token-admin`.
+- Causa raiz frontend: `authFetch` devolvia siempre payload de dashboard para tokens `mock-*`; la pagina de escuelas esperaba `response.data.schools`, recibia `undefined` y fallaba al ejecutar `.filter`.
+- Causa raiz deploy: GitHub Actions estaba desplegando a `/domains/educore/`, pero la URL real `https://onlineu.mx/educore/` se sirve desde `/domains/onlineu.mx/public_html/educore/`.
+
+### Cambios completados y desplegados
+- `frontend/lib/auth.ts`: mock demo por endpoint para stats, schools, plans, users, modules catalog, detalle, status y operaciones basicas.
+- `frontend/app/super-admin/schools/page.tsx`: defensas contra respuestas mal formadas y enlaces a detalle estatico.
+- `frontend/app/super-admin/schools/details/page.tsx`: reemplazo de ruta dinamica incompatible con static export por ruta estatica con query `?id=`.
+- `frontend/app/super-admin/plans/*` y `frontend/app/super-admin/users/page.tsx`: parsing/guards para evitar crashes con datos demo o respuestas parciales.
+- `.github/workflows/deploy.yml`: ruta FTP corregida a `/domains/onlineu.mx/public_html/educore/`.
+
+### Verificacion en produccion
+- `https://onlineu.mx/educore/super-admin/schools/?v=454aea5` sirve HTML actualizado con chunk `page-8924bb29e4b66faf.js`.
+- Prueba headless con Chrome y localStorage demo: escuelas renderiza sin `Application error`.
+- Crear escuela en modo demo funciona y persiste en `localStorage`.
+- Planes y Usuarios Globales cargan; modal de usuario abre correctamente.
+
+### Pendiente local no desplegado
+- Commit local `c9facf1 fix: make tabs compatible with static Super Admin pages` corrige el componente `Tabs`.
+- Commit local `5beac68 fix: use deterministic lftp deploy` cambia el workflow para usar `lftp mirror --reverse` en lugar de `SamKirkland/FTP-Deploy-Action`, porque un deploy posterior se quedo atascado.
+- El ultimo `git push origin master` fue bloqueado por limite de uso/red del entorno. Cuando sea posible, ejecutar `git push origin master` desde `C:\Users\gioes\OneDrive\Desktop\Educore` para desplegar esos commits pendientes.
+
+#frontend #deployment #super_admin #production #memory
