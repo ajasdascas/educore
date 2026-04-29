@@ -420,3 +420,18 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - EduCore no debe abrir modulos tenant-facing fuera de 4 Core: Auth/Tenant/RBAC, Users, Academic Core y Grading System. Billing y Database Admin son herramientas internas del SuperAdmin Control Plane.
 
 #memory #super_admin #database #architecture #security #frontend #backend
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - Responsive fix Database Admin
+
+### Cambio completado
+- `frontend/app/super-admin/layout.tsx`: el layout SuperAdmin ahora limita overflow horizontal global y permite que el contenido principal se contraiga con `min-w-0`.
+- `frontend/app/super-admin/database/page.tsx`: Database Admin fue adaptado para desktop/tablet/mobile; las tablas ahora hacen scroll dentro de sus cards y ya no ensanchan toda la pantalla.
+
+### Verificacion
+- `npm run build`: OK.
+- `git diff --check`: OK.
+- Browser Use local en mobile/narrow viewport: Database Admin renderiza sin scrollbar horizontal global visible.
+
+#memory #super_admin #database #responsive #frontend

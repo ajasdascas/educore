@@ -173,53 +173,53 @@ export default function DatabaseAdminPage() {
   const rowKeys = rows[0] ? Object.keys(rows[0]).slice(0, 8) : columns.slice(0, 8).map((column) => column.name);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Database Admin</h1>
+    <div className="min-w-0 max-w-full space-y-5 overflow-x-hidden">
+      <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Database Admin</h1>
           <p className="text-muted-foreground">
             Control seguro de schema, datos, importaciones Excel y export completo para SuperAdmin.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={loadTables}>
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 xl:w-auto">
+          <Button variant="outline" onClick={loadTables} className="min-w-0">
             <RefreshCw className="mr-2 h-4 w-4" />
             Actualizar
           </Button>
-          <Button variant="outline" onClick={exportSelected} disabled={!selectedTable}>
+          <Button variant="outline" onClick={exportSelected} disabled={!selectedTable} className="min-w-0">
             <Download className="mr-2 h-4 w-4" />
             Export tabla
           </Button>
-          <Button onClick={exportFull}>
+          <Button onClick={exportFull} className="min-w-0">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Export full DB
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card>
+      <div className="grid min-w-0 gap-3 md:grid-cols-3">
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="flex items-center gap-3 p-5">
             <Database className="h-5 w-5 text-primary" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Tablas</p>
               <p className="text-2xl font-bold">{tables.length}</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="flex items-center gap-3 p-5">
             <Table2 className="h-5 w-5 text-primary" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Filas visibles</p>
               <p className="text-2xl font-bold">{rows.length}</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardContent className="flex items-center gap-3 p-5">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Modo DDL</p>
               <p className="text-2xl font-bold">Protegido</p>
             </div>
@@ -227,8 +227,8 @@ export default function DatabaseAdminPage() {
         </Card>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
-        <Card>
+      <div className="grid min-w-0 max-w-full gap-5 xl:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle>Tablas</CardTitle>
             <CardDescription>Selecciona una tabla para ver estructura y datos.</CardDescription>
@@ -253,7 +253,7 @@ export default function DatabaseAdminPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{table.name}</span>
+                    <span className="min-w-0 truncate font-medium">{table.name}</span>
                     {table.is_protected ? <Badge variant="outline">Protegida</Badge> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">{table.estimated_rows || 0} filas estimadas</p>
@@ -263,11 +263,11 @@ export default function DatabaseAdminPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-5">
-          <Card>
+        <div className="min-w-0 max-w-full space-y-5 overflow-hidden">
+          <Card className="min-w-0 overflow-hidden">
             <CardHeader className="gap-2">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
+                <div className="min-w-0">
                   <CardTitle>{selectedTable || "Sin tabla seleccionada"}</CardTitle>
                   <CardDescription>Schema, constraints, relaciones y protección de estructura.</CardDescription>
                 </div>
@@ -288,9 +288,9 @@ export default function DatabaseAdminPage() {
                   Cargando tabla
                 </div>
               ) : (
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-md border">
-                    <Table>
+                <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+                  <div className="min-w-0 overflow-hidden rounded-md border">
+                    <Table className="min-w-[520px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Columna</TableHead>
@@ -301,8 +301,8 @@ export default function DatabaseAdminPage() {
                       <TableBody>
                         {columns.map((column) => (
                           <TableRow key={column.name}>
-                            <TableCell className="font-medium">{column.name}</TableCell>
-                            <TableCell>{column.type}</TableCell>
+                            <TableCell className="max-w-[180px] truncate font-medium">{column.name}</TableCell>
+                            <TableCell className="max-w-[160px] truncate">{column.type}</TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {column.is_primary ? <Badge variant="outline">PK</Badge> : null}
@@ -315,20 +315,20 @@ export default function DatabaseAdminPage() {
                       </TableBody>
                     </Table>
                   </div>
-                  <div className="rounded-md border p-4">
+                  <div className="min-w-0 rounded-md border p-4">
                     <h2 className="mb-2 text-sm font-semibold">Relaciones</h2>
                     {relationships.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Sin foreign keys directas.</p>
                     ) : (
                       <div className="space-y-2">
                         {relationships.map((rel) => (
-                          <div key={`${rel.column}-${rel.foreign_table}`} className="rounded-md bg-muted px-3 py-2 text-sm">
+                          <div key={`${rel.column}-${rel.foreign_table}`} className="break-words rounded-md bg-muted px-3 py-2 text-sm">
                             {rel.column} -> {rel.foreign_table}.{rel.foreign_column}
                           </div>
                         ))}
                       </div>
                     )}
-                    <div className="mt-4 flex gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900 dark:border-yellow-900 dark:bg-yellow-950 dark:text-yellow-100">
+                    <div className="mt-4 flex min-w-0 gap-2 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900 dark:border-yellow-900 dark:bg-yellow-950 dark:text-yellow-100">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <p>Crear o alterar tablas requiere activar el flag backend y queda auditado como acción crítica.</p>
                     </div>
@@ -338,14 +338,14 @@ export default function DatabaseAdminPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0 overflow-hidden">
             <CardHeader>
               <CardTitle>Datos</CardTitle>
               <CardDescription>Vista paginada de las primeras 50 filas para inspección rápida.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
+              <div className="max-w-full overflow-x-auto rounded-md border">
+                <Table className="min-w-[720px]">
                   <TableHeader>
                     <TableRow>
                       {rowKeys.map((key) => <TableHead key={key}>{key}</TableHead>)}
@@ -360,7 +360,7 @@ export default function DatabaseAdminPage() {
                       </TableRow>
                     ) : rows.slice(0, 12).map((row, index) => (
                       <TableRow key={String(row.id || index)}>
-                        {rowKeys.map((key) => <TableCell key={key}>{normalizeCell(row[key])}</TableCell>)}
+                        {rowKeys.map((key) => <TableCell key={key} className="max-w-[220px] truncate">{normalizeCell(row[key])}</TableCell>)}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -369,7 +369,7 @@ export default function DatabaseAdminPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0 overflow-hidden">
             <CardHeader>
               <CardTitle>Import Excel</CardTitle>
               <CardDescription>Preview y validación antes de insertar datos masivos.</CardDescription>

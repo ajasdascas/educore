@@ -234,3 +234,8 @@
 - Billing y Database Admin se clasifican como submodulos internos de SuperAdmin Control Plane, no como modulos nuevos para escuelas.
 
 #super_admin #database #security #frontend #backend #architecture
+# [29-04-2026] Responsive fix SuperAdmin Database Admin
+- Corregido overflow horizontal global en `SuperAdminLayout`.
+- Adaptada `/super-admin/database` para desktop, tablet y mobile sin tener que recorrer toda la pagina horizontalmente.
+- Las tablas de schema y datos conservan scroll interno dentro de la card cuando el contenido es ancho.
+- Verificacion: `npm run build` y `git diff --check` OK.
