@@ -14,6 +14,7 @@ import (
 	"educore/internal/modules/reports"
 	"educore/internal/modules/school_admin"
 	superadmin "educore/internal/modules/super_admin"
+	"educore/internal/modules/teacher"
 	"educore/internal/modules/tenants"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/redis"
@@ -125,6 +126,13 @@ func main() {
 	parentHandler := parent.NewHandler(parentService)
 	parentGroupActive := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("PARENT"))
 	parentHandler.RegisterRoutes(parentGroupActive)
+
+	// Teacher module
+	teacherRepo := teacher.NewRepository(db)
+	teacherService := teacher.NewService(teacherRepo, eventBus)
+	teacherHandler := teacher.NewHandler(teacherService)
+	teacherGroup := api.Group("/teacher", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("TEACHER"))
+	teacherHandler.RegisterRoutes(teacherGroup)
 
 	// Reports module (SCHOOL_ADMIN, TEACHER)
 	reportsRepo := reports.NewRepository(sqlDB)

@@ -871,6 +871,9 @@ function buildMockParentsFromBody(body: any) {
 
 async function mockDemoFetch(endpoint: string, options: RequestInit = {}) {
   const url = new URL(endpoint, "https://mock.educore.local");
+  if (url.pathname.includes("/teacher")) {
+    return mockTeacherFetch(endpoint, options);
+  }
   if (url.pathname.includes("/parent")) {
     return mockParentFetch(endpoint, options);
   }
@@ -1001,6 +1004,151 @@ function buildMockParentAttendance(child: any, startDate: string, endDate: strin
   };
 }
 
+function getMockTeacherClasses() {
+  const groups = readMockList("mock_school_groups", mockSchoolGroups);
+  const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+  const schedule = readMockList("mock_school_schedule", defaultMockScheduleBlocks);
+  return groups.slice(0, 3).map((group: any, index: number) => {
+    const subject = subjects[index % Math.max(subjects.length, 1)] || {};
+    const block = schedule.find((item: any) => item.group_id === group.id) || {};
+    return {
+      id: block.id || `teacher-class-${group.id}-${subject.id}`,
+      group_id: group.id,
+      group_name: group.name,
+      grade_name: group.grade_name || group.grade || "Primaria",
+      subject_id: subject.id || "subject-math",
+      subject_name: subject.name || "Matematicas",
+      day: block.day || "monday",
+      start_time: block.start_time || "08:00",
+      end_time: block.end_time || "09:00",
+      room: block.room || group.room || "Salon 1",
+      student_count: group.student_count || 24,
+      status: "active",
+      updated_at: group.updated_at || nowIso(),
+    };
+  });
+}
+
+function getMockTeacherStudents(groupId: string) {
+  const students = readMockList("mock_school_students", defaultMockStudents);
+  return students.slice(0, 12).map((student: any, index: number) => ({
+    id: student.id,
+    first_name: student.first_name,
+    last_name: student.last_name,
+    enrollment_id: student.enrollment_id || `ALU-${index + 1}`,
+    group_id: groupId,
+    group_name: student.group_name || "1A",
+    attendance_rate: Number(student.attendance_rate || 92),
+    average_grade: Number(student.average_grade || 86),
+    last_attendance: "2026-04-29",
+    status: student.status || "active",
+    parent_id: `parent-${student.id}`,
+    parent_name: student.parent_name || "Tutor principal",
+  }));
+}
+
+async function mockTeacherFetch(endpoint: string, options: RequestInit = {}) {
+  await new Promise((resolve) => setTimeout(resolve, 150));
+
+  const method = (options.method || "GET").toUpperCase();
+  const url = new URL(endpoint, "https://mock.educore.local");
+  const path = url.pathname;
+  const classes = getMockTeacherClasses();
+
+  if (path.endsWith("/teacher/dashboard")) {
+    const messages = readMockList("mock_teacher_messages", [
+      { id: "teacher-msg-1", conversation_id: "conv-teacher-1", sender_name: "Padre de Sofia", recipient_name: "Maria Lopez", subject: "Duda sobre tarea", content: "Buenas tardes, podria confirmar la fecha de entrega?", priority: "normal", is_read: false, created_at: "2026-04-29T11:00:00.000Z" },
+    ]);
+    const totalStudents = classes.reduce((sum, item) => sum + Number(item.student_count || 0), 0);
+    return {
+      success: true,
+      data: {
+        stats: {
+          total_groups: new Set(classes.map((item) => item.group_id)).size,
+          total_students: totalStudents,
+          today_classes: classes.length,
+          pending_attendance: 1,
+          pending_grades: 2,
+          average_grade: 87,
+        },
+        today_classes: classes,
+        alerts: [
+          { id: "alert-att", type: "attendance", title: "Asistencia pendiente", message: "El grupo 1A aun no tiene pase de lista.", priority: "high" },
+          { id: "alert-grade", type: "grades", title: "Calificaciones por revisar", message: "Hay 2 evaluaciones listas para publicar.", priority: "normal" },
+        ],
+        recent_messages: messages.slice(0, 4),
+        last_updated: nowIso(),
+      },
+    };
+  }
+
+  if (path.endsWith("/teacher/classes")) {
+    return { success: true, data: classes };
+  }
+
+  const studentsMatch = path.match(/\/teacher\/classes\/([^/]+)\/students$/);
+  if (studentsMatch) {
+    return { success: true, data: getMockTeacherStudents(decodeURIComponent(studentsMatch[1])) };
+  }
+
+  if (path.endsWith("/teacher/attendance")) {
+    const groupId = url.searchParams.get("group_id") || classes[0]?.group_id || "group-1a";
+    const date = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
+    const key = `mock_teacher_attendance_${groupId}_${date}`;
+    if (method === "POST") {
+      const body = parseBody(options);
+      writeMockList(`mock_teacher_attendance_${body.group_id}_${body.date}`, body.records || []);
+      return { success: true, message: "Asistencia guardada en modo demo" };
+    }
+    const saved = readMockList(key, []);
+    const students = getMockTeacherStudents(groupId).map((student) => {
+      const record = saved.find((item: any) => item.student_id === student.id || item.student_id === student.student_id);
+      return { student_id: student.id, student_name: `${student.first_name} ${student.last_name}`, enrollment_id: student.enrollment_id, status: record?.status || "present", notes: record?.notes || "" };
+    });
+    const summary = students.reduce((acc: any, item: any) => {
+      acc.total += 1;
+      acc[item.status] = (acc[item.status] || 0) + 1;
+      return acc;
+    }, { total: 0, present: 0, absent: 0, late: 0, excused: 0 });
+    return { success: true, data: { group_id: groupId, group_name: classes.find((item) => item.group_id === groupId)?.group_name || "Grupo", date, students, summary } };
+  }
+
+  if (path.endsWith("/teacher/grades")) {
+    const groupId = url.searchParams.get("group_id") || classes[0]?.group_id || "group-1a";
+    const subjectId = url.searchParams.get("subject_id") || classes[0]?.subject_id || "subject-math";
+    const period = url.searchParams.get("period") || "current";
+    const key = `mock_teacher_grades_${groupId}_${subjectId}_${period}`;
+    if (method === "POST") {
+      const body = parseBody(options);
+      writeMockList(`mock_teacher_grades_${body.group_id}_${body.grades?.[0]?.subject_id || subjectId}_${body.period || "current"}`, body.grades || []);
+      return { success: true, message: "Calificaciones guardadas en modo demo" };
+    }
+    const saved = readMockList(key, []);
+    const students = getMockTeacherStudents(groupId).map((student, index) => {
+      const record = saved.find((item: any) => item.student_id === student.id || item.student_id === student.student_id);
+      const score = Number(record?.score ?? Math.max(70, Number(student.average_grade || 86) + (index % 2 === 0 ? 2 : -4)));
+      return { student_id: student.id, student_name: `${student.first_name} ${student.last_name}`, enrollment_id: student.enrollment_id, score, status: score >= 60 ? "passing" : "at_risk", notes: record?.notes || "" };
+    });
+    const avg = Math.round(students.reduce((sum, item) => sum + Number(item.score || 0), 0) / Math.max(students.length, 1));
+    return { success: true, data: { group_id: groupId, group_name: classes.find((item) => item.group_id === groupId)?.group_name || "Grupo", subject_id: subjectId, subject_name: classes.find((item) => item.subject_id === subjectId)?.subject_name || "Materia", period, students, summary: { total: students.length, average: avg, passing: students.filter((item) => item.score >= 60).length, at_risk: students.filter((item) => item.score < 70).length } } };
+  }
+
+  if (path.endsWith("/teacher/messages")) {
+    const messages = readMockList("mock_teacher_messages", [
+      { id: "teacher-msg-1", conversation_id: "conv-teacher-1", sender_name: "Padre de Sofia", recipient_name: "Maria Lopez", subject: "Duda sobre tarea", content: "Buenas tardes, podria confirmar la fecha de entrega?", priority: "normal", is_read: false, created_at: "2026-04-29T11:00:00.000Z" },
+    ]);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = { id: `teacher-msg-${Date.now()}`, conversation_id: `teacher-conv-${Date.now()}`, sender_name: "Maria Lopez", recipient_name: body.recipient_id === "school-admin" ? "Direccion" : "Tutor", subject: body.subject, content: body.content, priority: body.priority || "normal", is_read: false, created_at: nowIso() };
+      writeMockList("mock_teacher_messages", [created, ...messages]);
+      return { success: true, data: created, message: "Mensaje enviado en modo demo" };
+    }
+    return { success: true, data: messages };
+  }
+
+  return { success: false, message: "Endpoint Teacher demo no implementado" };
+}
+
 async function mockParentFetch(endpoint: string, options: RequestInit = {}) {
   await new Promise((resolve) => setTimeout(resolve, 160));
 
@@ -1085,6 +1233,81 @@ async function mockParentFetch(endpoint: string, options: RequestInit = {}) {
       { id: "notif-parent-1", title: "Boleta disponible", message: "Ya puedes revisar la boleta del periodo.", type: "grade_published", priority: "normal", is_read: false, sender_name: "Direccion", created_at: nowIso() },
     ]);
     return { success: true, data: notifications, meta: { total: notifications.length, page: 1, per_page: 20 } };
+  }
+
+  if (path.endsWith("/parent/documents")) {
+    const fallback = children.flatMap((child: any, index: number) => [
+      { id: `doc-${child.id}-report`, student_id: child.id, student_name: `${child.first_name} ${child.last_name}`, title: "Boleta parcial", description: "Reporte academico del periodo actual.", category: "report_card", file_name: "boleta-parcial.pdf", file_url: "#", mime_type: "application/pdf", status: "active", created_at: nowIso() },
+      { id: `doc-${child.id}-circular`, student_id: child.id, student_name: `${child.first_name} ${child.last_name}`, title: index === 0 ? "Circular reunion de padres" : "Lista de materiales", description: "Documento compartido por direccion escolar.", category: "circular", file_name: "circular.pdf", file_url: "#", mime_type: "application/pdf", status: "active", created_at: "2026-04-28T12:00:00.000Z" },
+    ]);
+    return { success: true, data: readMockList("mock_parent_documents", fallback) };
+  }
+
+  if (path.endsWith("/parent/payments")) {
+    const fallback = children.flatMap((child: any, index: number) => [
+      { id: `pay-${child.id}-may`, student_id: child.id, student_name: `${child.first_name} ${child.last_name}`, concept: "Colegiatura mayo", description: "Pago mensual escolar", amount: 1850 + index * 150, currency: "MXN", due_date: "2026-05-05", paid_at: null, payment_method: "", receipt_number: "", receipt_url: "", status: index === 0 ? "pending" : "paid" },
+      { id: `pay-${child.id}-ins`, student_id: child.id, student_name: `${child.first_name} ${child.last_name}`, concept: "Material academico", description: "Cuota de material y plataforma", amount: 450, currency: "MXN", due_date: "2026-04-15", paid_at: "2026-04-12T10:00:00.000Z", payment_method: "Transferencia", receipt_number: `REC-${index + 1}`, receipt_url: "#", status: "paid" },
+    ]);
+    const payments = readMockList("mock_parent_payments", fallback);
+    return {
+      success: true,
+      data: {
+        payments,
+        summary: {
+          total_due: payments.filter((item: any) => item.status !== "paid" && item.status !== "cancelled").reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
+          total_paid: payments.filter((item: any) => item.status === "paid").reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
+          overdue_count: payments.filter((item: any) => item.status === "overdue").length,
+          pending_count: payments.filter((item: any) => item.status === "pending").length,
+          currency: "MXN",
+        },
+      },
+    };
+  }
+
+  if (path.endsWith("/parent/consents")) {
+    const fallback = children.map((child: any, index: number) => ({
+      id: `consent-${child.id}`,
+      student_id: child.id,
+      student_name: `${child.first_name} ${child.last_name}`,
+      title: index === 0 ? "Autorizacion salida academica" : "Uso de imagen institucional",
+      description: index === 0 ? "Autorizacion para participar en visita escolar supervisada." : "Consentimiento para fotografias en eventos escolares.",
+      category: index === 0 ? "activity" : "image_rights",
+      due_date: "2026-05-10",
+      status: "pending",
+      signed_at: null,
+      notes: "",
+      created_at: nowIso(),
+    }));
+    return { success: true, data: readMockList("mock_parent_consents", fallback) };
+  }
+
+  const consentMatch = path.match(/\/parent\/consents\/([^/]+)$/);
+  if (consentMatch && method === "PATCH") {
+    const body = parseBody(options);
+    const consents = readMockList("mock_parent_consents", []);
+    const updated = consents.map((item: any) => item.id === decodeURIComponent(consentMatch[1]) ? { ...item, status: body.action || "approved", notes: body.notes || item.notes, signed_at: nowIso() } : item);
+    writeMockList("mock_parent_consents", updated);
+    return { success: true, data: updated.find((item: any) => item.id === decodeURIComponent(consentMatch[1])), message: "Permiso actualizado en modo demo" };
+  }
+
+  if (path.endsWith("/parent/reports/summary")) {
+    const documents = readMockList("mock_parent_documents", []);
+    const payments = readMockList("mock_parent_payments", []);
+    const consents = readMockList("mock_parent_consents", []);
+    const messages = readMockList("mock_parent_messages", defaultMessages);
+    return {
+      success: true,
+      data: {
+        children_count: children.length,
+        average_attendance: Math.round(children.reduce((sum: number, child: any) => sum + Number(child.attendance_rate || 0), 0) / Math.max(children.length, 1)),
+        average_grade: Math.round(children.reduce((sum: number, child: any) => sum + Number(child.current_gpa || 0), 0) / Math.max(children.length, 1)),
+        pending_payments: payments.filter((item: any) => item.status !== "paid").reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
+        pending_consents: consents.filter((item: any) => item.status === "pending").length,
+        unread_messages: messages.filter((item: any) => !item.is_read).length,
+        documents_available: documents.length,
+        last_updated: nowIso(),
+      },
+    };
   }
 
   const notificationReadMatch = path.match(/\/parent\/notifications\/([^/]+)\/read$/);
