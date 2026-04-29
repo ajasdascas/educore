@@ -3,7 +3,26 @@
 import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building, Users, Settings, LogOut, LayoutDashboard, Menu, X, Package } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Building,
+  CreditCard,
+  Database,
+  Flag,
+  HeartPulse,
+  History,
+  LayoutDashboard,
+  LifeBuoy,
+  LogOut,
+  Menu,
+  Package,
+  RotateCcw,
+  Settings,
+  ShieldCheck,
+  Users,
+  X,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,6 +31,16 @@ import { RoleGuard } from "@/components/providers/RoleGuard";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/super-admin/modules", label: "Modulos", icon: Package },
+  { href: "/super-admin/billing", label: "Billing", icon: CreditCard },
+  { href: "/super-admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/super-admin/health", label: "Health Monitor", icon: HeartPulse },
+  { href: "/super-admin/audit", label: "Auditoria", icon: History },
+  { href: "/super-admin/support", label: "Soporte", icon: LifeBuoy },
+  { href: "/super-admin/storage", label: "Storage", icon: Database },
+  { href: "/super-admin/feature-flags", label: "Feature Flags", icon: Flag },
+  { href: "/super-admin/backups", label: "Backups", icon: RotateCcw },
+  { href: "/super-admin/version", label: "Versioning", icon: ShieldCheck },
   { href: "/super-admin/plans", label: "Planes", icon: Package },
   { href: "/super-admin/schools", label: "Escuelas", icon: Building },
   { href: "/super-admin/users", label: "Usuarios Globales", icon: Users },
@@ -65,7 +94,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
           </button>
         </div>
 
-        <nav className="flex-1 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-4 space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (

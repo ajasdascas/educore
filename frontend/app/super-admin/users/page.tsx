@@ -31,7 +31,10 @@ import {
   ToggleRight,
   Trash2,
   Clock,
-  Shield
+  Shield,
+  KeyRound,
+  LogOut,
+  UserCheck
 } from "lucide-react";
 import { authFetch } from "@/lib/auth";
 import { UserFormModal } from "./UserFormModal";
@@ -174,6 +177,47 @@ export default function UsersPage() {
         variant: "destructive",
         title: "Error",
         description: "No se pudo desactivar el usuario",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleEnterpriseAction = async (userId: string, action: "reset" | "logout" | "impersonate") => {
+    setActionLoading(userId);
+    try {
+      const endpoint =
+        action === "reset"
+          ? `/api/v1/super-admin/global-users/${userId}/reset-password`
+          : action === "logout"
+            ? `/api/v1/super-admin/global-users/${userId}/force-logout`
+            : "/api/v1/super-admin/impersonation/start";
+      const body = action === "impersonate"
+        ? { target_user_id: userId, reason: "Soporte SuperAdmin desde panel" }
+        : {};
+      const response = await authFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      if (!response.success) {
+        throw new Error(response.message || response.error || "Accion no disponible");
+      }
+
+      toast({
+        title: "Accion registrada",
+        description:
+          action === "reset"
+            ? `Password temporal: ${response.data?.temporary_password || "generado"}`
+            : action === "logout"
+              ? "Sesiones cerradas correctamente"
+              : "Impersonation iniciado con auditoria",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "No se pudo completar la accion",
       });
     } finally {
       setActionLoading(null);
@@ -413,6 +457,18 @@ export default function UsersPage() {
                                   <ToggleRight className="h-4 w-4 mr-2" />
                                 )}
                                 {user.is_active ? "Desactivar" : "Activar"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEnterpriseAction(user.id, "reset")}>
+                                <KeyRound className="h-4 w-4 mr-2" />
+                                Reset password
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEnterpriseAction(user.id, "logout")}>
+                                <LogOut className="h-4 w-4 mr-2" />
+                                Force logout
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEnterpriseAction(user.id, "impersonate")}>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Impersonar
                               </DropdownMenuItem>
                               {user.is_active && (
                                 <DropdownMenuItem

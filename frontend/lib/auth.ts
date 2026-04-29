@@ -1886,6 +1886,74 @@ async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) 
   const url = new URL(endpoint, "https://mock.educore.local");
   const path = url.pathname;
 
+  const enterpriseModules = modulesCatalog.map((mod, index) => ({
+    ...mod,
+    id: mod.key,
+    status: mod.enabled === false ? "inactive" : index > 9 ? "in_development" : "active",
+    version: index < 8 ? "1.0.0" : "0.9.0",
+    dependencies: mod.is_core ? [] : ["academic_core"],
+    required_level: mod.layer === "level" ? mod.key : "all",
+    global_enabled: mod.enabled !== false,
+    active_tenants: mod.is_core ? 3 : 1,
+    error_rate: index % 4 === 0 ? 1.8 : 0.2,
+  }));
+
+  const enterpriseSubscriptions = defaultMockSchools.map((school) => {
+    const plan = defaultMockPlans.find((item) => item.id === school.plan) || defaultMockPlans[0];
+    return {
+      id: `sub-${school.id}`,
+      tenant_id: school.id,
+      tenant_name: school.name,
+      plan_id: plan.id,
+      status: school.status === "active" ? "active" : school.status,
+      billing_cycle: "monthly",
+      price_monthly: plan.price_monthly,
+      discount_percent: plan.id === "enterprise" ? 10 : 0,
+      max_students: plan.max_students,
+      max_teachers: plan.max_teachers,
+      storage_limit_mb: plan.id === "enterprise" ? 51200 : 10240,
+      current_period_end: "2026-05-29T00:00:00.000Z",
+      created_at: school.created_at,
+    };
+  });
+
+  const enterpriseAuditLogs = [
+    { id: "audit-1", created_at: nowIso(), user: "admin@educore.mx", action: "module.toggle", resource: "reports", severity: "warning", ip_address: "127.0.0.1" },
+    { id: "audit-2", created_at: "2026-04-29T12:20:00.000Z", user: "admin@educore.mx", action: "impersonation.start", resource: "school@educore.mx", severity: "critical", ip_address: "127.0.0.1" },
+    { id: "audit-3", created_at: "2026-04-29T11:42:00.000Z", user: "operaciones@educore.mx", action: "billing.manual_payment", resource: "school-don-bosco", severity: "warning", ip_address: "127.0.0.1" },
+  ];
+
+  if (path.endsWith("/super-admin/dashboard/overview")) {
+    const schools = readMockList("mock_schools", defaultMockSchools);
+    const users = readMockList("mock_users", defaultMockUsers);
+    const subscriptions = readMockList("mock_enterprise_subscriptions", enterpriseSubscriptions);
+    const mrr = subscriptions.reduce((sum, sub) => sum + (sub.status === "active" ? Number(sub.price_monthly || 0) : 0), 0);
+    return {
+      success: true,
+      data: {
+        total_tenants: schools.length,
+        active_tenants: schools.filter((school) => school.status === "active").length,
+        trial_tenants: schools.filter((school) => school.status === "trial").length,
+        total_students: schools.reduce((sum, school) => sum + (school.total_students || 0), 0),
+        total_users: users.length + schools.reduce((sum, school) => sum + (school.total_users || 0), 0),
+        active_sessions: 42,
+        mrr_mxn: mrr,
+        arr_mxn: mrr * 12,
+        churn_risk_avg: 28,
+        recent_schools: schools.slice(0, 5),
+        module_usage: enterpriseModules.slice(0, 6),
+        risky_institutions: schools.map((school, index) => ({ ...school, risk_score: index === 1 ? 62 : 18 + index * 8 })).slice(0, 4),
+        health: [
+          { module_key: "auth", status: "healthy", severity: "info", latency_ms: 82, error_rate: 0.1 },
+          { module_key: "reports", status: "degraded", severity: "warning", latency_ms: 680, error_rate: 2.5 },
+        ],
+        alerts: [
+          { id: "alert-health", message: "Reportes con latencia elevada en modo demo", severity: "warning" },
+        ],
+      },
+    };
+  }
+
   if (path.endsWith("/super-admin/stats")) {
     const schools = readMockList("mock_schools", defaultMockSchools);
     return {
@@ -1904,6 +1972,275 @@ async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) 
 
   if (path.endsWith("/super-admin/modules-catalog")) {
     return { success: true, data: { modules: modulesCatalog } };
+  }
+
+  if (path.endsWith("/super-admin/modules")) {
+    return {
+      success: true,
+      data: {
+        modules: readMockList("mock_enterprise_modules", enterpriseModules),
+        total_modules: enterpriseModules.length,
+        active_modules: enterpriseModules.filter((mod) => mod.status === "active").length,
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/modules/usage") || path.endsWith("/super-admin/analytics/module-usage")) {
+    return {
+      success: true,
+      data: {
+        modules: enterpriseModules.map((mod, index) => ({
+          id: `usage-${mod.key}`,
+          module_key: mod.key,
+          name: mod.name,
+          active_tenants: mod.active_tenants,
+          requests_30d: 1200 - index * 67,
+          error_rate: mod.error_rate,
+        })),
+      },
+    };
+  }
+
+  const globalModuleMatch = path.match(/\/super-admin\/modules\/([^/]+)\/global$/);
+  if (globalModuleMatch && method === "PATCH") {
+    return { success: true, message: "Modulo global actualizado en modo demo" };
+  }
+
+  const schoolModuleMatch = path.match(/\/super-admin\/schools\/([^/]+)\/modules\/([^/]+)$/);
+  if (schoolModuleMatch && method === "PATCH") {
+    return { success: true, message: "Modulo de institucion actualizado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/global-users")) {
+    return { success: true, data: { users: readMockList("mock_users", defaultMockUsers) } };
+  }
+
+  const globalUserActionMatch = path.match(/\/super-admin\/global-users\/([^/]+)\/(reset-password|force-logout)$/);
+  if (globalUserActionMatch && method === "POST") {
+    return {
+      success: true,
+      data: globalUserActionMatch[2] === "reset-password" ? { temporary_password: "EduCore-Temp-2026" } : {},
+      message: globalUserActionMatch[2] === "reset-password" ? "Password temporal generado en modo demo" : "Sesiones cerradas en modo demo",
+    };
+  }
+
+  if (path.endsWith("/super-admin/impersonation/start") && method === "POST") {
+    const body = parseBody(options);
+    const sessions = readMockList<any>("mock_impersonation_sessions", []);
+    const created = {
+      id: `imp-${Date.now()}`,
+      acting_user: "admin@educore.mx",
+      target_user: body.target_user_id || "usuario-demo",
+      tenant_name: "EduCore",
+      reason: body.reason || "Soporte SuperAdmin",
+      status: "active",
+      started_at: nowIso(),
+      ended_at: null,
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    };
+    writeMockList("mock_impersonation_sessions", [created, ...sessions]);
+    return { success: true, data: { session_id: created.id, target_user: created.target_user, expires_in_minutes: 30 }, message: "Impersonation iniciado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/impersonation/stop") && method === "POST") {
+    const sessions = readMockList<any>("mock_impersonation_sessions", []);
+    writeMockList("mock_impersonation_sessions", sessions.map((session) => ({ ...session, status: "ended", ended_at: nowIso() })));
+    return { success: true, message: "Impersonation detenido en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/impersonation/audit")) {
+    return {
+      success: true,
+      data: {
+        sessions: readMockList("mock_impersonation_sessions", [
+          { id: "imp-demo", acting_user: "admin@educore.mx", target_user: "school@educore.mx", tenant_name: "Instituto Tecnologico Don Bosco", reason: "Soporte de configuracion", status: "ended", started_at: "2026-04-29T12:00:00.000Z", ended_at: "2026-04-29T12:10:00.000Z", expires_at: "2026-04-29T12:30:00.000Z" },
+        ]),
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/billing/subscriptions")) {
+    return { success: true, data: { subscriptions: readMockList("mock_enterprise_subscriptions", enterpriseSubscriptions) } };
+  }
+
+  if (path.endsWith("/super-admin/billing/invoices")) {
+    return {
+      success: true,
+      data: {
+        invoices: defaultMockSchools.map((school, index) => ({
+          id: `invoice-${index + 1}`,
+          tenant_name: school.name,
+          status: index === 1 ? "pending" : "paid",
+          total: index === 1 ? 899 : 1899,
+          due_date: "2026-05-05T00:00:00.000Z",
+          created_at: "2026-04-29T10:00:00.000Z",
+        })),
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/billing/payments/manual") && method === "POST") {
+    return { success: true, data: { id: `payment-${Date.now()}` }, message: "Pago manual registrado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/analytics/kpis")) {
+    const subscriptions = readMockList("mock_enterprise_subscriptions", enterpriseSubscriptions);
+    const mrr = subscriptions.reduce((sum, sub) => sum + Number(sub.price_monthly || 0), 0);
+    return { success: true, data: { mrr_mxn: mrr, arr_mxn: mrr * 12, churn_rate: 4.2, active_sessions: 42 } };
+  }
+
+  if (path.endsWith("/super-admin/analytics/growth")) {
+    return {
+      success: true,
+      data: {
+        growth: ["Nov", "Dic", "Ene", "Feb", "Mar", "Abr"].map((month, index) => ({ month, institutions: 2 + index, users: 80 + index * 42 })),
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/analytics/churn-risk")) {
+    const schools = readMockList("mock_schools", defaultMockSchools);
+    return {
+      success: true,
+      data: {
+        institutions: schools.map((school, index) => ({
+          ...school,
+          last_activity_at: index === 1 ? "2026-04-19T09:00:00.000Z" : nowIso(),
+          active_modules: school.plan === "enterprise" ? 12 : 7,
+          open_tickets: index === 1 ? 3 : 0,
+          risk_score: index === 1 ? 72 : 18 + index * 9,
+        })),
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/health/modules")) {
+    return {
+      success: true,
+      data: {
+        modules: [
+          { id: "health-auth", module_key: "auth", tenant_name: "Global", status: "healthy", severity: "info", error_rate: 0.1, latency_ms: 82, message: "Auth estable", created_at: nowIso() },
+          { id: "health-reports", module_key: "reports", tenant_name: "Instituto Tecnologico Don Bosco", status: "degraded", severity: "warning", error_rate: 2.5, latency_ms: 680, message: "Export demo lento", created_at: nowIso() },
+        ],
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/health/system")) {
+    return { success: true, data: { status: "healthy", api_latency_ms: 94, database_status: "connected", redis_status: "connected" } };
+  }
+
+  if (path.endsWith("/super-admin/health/events") && method === "POST") {
+    return { success: true, data: { id: `health-${Date.now()}` }, message: "Evento de salud registrado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/logs/audit")) {
+    return { success: true, data: { logs: readMockList("mock_enterprise_audit_logs", enterpriseAuditLogs) } };
+  }
+
+  if (path.endsWith("/super-admin/logs/errors")) {
+    return { success: true, data: { errors: enterpriseAuditLogs.filter((log) => log.severity !== "warning") } };
+  }
+
+  if (path.endsWith("/super-admin/logs/activity")) {
+    return { success: true, data: { activity: enterpriseAuditLogs } };
+  }
+
+  if (path.endsWith("/super-admin/support/tickets")) {
+    const tickets = readMockList("mock_support_tickets", [
+      { id: "ticket-1", title: "Revision de acceso a reportes", tenant_name: "Instituto Tecnologico Don Bosco", status: "open", priority: "high", module_key: "reports", created_at: "2026-04-29T09:30:00.000Z", resolved_at: null },
+      { id: "ticket-2", title: "Ajuste de limite de storage", tenant_name: "Colegio San Miguel", status: "in_progress", priority: "medium", module_key: "storage", created_at: "2026-04-28T16:00:00.000Z", resolved_at: null },
+    ]);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = { id: `ticket-${Date.now()}`, tenant_name: "EduCore interno", created_at: nowIso(), resolved_at: null, ...body };
+      writeMockList("mock_support_tickets", [created, ...tickets]);
+      return { success: true, data: created, message: "Ticket creado en modo demo" };
+    }
+    return { success: true, data: { tickets } };
+  }
+
+  if (path.endsWith("/super-admin/storage/usage")) {
+    return {
+      success: true,
+      data: {
+        usage: defaultMockSchools.map((school, index) => ({
+          id: `storage-${school.id}`,
+          tenant_name: school.name,
+          used_mb: 1200 + index * 830,
+          storage_limit_mb: school.plan === "enterprise" ? 51200 : 10240,
+          file_count: 420 + index * 95,
+        })),
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/storage/archive") && method === "POST") {
+    return { success: true, data: { id: `archive-${Date.now()}` }, message: "Archivado demo solicitado" };
+  }
+
+  if (path.endsWith("/super-admin/feature-flags")) {
+    const flags = readMockList("mock_feature_flags", [
+      { id: "flag-1", key: "enterprise_dashboard", name: "Dashboard Enterprise", enabled: true, rollout_percentage: 100, updated_at: nowIso() },
+      { id: "flag-2", key: "impersonation_mode", name: "Impersonation Mode", enabled: true, rollout_percentage: 100, updated_at: nowIso() },
+      { id: "flag-3", key: "level_extensions", name: "Extensiones por nivel", enabled: false, rollout_percentage: 25, updated_at: nowIso() },
+    ]);
+    if (method === "POST" || method === "PUT") {
+      const body = parseBody(options);
+      const created = { id: `flag-${Date.now()}`, updated_at: nowIso(), ...body };
+      writeMockList("mock_feature_flags", [created, ...flags]);
+      return { success: true, data: created, message: "Feature flag guardado en modo demo" };
+    }
+    return { success: true, data: { flags } };
+  }
+
+  const featureFlagScopeMatch = path.match(/\/super-admin\/feature-flags\/([^/]+)\/scope$/);
+  if (featureFlagScopeMatch && method === "PATCH") {
+    return { success: true, message: "Scope actualizado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/backups")) {
+    const backups = readMockList("mock_backup_jobs", [
+      { id: "backup-1", tenant_name: "Global", type: "full", status: "completed", size_mb: 2840, created_at: "2026-04-29T03:00:00.000Z", completed_at: "2026-04-29T03:08:00.000Z" },
+      { id: "backup-2", tenant_name: "Instituto Tecnologico Don Bosco", type: "tenant", status: "completed", size_mb: 920, created_at: "2026-04-28T03:00:00.000Z", completed_at: "2026-04-28T03:04:00.000Z" },
+    ]);
+    if (method === "POST") {
+      const body = parseBody(options);
+      const created = { id: `backup-${Date.now()}`, tenant_name: "Global", type: body.type || "full", status: "queued", size_mb: 0, created_at: nowIso(), completed_at: null };
+      writeMockList("mock_backup_jobs", [created, ...backups]);
+      return { success: true, data: created, message: "Backup solicitado en modo demo" };
+    }
+    return { success: true, data: { backups } };
+  }
+
+  const restoreBackupMatch = path.match(/\/super-admin\/backups\/([^/]+)\/restore$/);
+  if (restoreBackupMatch && method === "POST") {
+    return { success: true, message: "Restore registrado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/version")) {
+    return {
+      success: true,
+      data: {
+        versions: [
+          { id: "version-current", version: "2026.04.29-enterprise", status: "current", changelog: "SuperAdmin enterprise control plane", deployed_at: nowIso() },
+          { id: "version-prev", version: "2026.04.28-core", status: "previous", changelog: "Core modular School Admin", deployed_at: "2026-04-28T19:30:00.000Z" },
+        ],
+      },
+    };
+  }
+
+  if (path.endsWith("/super-admin/version/deploy") && method === "POST") {
+    return { success: true, data: { id: `deploy-${Date.now()}` }, message: "Deploy registrado en modo demo" };
+  }
+
+  if (path.endsWith("/super-admin/version/rollback") && method === "POST") {
+    return { success: true, data: { id: `rollback-${Date.now()}` }, message: "Rollback registrado en modo demo" };
+  }
+
+  if (path.includes("/super-admin/system/")) {
+    if (method === "PUT") return { success: true, message: "Configuracion global guardada en modo demo" };
+    return { success: true, data: { settings: { maintenance_mode: false, platform_name: "EduCore SaaS", timezone: "America/Mexico_City" } } };
   }
 
   if (path.endsWith("/super-admin/plans")) {
