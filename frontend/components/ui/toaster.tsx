@@ -5,10 +5,11 @@ import { X } from "lucide-react"
 
 export function Toaster() {
   const { toasts, dismiss } = useToast()
+  const visibleToasts = toasts.filter((toast) => toast.open !== false)
 
   return (
     <div className="fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]">
-      {toasts.map(({ id, title, description, variant, open, onOpenChange, ...props }) => (
+      {visibleToasts.map(({ id, title, description, variant, open, onOpenChange, ...props }) => (
         <div
           key={id}
           className={`
@@ -31,6 +32,7 @@ export function Toaster() {
           <button
             onClick={() => dismiss(id)}
             className="absolute right-2 top-2 opacity-70 hover:opacity-100"
+            aria-label="Cerrar notificacion"
           >
             <X className="h-4 w-4" />
           </button>

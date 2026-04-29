@@ -264,3 +264,14 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con Configuracion School Admin solo despues de smoke test productivo de Estructura, Grupos y Horarios.
 
 #school_admin #academic_structure #schedule #backend #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - Fix global cierre de toasts
+
+### Cambio completado
+- `frontend/components/ui/use-toast.tsx`: el delay de remocion de toast se redujo de un valor excesivo a 5 segundos.
+- `frontend/components/ui/toaster.tsx`: los toasts con `open === false` ya no se renderizan, por lo que el boton `X` los oculta inmediatamente.
+- Impacto: la notificacion blanca de "Descarga lista" en Reportes ya no queda estorbando despues de cerrarla.
+
+#frontend #school_admin #reports #ux
