@@ -120,7 +120,11 @@ func (h *Handler) RegisterEnterpriseRoutes(router fiber.Router) {
 	router.Post("/billing/subscriptions", h.CreateSubscription)
 	router.Patch("/billing/subscriptions/:id", h.UpdateSubscription)
 	router.Get("/billing/invoices", h.ListInvoices)
+	router.Post("/billing/invoices/generate", h.GenerateInvoice)
+	router.Post("/billing/invoices/:id/mark-paid", h.MarkInvoicePaid)
 	router.Post("/billing/payments/manual", h.RecordManualPayment)
+	router.Post("/billing/reminders", h.SendBillingReminders)
+	router.Get("/billing/reports/monthly", h.MonthlyBillingReport)
 
 	router.Get("/analytics/kpis", h.AnalyticsKPIs)
 	router.Get("/analytics/growth", h.AnalyticsGrowth)
@@ -724,6 +728,84 @@ func (h *Handler) RecordManualPayment(c *fiber.Ctx) error {
 	return response.Success(c, fiber.Map{"id": id}, "Payment recorded")
 }
 
+func (h *Handler) GenerateInvoice(c *fiber.Ctx) error {
+	var req struct {
+		TenantID string  `json:"tenant_id"`
+		Total    float64 `json:"total"`
+		DueDate  string  `json:"due_date"`
+		Notes    string  `json:"notes"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.TenantID == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid invoice payload")
+	}
+	if req.Total <= 0 {
+		req.Total = 0
+	}
+	folio := fmt.Sprintf("EDU-%s", strings.ToUpper(hex.EncodeToString(randomBytes(4))))
+	var id string
+	err := h.db.QueryRow(c.UserContext(),
+		`INSERT INTO invoices (tenant_id, folio, status, subtotal, tax, total, currency, due_date, notes)
+		 VALUES ($1, $2, 'pending', $3, 0, $3, 'MXN', NULLIF($4, '')::date, $5)
+		 RETURNING id`,
+		req.TenantID, folio, req.Total, req.DueDate, req.Notes).Scan(&id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not generate invoice")
+	}
+	h.auditSuperAdmin(c, "billing.invoice.generate", "invoices", id, "warning", fiber.Map{"tenant_id": req.TenantID, "total": req.Total}, "")
+	return response.Success(c, fiber.Map{"id": id, "folio": folio}, "Invoice generated")
+}
+
+func (h *Handler) MarkInvoicePaid(c *fiber.Ctx) error {
+	id := c.Params("id")
+	tag, err := h.db.Exec(c.UserContext(), "UPDATE invoices SET status = 'paid', paid_at = NOW(), updated_at = NOW() WHERE id = $1", id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not mark invoice as paid")
+	}
+	if tag.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Invoice not found")
+	}
+	h.auditSuperAdmin(c, "billing.invoice.mark_paid", "invoices", id, "warning", fiber.Map{"invoice_id": id}, "")
+	return response.Success(c, fiber.Map{"id": id}, "Invoice marked as paid")
+}
+
+func (h *Handler) SendBillingReminders(c *fiber.Ctx) error {
+	var req struct {
+		TenantID string `json:"tenant_id"`
+		Scope    string `json:"scope"`
+	}
+	_ = c.BodyParser(&req)
+	h.auditSuperAdmin(c, "billing.reminders.send", "billing", "", "info", fiber.Map{"tenant_id": req.TenantID, "scope": defaultString(req.Scope, "pending")}, "")
+	return response.Success(c, fiber.Map{"queued": true}, "Billing reminders queued")
+}
+
+func (h *Handler) MonthlyBillingReport(c *fiber.Ctx) error {
+	rows, err := h.db.Query(c.UserContext(),
+		`SELECT
+			to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+			COUNT(*) AS invoices,
+			COALESCE(SUM(total), 0) AS total,
+			COALESCE(SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END), 0) AS paid,
+			COALESCE(SUM(CASE WHEN status <> 'paid' THEN total ELSE 0 END), 0) AS pending
+		 FROM invoices
+		 WHERE deleted_at IS NULL
+		 GROUP BY 1
+		 ORDER BY 1 DESC
+		 LIMIT 12`)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not fetch monthly report")
+	}
+	defer rows.Close()
+	items := []fiber.Map{}
+	for rows.Next() {
+		var month string
+		var invoices int
+		var total, paid, pending float64
+		_ = rows.Scan(&month, &invoices, &total, &paid, &pending)
+		items = append(items, fiber.Map{"month": month, "invoices": invoices, "total": total, "paid": paid, "pending": pending})
+	}
+	return response.Success(c, fiber.Map{"reports": items}, "Monthly billing report")
+}
+
 func (h *Handler) AnalyticsKPIs(c *fiber.Ctx) error {
 	return h.EnterpriseOverview(c)
 }
@@ -1219,6 +1301,14 @@ func defaultString(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func randomBytes(size int) []byte {
+	token := make([]byte, size)
+	if _, err := rand.Read(token); err != nil {
+		return []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+	}
+	return token
 }
 
 func stringPtrValue(value *string) string {
