@@ -1,14 +1,22 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { User, Settings, Bell, Shield, LogOut, ChevronDown } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Settings, Shield, User } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
+import type { User as AuthUser } from "@/lib/auth";
 
 interface ProfileDropdownProps {
   userInitials: string;
   userRole: string;
 }
+
+const accountBasePathByRole: Record<AuthUser["role"], string> = {
+  SUPER_ADMIN: "/super-admin",
+  SCHOOL_ADMIN: "/school-admin",
+  TEACHER: "/teacher",
+  PARENT: "/parent",
+};
 
 export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +24,6 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -28,44 +35,21 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const navigateToAccountPage = (page: "profile" | "settings" | "notifications" | "security") => {
+    if (!user) return;
+    router.push(`${accountBasePathByRole[user.role]}/${page}`);
+    setIsOpen(false);
+  };
+
   const menuItems = [
-    {
-      icon: User,
-      label: "Mi Perfil",
-      onClick: () => {
-        router.push("/super-admin/profile");
-        setIsOpen(false);
-      }
-    },
-    {
-      icon: Settings,
-      label: "Configuración",
-      onClick: () => {
-        router.push("/super-admin/settings");
-        setIsOpen(false);
-      }
-    },
-    {
-      icon: Bell,
-      label: "Notificaciones",
-      onClick: () => {
-        router.push("/super-admin/notifications");
-        setIsOpen(false);
-      }
-    },
-    {
-      icon: Shield,
-      label: "Seguridad",
-      onClick: () => {
-        router.push("/super-admin/security");
-        setIsOpen(false);
-      }
-    },
+    { icon: User, label: "Mi Perfil", onClick: () => navigateToAccountPage("profile") },
+    { icon: Settings, label: "Configuracion", onClick: () => navigateToAccountPage("settings") },
+    { icon: Bell, label: "Notificaciones", onClick: () => navigateToAccountPage("notifications") },
+    { icon: Shield, label: "Seguridad", onClick: () => navigateToAccountPage("security") },
   ];
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Profile Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 p-1 rounded-lg hover:bg-muted/50 transition-colors"
@@ -75,17 +59,15 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
         </div>
         <div className="hidden sm:block text-left">
           <p className="text-sm font-medium text-foreground truncate max-w-[120px]">
-            {user?.email?.split('@')[0] || 'Usuario'}
+            {user?.email?.split("@")[0] || "Usuario"}
           </p>
           <p className="text-xs text-muted-foreground">{userRole}</p>
         </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-56 bg-popover border border-border rounded-lg shadow-lg z-50 py-1">
-          {/* User Info Header */}
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-medium text-popover-foreground truncate">
               {user?.email}
@@ -93,11 +75,10 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
             <p className="text-xs text-muted-foreground">{userRole}</p>
           </div>
 
-          {/* Menu Items */}
           <div className="py-1">
-            {menuItems.map((item, index) => (
+            {menuItems.map((item) => (
               <button
-                key={index}
+                key={item.label}
                 onClick={item.onClick}
                 className="w-full flex items-center px-4 py-2 text-sm text-popover-foreground hover:bg-muted/50 transition-colors"
               >
@@ -107,10 +88,8 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
             ))}
           </div>
 
-          {/* Divider */}
           <div className="border-t border-border my-1" />
 
-          {/* Logout */}
           <button
             onClick={() => {
               logout();
@@ -119,7 +98,7 @@ export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps
             className="w-full flex items-center px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
           >
             <LogOut className="w-4 h-4 mr-3" />
-            Cerrar Sesión
+            Cerrar Sesion
           </button>
         </div>
       )}

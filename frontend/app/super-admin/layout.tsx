@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { RoleGuard } from "@/components/providers/RoleGuard";
 
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,6 +35,7 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
   const userRole = user?.role === "SUPER_ADMIN" ? "Super Admin" : user?.role || "";
 
   return (
+    <RoleGuard allowedRoles={["SUPER_ADMIN"]}>
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
       {sidebarOpen && (
         <div
@@ -117,5 +119,6 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
       </main>
       <Toaster />
     </div>
+    </RoleGuard>
   );
 }

@@ -18,6 +18,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { RoleGuard } from "@/components/providers/RoleGuard";
 
 const navItems = [
   { href: "/school-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -47,6 +48,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
   const userRole = user?.role === "SCHOOL_ADMIN" ? "Administrador Escuela" : user?.role || "";
 
   return (
+    <RoleGuard allowedRoles={["SCHOOL_ADMIN"]}>
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
       {sidebarOpen && (
         <div
@@ -120,5 +122,6 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
       </main>
       <Toaster />
     </div>
+    </RoleGuard>
   );
 }
