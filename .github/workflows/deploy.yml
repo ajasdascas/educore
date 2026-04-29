@@ -1,82 +1,130 @@
-name: 🚀 Deploy EduCore to Production
+name: Deploy EduCore to Production
 
 on:
   push:
-    branches: [ master ]
-  workflow_dispatch: # Permite ejecutar manualmente
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout del código
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    # 2. Setup Node.js
-    - name: 🔧 Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-    # 3. Install dependencies
-    - name: 📦 Install dependencies
-      run: |
-        cd frontend
-        npm ci
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
 
-    # 4. Build production
-    - name: 🏗️ Build for production
-      run: |
-        cd frontend
-        npm run build
-        echo "✅ Build completed"
-        echo "📁 Static export generated:"
-        ls -la out/
-        echo "📁 Build size:"
-        du -sh out/
+      - name: Build for production
+        run: |
+          cd frontend
+          npm run build
+          echo "Build completed"
+          echo "Static export generated:"
+          ls -la out/
+          echo "Build size:"
+          du -sh out/
 
-    # 5. Test FTP connection first
-    - name: 🔍 Test FTP connection
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y lftp
-        timeout 60s lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; set net:timeout 15; set net:max-retries 1; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
+      - name: Install deployment tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
 
-    # 6. Deploy with lftp. We upload the static export directly to the real web root.
-    - name: 🚀 Deploy to FTP Server
-      run: |
-        lftp -c "
-          set ftp:ssl-allow false;
-          set ftp:ssl-force false;
-          set ssl:verify-certificate false;
-          set net:timeout 20;
-          set net:max-retries 2;
-          open onlineu.mx;
-          user u550473909 ${{ secrets.FTP_PASSWORD }};
-          mirror --reverse --verbose --parallel=4 frontend/out/ /domains/onlineu.mx/public_html/educore/;
-          quit
-        "
+      - name: Verify FTP access
+        run: |
+          cat <<'EOF' > ftp-verify.lftp
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:ssl-force no
+          set ftp:passive-mode yes
+          set ftp:prefer-epsv false
+          set ssl:verify-certificate no
+          set dns:order inet
+          set net:timeout 20
+          set net:max-retries 2
+          set net:reconnect-interval-base 5
+          open -u "u550473909,${{ secrets.FTP_PASSWORD }}" ftp://onlineu.mx
+          cd /domains/onlineu.mx/public_html/educore/
+          pwd
+          bye
+          EOF
 
-    # 7. Verify deployment
-    - name: 🔍 Verify files were uploaded
-      run: |
-        sudo apt-get install -y lftp
-        echo "📋 Checking uploaded files:"
-        lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; cd /domains/onlineu.mx/public_html/educore/; ls -la; quit"
+          for attempt in 1 2 3; do
+            echo "FTP verify attempt ${attempt}/3"
+            if timeout 90s lftp -f ftp-verify.lftp; then
+              exit 0
+            fi
+            sleep 10
+          done
 
-    # 8. Test website response
-    - name: 🌐 Test website
-      run: |
-        echo "🧪 Testing website response..."
-        curl -I https://onlineu.mx/educore/ || echo "Site not responding yet"
+          echo "FTP verification failed after retries"
+          exit 1
 
-    # 9. Notify success
-    - name: ✅ Deploy Success
-      run: |
-        echo "🎉 Deploy completado exitosamente!"
-        echo "🌐 URL: https://onlineu.mx/educore/super-admin/dashboard/"
-        echo "⏰ Timestamp: $(date)"
+      - name: Deploy to FTP server
+        run: |
+          cat <<'EOF' > ftp-deploy.lftp
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:ssl-force no
+          set ftp:passive-mode yes
+          set ftp:prefer-epsv false
+          set ssl:verify-certificate no
+          set dns:order inet
+          set net:timeout 30
+          set net:max-retries 3
+          set net:reconnect-interval-base 5
+          open -u "u550473909,${{ secrets.FTP_PASSWORD }}" ftp://onlineu.mx
+          mirror --reverse --delete --verbose --parallel=2 frontend/out/ /domains/onlineu.mx/public_html/educore/
+          bye
+          EOF
+
+          for attempt in 1 2 3; do
+            echo "FTP deploy attempt ${attempt}/3"
+            if timeout 180s lftp -f ftp-deploy.lftp; then
+              exit 0
+            fi
+            sleep 15
+          done
+
+          echo "FTP deploy failed after retries"
+          exit 1
+
+      - name: Verify uploaded files
+        run: |
+          cat <<'EOF' > ftp-postcheck.lftp
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:ssl-force no
+          set ftp:passive-mode yes
+          set ftp:prefer-epsv false
+          set ssl:verify-certificate no
+          set dns:order inet
+          set net:timeout 20
+          open -u "u550473909,${{ secrets.FTP_PASSWORD }}" ftp://onlineu.mx
+          cd /domains/onlineu.mx/public_html/educore/
+          cls -1
+          bye
+          EOF
+
+          timeout 90s lftp -f ftp-postcheck.lftp
+
+      - name: Test website
+        run: |
+          echo "Testing website response..."
+          curl -I https://onlineu.mx/educore/ || echo "Site not responding yet"
+
+      - name: Deploy success
+        run: |
+          echo "Deploy completado exitosamente"
+          echo "URL: https://onlineu.mx/educore/super-admin/dashboard/"
+          echo "Timestamp: $(date)"
