@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type ReportStatus = "completed" | "scheduled" | "failed" | "pending";
 
@@ -127,7 +128,7 @@ function downloadTextFile(filename: string, content: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function SchoolReportsPage() {
+function SchoolReportsContent() {
   const { toast } = useToast();
   const [reports, setReports] = useState<SchoolReport[]>([]);
   const [groups, setGroups] = useState<SchoolGroup[]>([]);
@@ -390,5 +391,13 @@ export default function SchoolReportsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolReportsPage() {
+  return (
+    <ModuleGuard moduleKey="reports" moduleName="Reportes">
+      <SchoolReportsContent />
+    </ModuleGuard>
   );
 }

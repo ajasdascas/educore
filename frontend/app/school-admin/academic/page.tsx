@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type SchoolYear = {
   id: string;
@@ -83,7 +84,7 @@ function statusLabel(status: string) {
   return labels[status] || status;
 }
 
-export default function SchoolAcademicStructurePage() {
+function SchoolAcademicStructureContent() {
   const { toast } = useToast();
   const [years, setYears] = useState<SchoolYear[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -336,5 +337,13 @@ export default function SchoolAcademicStructurePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolAcademicStructurePage() {
+  return (
+    <ModuleGuard moduleKey="academic_core" moduleName="Estructura Academica">
+      <SchoolAcademicStructureContent />
+    </ModuleGuard>
   );
 }

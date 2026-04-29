@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type GroupStatus = "active" | "inactive";
 
@@ -178,7 +179,7 @@ function teacherName(teacher: Teacher) {
   return `${teacher.first_name} ${teacher.last_name}`.trim();
 }
 
-export default function SchoolGroupsPage() {
+function SchoolGroupsContent() {
   const { toast } = useToast();
   const [groups, setGroups] = useState<Group[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -460,5 +461,13 @@ export default function SchoolGroupsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolGroupsPage() {
+  return (
+    <ModuleGuard moduleKey="groups" moduleName="Grupos">
+      <SchoolGroupsContent />
+    </ModuleGuard>
   );
 }

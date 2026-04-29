@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type ScheduleStatus = "active" | "inactive";
 
@@ -162,7 +163,7 @@ function toPayload(form: ScheduleFormState) {
   };
 }
 
-export default function SchoolSchedulePage() {
+function SchoolScheduleContent() {
   const { toast } = useToast();
   const [blocks, setBlocks] = useState<ScheduleBlock[]>([]);
   const [groups, setGroups] = useState<SchoolGroup[]>([]);
@@ -520,6 +521,14 @@ export default function SchoolSchedulePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolSchedulePage() {
+  return (
+    <ModuleGuard moduleKey="schedules" moduleName="Horarios">
+      <SchoolScheduleContent />
+    </ModuleGuard>
   );
 }
 

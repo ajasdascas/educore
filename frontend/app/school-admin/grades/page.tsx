@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type GroupOption = { id: string; name: string; grade_name: string; subject_ids?: string[] };
 type SubjectOption = { id: string; name: string; code: string };
@@ -27,7 +28,7 @@ function normalizeArray(response: any) {
   return Array.isArray(response?.data) ? response.data : response?.data?.items || [];
 }
 
-export default function GradesPage() {
+function GradesContent() {
   const { toast } = useToast();
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [subjects, setSubjects] = useState<SubjectOption[]>([]);
@@ -191,5 +192,13 @@ export default function GradesPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function GradesPage() {
+  return (
+    <ModuleGuard moduleKey="grades" moduleName="Calificaciones">
+      <GradesContent />
+    </ModuleGuard>
   );
 }

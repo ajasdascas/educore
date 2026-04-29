@@ -22,25 +22,28 @@ import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { RoleGuard } from "@/components/providers/RoleGuard";
+import { ModuleKey } from "@/lib/modules/registry";
+import { useEnabledModules } from "@/lib/modules/use-enabled-modules";
 
-const navItems = [
+const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: ModuleKey }> = [
   { href: "/school-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/school-admin/academic", label: "Estructura", icon: BookOpen },
-  { href: "/school-admin/students", label: "Estudiantes", icon: GraduationCap },
-  { href: "/school-admin/teachers", label: "Profesores", icon: Users },
-  { href: "/school-admin/groups", label: "Grupos", icon: Users },
-  { href: "/school-admin/schedule", label: "Horarios", icon: Calendar },
-  { href: "/school-admin/attendance", label: "Asistencias", icon: ClipboardCheck },
-  { href: "/school-admin/grades", label: "Calificaciones", icon: NotebookPen },
-  { href: "/school-admin/reports", label: "Reportes", icon: FileText },
-  { href: "/school-admin/communications", label: "Comunicaciones", icon: MessageCircle },
-  { href: "/school-admin/settings", label: "Configuración", icon: Settings },
+  { href: "/school-admin/academic", label: "Estructura", icon: BookOpen, moduleKey: "academic_core" },
+  { href: "/school-admin/students", label: "Estudiantes", icon: GraduationCap, moduleKey: "students" },
+  { href: "/school-admin/teachers", label: "Profesores", icon: Users, moduleKey: "users" },
+  { href: "/school-admin/groups", label: "Grupos", icon: Users, moduleKey: "groups" },
+  { href: "/school-admin/schedule", label: "Horarios", icon: Calendar, moduleKey: "schedules" },
+  { href: "/school-admin/attendance", label: "Asistencias", icon: ClipboardCheck, moduleKey: "attendance" },
+  { href: "/school-admin/grades", label: "Calificaciones", icon: NotebookPen, moduleKey: "grades" },
+  { href: "/school-admin/reports", label: "Reportes", icon: FileText, moduleKey: "reports" },
+  { href: "/school-admin/communications", label: "Comunicaciones", icon: MessageCircle, moduleKey: "communications" },
+  { href: "/school-admin/settings", label: "Configuracion", icon: Settings },
 ];
 
 export default function SchoolAdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout, loading } = useAuth();
+  const { isModuleEnabled } = useEnabledModules();
 
   if (loading) {
     return (
@@ -85,7 +88,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
         </div>
 
         <nav className="flex-1 py-4 space-y-1">
-          {navItems.map((item) => {
+          {navItems.filter((item) => !item.moduleKey || isModuleEnabled(item.moduleKey)).map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link

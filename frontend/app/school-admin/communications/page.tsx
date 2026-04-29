@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type CommunicationStatus = "sent" | "scheduled" | "draft";
 type CommunicationPriority = "low" | "normal" | "high" | "urgent";
@@ -182,7 +183,7 @@ function formToPayload(form: CommunicationForm, forceScheduled = false) {
   };
 }
 
-export default function SchoolAdminCommunicationsPage() {
+function SchoolAdminCommunicationsContent() {
   const { toast } = useToast();
   const [communications, setCommunications] = useState<SchoolCommunication[]>([]);
   const [groups, setGroups] = useState<SchoolGroup[]>([]);
@@ -508,5 +509,13 @@ export default function SchoolAdminCommunicationsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolAdminCommunicationsPage() {
+  return (
+    <ModuleGuard moduleKey="communications" moduleName="Comunicaciones">
+      <SchoolAdminCommunicationsContent />
+    </ModuleGuard>
   );
 }

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type AttendanceStatus = "present" | "absent" | "late" | "excused";
 
@@ -45,7 +46,7 @@ function normalizeGroups(response: any): GroupOption[] {
   return Array.isArray(raw) ? raw : [];
 }
 
-export default function AttendancePage() {
+function AttendanceContent() {
   const { toast } = useToast();
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [groupID, setGroupID] = useState("");
@@ -216,5 +217,13 @@ export default function AttendancePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <ModuleGuard moduleKey="attendance" moduleName="Asistencias">
+      <AttendanceContent />
+    </ModuleGuard>
   );
 }

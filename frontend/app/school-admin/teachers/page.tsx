@@ -45,6 +45,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type Teacher = {
   id: string;
@@ -136,7 +137,7 @@ function toPayload(form: TeacherFormState) {
   };
 }
 
-export default function SchoolTeachersPage() {
+function SchoolTeachersContent() {
   const { toast } = useToast();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -670,5 +671,13 @@ export default function SchoolTeachersPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolTeachersPage() {
+  return (
+    <ModuleGuard moduleKey="users" moduleName="Profesores">
+      <SchoolTeachersContent />
+    </ModuleGuard>
   );
 }

@@ -48,6 +48,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type StudentStatus = "active" | "inactive" | "graduated" | "withdrawn";
 type ParentRelationship = "mother" | "father" | "guardian" | "other";
@@ -331,7 +332,7 @@ function buildAcademicHistory(student: Student, years: SchoolYear[]): AcademicHi
   }));
 }
 
-export default function SchoolStudentsPage() {
+function SchoolStudentsContent() {
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<GroupOption[]>(fallbackGroups);
@@ -995,5 +996,13 @@ export default function SchoolStudentsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function SchoolStudentsPage() {
+  return (
+    <ModuleGuard moduleKey="students" moduleName="Estudiantes">
+      <SchoolStudentsContent />
+    </ModuleGuard>
   );
 }
