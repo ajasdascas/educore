@@ -48,6 +48,8 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **School Admin > Calificaciones:** completado con captura por grupo/materia, evaluaciones masivas, promedio y estado de aprobacion.
 - **Consolidacion modular Core + niveles:** completada ruta incremental sin migrar a `/src/modules`; se extendio `tenant_modules`, se agrego endpoint de modulos activos para School Admin, registry frontend y guards locales por modulo.
 - **Nucleo academico base:** los 4 modulos base quedan como prioridad verificada: Auth/Tenant/RBAC, Users, Academic Core y Evaluacion/Calificaciones.
-- **Siguiente submodulo:** verificar smoke en produccion y despues avanzar a Portal de Padres o extensiones por nivel educativo.
+- **SuperAdmin Enterprise Control Plane:** backend/API contracts, migracion `010`, UI enterprise, mocks estaticos, impersonation auditado, health monitor, usage scoring, billing interno, feature flags, backups y versioning completados en local.
+- **Verificacion SuperAdmin Enterprise:** `go test ./...`, `npm run build`, `git diff --check` y smoke browser local autenticado en dashboard, modulos, usuarios, billing, health y auditoria OK.
+- **Siguiente submodulo:** verificar deploy productivo y despues avanzar a Portal de Padres o extensiones por nivel educativo.
 
 #module #architecture #super_admin #school_admin

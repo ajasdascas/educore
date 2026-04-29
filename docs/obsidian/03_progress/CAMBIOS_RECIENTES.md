@@ -161,3 +161,28 @@
 - `npm run build`: OK.
 
 #architecture #modules #school_admin #super_admin #backend #frontend
+
+---
+
+## [29-04-2026] - SuperAdmin Enterprise Control Plane
+
+### Backend
+- Nueva migracion `010_superadmin_enterprise_control_plane.sql` para extender `modules_catalog`, `tenant_modules`, `tenants`, `users`, `subscription_plans` y `audit_logs`.
+- Nuevas tablas enterprise: `platform_settings`, `feature_flags`, `feature_flag_scopes`, `subscriptions`, `invoices`, `manual_payments`, `support_tickets`, `support_ticket_events`, `storage_usage_snapshots`, `module_health_events`, `module_usage_snapshots`, `impersonation_sessions`, `backup_jobs`, `system_versions` y `system_deploy_events`.
+- Endpoints bajo `/api/v1/super-admin` para dashboard overview, instituciones, modulos, usuarios globales, impersonation, billing, analytics, configuracion, logs, soporte, storage, feature flags, backups, versioning y health.
+- Acciones criticas quedan auditadas: module toggle, tenant suspend, reset-data, soft-delete, billing changes, impersonation, backup/restore, deploy/rollback.
+
+### Frontend
+- Navegacion SuperAdmin extendida con Modulos, Billing, Analytics, Health Monitor, Auditoria, Soporte, Storage, Feature Flags, Backups y Versioning.
+- Nuevo componente compartido `EnterpriseResourcePage` para vistas tabulares enterprise con metricas, busqueda, acciones y toasts.
+- Dashboard SuperAdmin consume `/api/v1/super-admin/dashboard/overview`.
+- Usuarios globales agregan acciones de reset password, force logout e impersonation.
+- Mocks estaticos limpios en `frontend/lib/auth.ts` para que Hostinger static export responda todos los endpoints enterprise sin backend Node.
+
+### Verificacion
+- `go test ./...`: OK.
+- `npm run build`: OK.
+- `git diff --check`: OK.
+- Smoke browser local autenticado en dashboard, modulos, usuarios, billing, health y auditoria: OK sin errores de consola.
+
+#super_admin #enterprise #billing #health #audit #frontend #backend

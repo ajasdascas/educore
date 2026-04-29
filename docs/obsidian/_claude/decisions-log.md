@@ -130,3 +130,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** La direccion escolar ya puede tomar asistencia y capturar calificaciones por grupo/materia. El nucleo academico queda listo para extender reportes, boletas y portal de padres sin redisenar rutas.
 
 #architecture #school_admin #attendance #grades
+
+## 29-04-2026 - SuperAdmin Enterprise se implementa como control plane auditado
+
+**Decision:** Implementar el SuperAdmin Enterprise Control Plane como capa incremental sobre Go Fiber + PostgreSQL + Next.js static export, con migracion aditiva `010` y mocks estaticos para Hostinger.
+
+**Razon:** EduCore necesita control SaaS central sin romper el flujo productivo actual. Billing, health monitor, usage scoring, feature flags, backups y versioning deben existir como contratos y UI antes de conectar ejecucion real de infraestructura.
+
+**Impacto:** El SuperAdmin ahora tiene contratos para instituciones, modulos, usuarios globales, impersonation auditado, billing interno, analytics, logs, soporte, storage, backups y versioning. Las acciones sensibles quedan auditadas y las destructivas requieren confirmacion o jobs protegidos.
+
+#architecture #super_admin #security #audit #billing
