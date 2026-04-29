@@ -46,26 +46,20 @@ jobs:
         sudo apt-get install -y lftp
         lftp -c "set ftp:ssl-allow false; set ftp:ssl-force false; set ssl:verify-certificate false; open onlineu.mx; user u550473909 ${{ secrets.FTP_PASSWORD }}; ls; quit"
 
-    # 6. Deploy with detailed logging
-    - name: 🚀 Deploy to FTP Server (Verbose)
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        server: onlineu.mx
-        username: u550473909
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: frontend/out/
-        server-dir: /domains/onlineu.mx/public_html/educore/
-        protocol: ftp
-        port: 21
-        security: loose
-        log-level: verbose
-        timeout: 60000
-        exclude: |
-          **/.git*
-          **/.git*/**
-          **/node_modules/**
-          **/.DS_Store
-          **/Thumbs.db
+    # 6. Deploy with lftp. We upload the static export directly to the real web root.
+    - name: 🚀 Deploy to FTP Server
+      run: |
+        lftp -c "
+          set ftp:ssl-allow false;
+          set ftp:ssl-force false;
+          set ssl:verify-certificate false;
+          set net:timeout 20;
+          set net:max-retries 2;
+          open onlineu.mx;
+          user u550473909 ${{ secrets.FTP_PASSWORD }};
+          mirror --reverse --verbose --parallel=4 frontend/out/ /domains/onlineu.mx/public_html/educore/;
+          quit
+        "
 
     # 7. Verify deployment
     - name: 🔍 Verify files were uploaded
