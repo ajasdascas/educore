@@ -139,3 +139,25 @@
 - `npm run build`: OK.
 
 #school_admin #attendance #grades #backend #frontend
+
+---
+
+## [29-04-2026] - Consolidacion Modular Core + Extensiones por Nivel
+
+### Backend
+- Nueva migracion `009_modular_core_activation.sql` para extender `tenant_modules` con `enabled`, `level`, `is_required`, `source`, `created_at` y `updated_at`.
+- `modules_catalog` queda alineado con modulos Core: usuarios, alumnos, grupos, horarios, asistencias, calificaciones, reportes y comunicaciones.
+- SuperAdmin activa modulos core y modulos por nivel al crear escuelas sin crear una tabla paralela.
+- Nuevo endpoint `GET /api/v1/school-admin/modules/enabled` para que School Admin consulte su contrato modular activo.
+
+### Frontend
+- Nuevo registry modular en `frontend/lib/modules`.
+- Nuevo `ModuleGuard` y `ModuleBoundary` para aislar pantallas del School Admin.
+- Navegacion School Admin filtra pantallas segun modulos activos del tenant.
+- Pantallas core protegidas localmente: estructura academica, estudiantes, profesores, grupos, horarios, asistencias, calificaciones, reportes y comunicaciones.
+
+### Verificacion
+- `go test ./...`: OK.
+- `npm run build`: OK.
+
+#architecture #modules #school_admin #super_admin #backend #frontend

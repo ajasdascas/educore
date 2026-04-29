@@ -331,3 +331,24 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - `npm run build` en frontend: OK, genera `/school-admin/attendance` y `/school-admin/grades`.
 
 #school_admin #attendance #grades #backend #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - Consolidacion Modular Core + niveles
+
+### Cambios completados
+- Se adopto evolucion incremental: no se migro a `/src/modules`, se mantuvo Next.js App Router + Go.
+- `backend/migrations/009_modular_core_activation.sql`: extiende `tenant_modules` con `enabled`, `level`, `is_required`, `source` y timestamps; rellena modulos core para tenants existentes.
+- SuperAdmin ahora activa modulos core, por nivel educativo y premium usando claves reales.
+- School Admin expone `GET /api/v1/school-admin/modules/enabled`.
+- Frontend agrega `frontend/lib/modules`, `ModuleGuard` y `ModuleBoundary`.
+- Navegacion y pantallas criticas del School Admin quedan protegidas por modulo activo.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `npm run build` en frontend: OK.
+
+### Siguiente paso recomendado
+- Correr smoke en produccion despues del deploy y luego avanzar al Portal de Padres o a extensiones especificas por nivel educativo.
+
+#architecture #modules #tenant_modules #school_admin #super_admin #memory

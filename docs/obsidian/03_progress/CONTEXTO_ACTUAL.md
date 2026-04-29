@@ -46,6 +46,8 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **School Admin > Alumnos/Padres + Historial + Importacion Excel:** completado con nombres separados obligatorios, fecha por dia/mes/ano, multiples padres vinculados, historial academico filtrable por ciclo y mapeo visual de columnas Excel.
 - **School Admin > Asistencias:** completado con registro diario por grupo, estados presente/ausente/retardo/justificado, notas y resumen inmediato.
 - **School Admin > Calificaciones:** completado con captura por grupo/materia, evaluaciones masivas, promedio y estado de aprobacion.
-- **Siguiente submodulo:** Cerrar pendientes finos de experiencia/produccion del nucleo academico o avanzar a Portal de Padres.
+- **Consolidacion modular Core + niveles:** completada ruta incremental sin migrar a `/src/modules`; se extendio `tenant_modules`, se agrego endpoint de modulos activos para School Admin, registry frontend y guards locales por modulo.
+- **Nucleo academico base:** los 4 modulos base quedan como prioridad verificada: Auth/Tenant/RBAC, Users, Academic Core y Evaluacion/Calificaciones.
+- **Siguiente submodulo:** verificar smoke en produccion y despues avanzar a Portal de Padres o extensiones por nivel educativo.
 
 #module #architecture #super_admin #school_admin
