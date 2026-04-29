@@ -1152,6 +1152,146 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     return block ? { success: true, data: block } : { success: false, message: "Bloque de horario no encontrado" };
   }
 
+  const attendanceTodayMatch = path.match(/\/school-admin\/attendance\/groups\/([^/]+)\/today$/);
+  if (attendanceTodayMatch) {
+    const groupID = decodeURIComponent(attendanceTodayMatch[1]);
+    const date = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
+    const students = readMockList("mock_school_students", defaultMockStudents).filter((student: any) => student.group_id === groupID);
+    const records = readMockList("mock_school_attendance", []);
+    const data = students.map((student: any) => {
+      const existing = records.find((record: any) => record.group_id === groupID && record.student_id === student.id && record.date === date);
+      return {
+        student_id: student.id,
+        first_name: student.first_name,
+        last_name: [student.paternal_last_name || student.last_name, student.maternal_last_name].filter(Boolean).join(" "),
+        status: existing?.status || "present",
+        notes: existing?.notes || "",
+        last_changed: existing?.updated_at || "",
+      };
+    });
+    const present = data.filter((item) => item.status === "present").length;
+    const late = data.filter((item) => item.status === "late").length;
+    const absent = data.filter((item) => item.status === "absent").length;
+    const excused = data.filter((item) => item.status === "excused").length;
+    return {
+      success: true,
+      data: {
+        group_id: groupID,
+        date,
+        students: data,
+        summary: { present, late, absent, excused, rate: data.length ? Math.round(((present + late + excused) / data.length) * 100) : 0 },
+        last_updated: nowIso(),
+      },
+    };
+  }
+
+  const attendanceBulkMatch = path.match(/\/school-admin\/attendance\/groups\/([^/]+)\/bulk$/);
+  if (attendanceBulkMatch && method === "POST") {
+    const groupID = decodeURIComponent(attendanceBulkMatch[1]);
+    const body = parseBody(options);
+    const date = body.date || new Date().toISOString().slice(0, 10);
+    const current = readMockList("mock_school_attendance", []);
+    const withoutDay = current.filter((record: any) => !(record.group_id === groupID && record.date === date));
+    const next = (Array.isArray(body.records) ? body.records : []).map((record: any) => ({
+      id: `attendance-${groupID}-${record.student_id}-${date}`,
+      group_id: groupID,
+      student_id: record.student_id,
+      date,
+      status: record.status || "present",
+      notes: record.notes || "",
+      updated_at: nowIso(),
+    }));
+    writeMockList("mock_school_attendance", [...next, ...withoutDay]);
+
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const updatedStudents = students.map((student: any) => {
+      if (student.group_id !== groupID) return student;
+      const studentRecords = [...next, ...withoutDay].filter((record: any) => record.student_id === student.id);
+      if (studentRecords.length === 0) return student;
+      const healthy = studentRecords.filter((record: any) => ["present", "late", "excused"].includes(record.status)).length;
+      const absent = studentRecords.filter((record: any) => record.status === "absent").length;
+      return {
+        ...student,
+        attendance_rate: Math.round((healthy / studentRecords.length) * 100),
+        total_absences: absent,
+        updated_at: nowIso(),
+      };
+    });
+    writeMockList("mock_school_students", updatedStudents);
+    return { success: true, message: "Asistencia guardada en modo demo" };
+  }
+
+  const groupGradesMatch = path.match(/\/school-admin\/grades\/groups\/([^/]+)\/subjects\/([^/]+)$/);
+  if (groupGradesMatch) {
+    const groupID = decodeURIComponent(groupGradesMatch[1]);
+    const subjectID = decodeURIComponent(groupGradesMatch[2]);
+    const students = readMockList("mock_school_students", defaultMockStudents).filter((student: any) => student.group_id === groupID);
+    const grades = readMockList("mock_school_grades", []);
+    const data = students.map((student: any) => {
+      const studentGrades = grades.filter((grade: any) => grade.student_id === student.id && grade.subject_id === subjectID);
+      const average = studentGrades.length
+        ? Math.round(studentGrades.reduce((sum: number, grade: any) => sum + Number(grade.score || 0), 0) / studentGrades.length)
+        : Number(student.average_grade || 0);
+      return {
+        student_id: student.id,
+        first_name: student.first_name,
+        last_name: [student.paternal_last_name || student.last_name, student.maternal_last_name].filter(Boolean).join(" "),
+        grades: studentGrades,
+        average,
+        letter_grade: average >= 90 ? "A" : average >= 80 ? "B" : average >= 70 ? "C" : average >= 60 ? "D" : "F",
+      };
+    });
+    const average = data.length ? Math.round(data.reduce((sum, student) => sum + student.average, 0) / data.length) : 0;
+    return {
+      success: true,
+      data: {
+        group_id: groupID,
+        subject_id: subjectID,
+        students: data,
+        summary: {
+          average,
+          highest: Math.max(0, ...data.map((student) => student.average)),
+          lowest: Math.min(100, ...data.map((student) => student.average || 100)),
+          passing_rate: data.length ? Math.round((data.filter((student) => student.average >= 60).length / data.length) * 100) : 0,
+          student_count: data.length,
+          grade_count: grades.filter((grade: any) => grade.subject_id === subjectID).length,
+        },
+      },
+    };
+  }
+
+  if (path.endsWith("/school-admin/grades/grades/bulk") && method === "POST") {
+    const body = parseBody(options);
+    const current = readMockList("mock_school_grades", []);
+    const created = (Array.isArray(body.grades) ? body.grades : []).map((grade: any) => ({
+      id: `grade-${Date.now()}-${grade.student_id}`,
+      student_id: grade.student_id,
+      subject_id: grade.subject_id,
+      score: Number(grade.score || 0),
+      max_score: 100,
+      type: grade.type || "exam",
+      description: grade.description || "Evaluacion",
+      weight: Number(grade.weight || 0),
+      date: new Date().toISOString().slice(0, 10),
+      teacher_name: "Coordinacion academica",
+      created_at: nowIso(),
+    }));
+    writeMockList("mock_school_grades", [...created, ...current]);
+
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const allGrades = [...created, ...current];
+    writeMockList("mock_school_students", students.map((student: any) => {
+      const studentGrades = allGrades.filter((grade: any) => grade.student_id === student.id);
+      if (studentGrades.length === 0) return student;
+      return {
+        ...student,
+        average_grade: Math.round(studentGrades.reduce((sum: number, grade: any) => sum + Number(grade.score || 0), 0) / studentGrades.length),
+        updated_at: nowIso(),
+      };
+    }));
+    return { success: true, data: { updated: created.length }, message: "Calificaciones guardadas en modo demo" };
+  }
+
   if (path.endsWith("/school-admin/reports/metrics")) {
     const reports = readMockList("mock_school_reports", defaultMockReports);
     const students = readMockList("mock_school_students", defaultMockStudents);

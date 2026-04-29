@@ -313,3 +313,21 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 - Continuar con Asistencias/Calificaciones para cerrar el nucleo academico operativo antes de pasar a otros modulos.
 
 #school_admin #students #parents #imports #backend #frontend #memory
+
+---
+
+## SESION 29-04-2026 (America/Mexico_City) - School Admin Asistencias y Calificaciones completado
+
+### Cambios completados
+- `frontend/app/school-admin/attendance/page.tsx`: nuevo submodulo de asistencias con selector de grupo/fecha, busqueda, estados por alumno, notas, marcar todos presentes y guardado masivo.
+- `frontend/app/school-admin/grades/page.tsx`: nuevo submodulo de calificaciones con selector de grupo/materia, tipo de evaluacion, peso, captura por alumno y resumen de promedio/aprobacion.
+- `frontend/app/school-admin/layout.tsx`: navegacion agrega Asistencias y Calificaciones como modulos propios.
+- `frontend/app/school-admin/dashboard/page.tsx`: acciones rapidas ahora llevan a rutas reales de asistencia y comunicaciones.
+- `frontend/lib/auth.ts`: mocks persistentes para asistencia diaria y calificaciones masivas.
+- Backend School Admin: repositorio de asistencia y calificaciones deja de ser stub y opera sobre `attendance_records` y `grade_records`.
+
+### Verificacion
+- `go test ./...` en backend: OK.
+- `npm run build` en frontend: OK, genera `/school-admin/attendance` y `/school-admin/grades`.
+
+#school_admin #attendance #grades #backend #frontend #memory

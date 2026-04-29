@@ -120,3 +120,13 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 **Impacto:** School Admin puede matricular alumnos con padres vinculados, consultar historial por ciclo y hacer importaciones masivas demo hoy; el backend queda preparado para persistencia real transaccional por tenant.
 
 #architecture #school_admin #students #database #imports
+
+## 29-04-2026 - Asistencias y calificaciones usan tablas legacy con UX dedicada
+
+**Decision:** Activar `attendance_records` y `grade_records` como fuente real del backend, manteniendo mocks persistentes en `authFetch` para produccion estatica.
+
+**Razon:** Las tablas ya existian desde la migracion inicial y solo faltaba una experiencia School Admin dedicada. Reusar el schema reduce riesgo y permite que el mismo contrato funcione tanto en demo Hostinger como en API real.
+
+**Impacto:** La direccion escolar ya puede tomar asistencia y capturar calificaciones por grupo/materia. El nucleo academico queda listo para extender reportes, boletas y portal de padres sin redisenar rutas.
+
+#architecture #school_admin #attendance #grades

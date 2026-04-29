@@ -57,6 +57,21 @@ func parseFloatOrZero(value string) float64 {
 	return parsed
 }
 
+func letterGrade(score float64) string {
+	switch {
+	case score >= 90:
+		return "A"
+	case score >= 80:
+		return "B"
+	case score >= 70:
+		return "C"
+	case score >= 60:
+		return "D"
+	default:
+		return "F"
+	}
+}
+
 func parseJSONMap(raw []byte) map[string]interface{} {
 	result := map[string]interface{}{}
 	if len(raw) == 0 {
@@ -2008,11 +2023,87 @@ func (r *Repository) DeleteScheduleBlock(ctx context.Context, tenantID, blockID 
 }
 
 func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID string) (*AttendanceResponse, error) {
-	return &AttendanceResponse{}, nil
+	today := time.Now().Format("2006-01-02")
+	groupName := ""
+	_ = r.db.QueryRow(ctx, `SELECT name FROM groups WHERE tenant_id = $1 AND id = $2`, tenantID, groupID).Scan(&groupName)
+
+	rows, err := r.db.Query(ctx, `
+		SELECT s.id, s.first_name, s.last_name,
+		       COALESCE(ar.status, 'present') as status,
+		       COALESCE(ar.notes, '') as notes,
+		       COALESCE(ar.updated_at, NOW()) as last_changed
+		FROM group_students gs
+		INNER JOIN students s ON gs.student_id = s.id
+		LEFT JOIN attendance_records ar
+		       ON ar.student_id = s.id AND ar.group_id = gs.group_id AND ar.date = CURRENT_DATE
+		WHERE s.tenant_id = $1 AND gs.group_id = $2
+		ORDER BY s.last_name, s.first_name
+	`, tenantID, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get today attendance: %w", err)
+	}
+	defer rows.Close()
+
+	students := []AttendanceStudent{}
+	summary := AttendanceSummary{}
+	for rows.Next() {
+		var student AttendanceStudent
+		if err := rows.Scan(&student.StudentID, &student.FirstName, &student.LastName, &student.Status, &student.Notes, &student.LastChanged); err != nil {
+			return nil, fmt.Errorf("failed to scan attendance student: %w", err)
+		}
+		switch student.Status {
+		case "present":
+			summary.Present++
+		case "absent":
+			summary.Absent++
+		case "late":
+			summary.Late++
+		case "excused":
+			summary.Excused++
+		}
+		students = append(students, student)
+	}
+	total := len(students)
+	if total > 0 {
+		summary.Rate = float64(summary.Present+summary.Late+summary.Excused) / float64(total) * 100
+	}
+
+	return &AttendanceResponse{
+		GroupID:     groupID,
+		GroupName:   groupName,
+		Date:        today,
+		Students:    students,
+		Summary:     summary,
+		LastUpdated: time.Now(),
+	}, nil
 }
 
 func (r *Repository) BulkUpdateAttendance(ctx context.Context, tenantID, groupID string, req BulkAttendanceRequest) error {
-	return nil
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin attendance transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// recorded_by is required by the legacy schema. Use the first school admin in tenant as a safe system recorder.
+	var recorderID string
+	if err := tx.QueryRow(ctx, `SELECT id FROM users WHERE tenant_id = $1 AND role = 'SCHOOL_ADMIN' ORDER BY created_at LIMIT 1`, tenantID).Scan(&recorderID); err != nil {
+		return fmt.Errorf("failed to resolve attendance recorder: %w", err)
+	}
+
+	for _, record := range req.Records {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO attendance_records (tenant_id, student_id, group_id, date, status, recorded_by, notes)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (student_id, group_id, date)
+			DO UPDATE SET status = EXCLUDED.status, notes = EXCLUDED.notes, updated_at = NOW()
+		`, tenantID, record.StudentID, groupID, req.Date, record.Status, recorderID, record.Notes)
+		if err != nil {
+			return fmt.Errorf("failed to upsert attendance record: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) GetStudentAttendanceHistory(ctx context.Context, tenantID, studentID, startDate, endDate string) (*AttendanceHistoryResponse, error) {
@@ -2024,11 +2115,125 @@ func (r *Repository) GetMonthlyAttendanceReport(ctx context.Context, tenantID st
 }
 
 func (r *Repository) GetGroupGrades(ctx context.Context, tenantID, groupID, subjectID string) (*GroupGradesResponse, error) {
-	return &GroupGradesResponse{}, nil
+	groupName := ""
+	_ = r.db.QueryRow(ctx, `SELECT name FROM groups WHERE tenant_id = $1 AND id = $2`, tenantID, groupID).Scan(&groupName)
+	subjectName := ""
+	_ = r.db.QueryRow(ctx, `SELECT name FROM subjects WHERE tenant_id = $1 AND id = $2`, tenantID, subjectID).Scan(&subjectName)
+
+	rows, err := r.db.Query(ctx, `
+		SELECT s.id, s.first_name, s.last_name
+		FROM group_students gs
+		INNER JOIN students s ON gs.student_id = s.id
+		WHERE s.tenant_id = $1 AND gs.group_id = $2
+		ORDER BY s.last_name, s.first_name
+	`, tenantID, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group students for grades: %w", err)
+	}
+	defer rows.Close()
+
+	students := []StudentGrade{}
+	for rows.Next() {
+		var student StudentGrade
+		if err := rows.Scan(&student.StudentID, &student.FirstName, &student.LastName); err != nil {
+			return nil, fmt.Errorf("failed to scan grade student: %w", err)
+		}
+		gradeRows, err := r.db.Query(ctx, `
+			SELECT id, 'exam' as type, COALESCE(score, 0), 100.0 as max_score,
+			       COALESCE(notes, 'Evaluacion') as description, 100.0 as weight,
+			       COALESCE(to_char(created_at, 'YYYY-MM-DD'), '') as date,
+			       'Profesor' as teacher_name, created_at
+			FROM grade_records
+			WHERE tenant_id = $1 AND student_id = $2 AND subject_id = $3
+			ORDER BY created_at DESC
+		`, tenantID, student.StudentID, subjectID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get student grades: %w", err)
+		}
+		total := 0.0
+		for gradeRows.Next() {
+			var grade GradeResponse
+			if err := gradeRows.Scan(&grade.ID, &grade.Type, &grade.Score, &grade.MaxScore, &grade.Description, &grade.Weight, &grade.Date, &grade.TeacherName, &grade.CreatedAt); err != nil {
+				gradeRows.Close()
+				return nil, fmt.Errorf("failed to scan grade: %w", err)
+			}
+			total += grade.Score
+			student.Grades = append(student.Grades, grade)
+		}
+		gradeRows.Close()
+		if len(student.Grades) > 0 {
+			student.Average = total / float64(len(student.Grades))
+		}
+		student.LetterGrade = letterGrade(student.Average)
+		students = append(students, student)
+	}
+
+	summary := GradeSummary{StudentCount: len(students)}
+	if len(students) > 0 {
+		lowest := 100.0
+		for _, student := range students {
+			summary.Average += student.Average
+			if student.Average > summary.Highest {
+				summary.Highest = student.Average
+			}
+			if student.Average < lowest {
+				lowest = student.Average
+			}
+			if student.Average >= 60 {
+				summary.PassingRate++
+			}
+			summary.GradeCount += len(student.Grades)
+		}
+		summary.Average = summary.Average / float64(len(students))
+		summary.Lowest = lowest
+		summary.PassingRate = summary.PassingRate / float64(len(students)) * 100
+	}
+
+	return &GroupGradesResponse{
+		GroupID:     groupID,
+		GroupName:   groupName,
+		SubjectID:   subjectID,
+		SubjectName: subjectName,
+		Students:    students,
+		Summary:     summary,
+	}, nil
 }
 
-func (r *Repository) BulkUpdateGrades(ctx context.Context, tenantID string, req BulkGradesRequest) error {
-	return nil
+func (r *Repository) BulkUpdateGrades(ctx context.Context, tenantID, userID string, req BulkGradesRequest) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin grades transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	for _, grade := range req.Grades {
+		var groupID string
+		if err := tx.QueryRow(ctx, `
+			SELECT gs.group_id
+			FROM group_students gs
+			INNER JOIN groups g ON gs.group_id = g.id
+			WHERE g.tenant_id = $1 AND gs.student_id = $2
+			ORDER BY gs.enrolled_at DESC
+			LIMIT 1
+		`, tenantID, grade.StudentID).Scan(&groupID); err != nil {
+			return fmt.Errorf("failed to resolve grade group: %w", err)
+		}
+		period := grade.Type
+		if period == "" {
+			period = "exam"
+		}
+		_, err = tx.Exec(ctx, `
+			INSERT INTO grade_records (tenant_id, student_id, subject_id, group_id, period, school_year, score, recorded_by, notes)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9)
+			ON CONFLICT (student_id, subject_id, period, school_year)
+			DO UPDATE SET score = EXCLUDED.score, notes = EXCLUDED.notes, updated_at = NOW()
+		`, tenantID, grade.StudentID, grade.SubjectID, groupID, period, time.Now().Format("2006"), grade.Score, userID, grade.Description)
+		if err != nil {
+			return fmt.Errorf("failed to upsert grade: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) GetStudentReportCard(ctx context.Context, tenantID, studentID, period string) (*ReportCardResponse, error) {

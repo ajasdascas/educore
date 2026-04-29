@@ -195,24 +195,24 @@ export default function SchoolAdminDashboard() {
                 <span className="text-sm font-medium">Registrar Profesor</span>
               </div>
             </Link>
-            <button
-              onClick={() => showQueuedModule("Asistencia")}
-              className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            <Link
+              href="/school-admin/attendance"
+              className="block w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center">
                 <Calendar className="h-4 w-4 mr-3 text-orange-600" />
                 <span className="text-sm font-medium">Tomar Asistencia</span>
               </div>
-            </button>
-            <button
-              onClick={() => showQueuedModule("Comunicaciones")}
-              className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            </Link>
+            <Link
+              href="/school-admin/communications"
+              className="block w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center">
                 <MessageCircle className="h-4 w-4 mr-3 text-purple-600" />
                 <span className="text-sm font-medium">Enviar Comunicado</span>
               </div>
-            </button>
+            </Link>
           </CardContent>
         </Card>
       </div>

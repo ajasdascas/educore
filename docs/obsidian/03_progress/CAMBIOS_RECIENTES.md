@@ -118,3 +118,24 @@
 - `npm run build`: OK.
 
 #school_admin #students #parents #imports #backend #frontend
+
+---
+
+## [29-04-2026] - School Admin: Asistencias y Calificaciones
+
+### Backend
+- `GetTodayAttendance` y `BulkUpdateAttendance` implementados sobre `attendance_records`.
+- `GetGroupGrades` y `BulkUpdateGrades` implementados sobre `grade_records`.
+- Los endpoints existentes dejan de responder objetos vacios para flujos clave del nucleo academico.
+
+### Frontend
+- Nueva ruta `/school-admin/attendance` para tomar asistencia por grupo y fecha.
+- Nueva ruta `/school-admin/grades` para capturar calificaciones por grupo y materia.
+- Navegacion lateral y acciones rapidas del dashboard actualizadas a rutas reales.
+- Mocks persistentes en `localStorage` para que produccion estatica funcione sin errores.
+
+### Verificacion
+- `go test ./...`: OK.
+- `npm run build`: OK.
+
+#school_admin #attendance #grades #backend #frontend

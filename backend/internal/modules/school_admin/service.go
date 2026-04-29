@@ -499,7 +499,7 @@ func (s *Service) BulkUpdateGrades(ctx context.Context, tenantID, userID string,
 		return err
 	}
 
-	err := s.repo.BulkUpdateGrades(ctx, tenantID, req)
+	err := s.repo.BulkUpdateGrades(ctx, tenantID, userID, req)
 	if err != nil {
 		return fmt.Errorf("failed to update grades: %w", err)
 	}
