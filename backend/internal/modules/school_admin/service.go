@@ -120,6 +120,7 @@ func (s *Service) CreateStudent(ctx context.Context, tenantID, userID string, re
 	if err != nil {
 		return nil, fmt.Errorf("failed to create student: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "student.created", "students", student.ID, map[string]interface{}{"after": student})
 
 	// Publish domain event
 	s.bus.Publish("student.created", map[string]interface{}{
@@ -155,10 +156,12 @@ func (s *Service) UpdateStudent(ctx context.Context, tenantID, userID, studentID
 		return nil, err
 	}
 
+	before, _ := s.repo.GetStudentByID(ctx, tenantID, studentID)
 	student, err := s.repo.UpdateStudent(ctx, tenantID, studentID, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update student: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "student.updated", "students", studentID, map[string]interface{}{"before": before, "after": student})
 
 	// Publish domain event
 	s.bus.Publish("student.updated", map[string]interface{}{
@@ -177,10 +180,12 @@ func (s *Service) DeleteStudent(ctx context.Context, tenantID, userID, studentID
 		return err
 	}
 
+	before, _ := s.repo.GetStudentByID(ctx, tenantID, studentID)
 	err := s.repo.DeleteStudent(ctx, tenantID, studentID)
 	if err != nil {
 		return fmt.Errorf("failed to delete student: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "student.deleted", "students", studentID, map[string]interface{}{"before": before})
 
 	// Publish domain event
 	s.bus.Publish("student.deleted", map[string]interface{}{
@@ -406,10 +411,16 @@ func (s *Service) GetSchedule(ctx context.Context, tenantID, groupID string) ([]
 }
 
 func (s *Service) CreateScheduleBlock(ctx context.Context, tenantID, userID string, req CreateScheduleBlockRequest) (*ScheduleBlockResponse, error) {
+	if conflict, err := s.repo.FindScheduleConflict(ctx, tenantID, "", req.GroupID, req.TeacherID, req.Room, req.Day, req.StartTime, req.EndTime); err != nil {
+		return nil, err
+	} else if conflict != "" {
+		return nil, fmt.Errorf("%s", conflict)
+	}
 	block, err := s.repo.CreateScheduleBlock(ctx, tenantID, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create schedule block: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "schedule.created", "class_schedule_blocks", block.ID, map[string]interface{}{"after": block})
 	s.bus.Publish("schedule.created", map[string]interface{}{"tenant_id": tenantID, "schedule_id": block.ID, "created_by": userID, "timestamp": time.Now()})
 	return block, nil
 }
@@ -423,25 +434,51 @@ func (s *Service) GetScheduleBlock(ctx context.Context, tenantID, blockID string
 }
 
 func (s *Service) UpdateScheduleBlock(ctx context.Context, tenantID, userID, blockID string, req UpdateScheduleBlockRequest) (*ScheduleBlockResponse, error) {
+	before, err := s.repo.GetScheduleBlock(ctx, tenantID, blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schedule block before update: %w", err)
+	}
+	groupID := firstNonEmpty(req.GroupID, before.GroupID)
+	teacherID := firstNonEmpty(req.TeacherID, before.TeacherID)
+	room := firstNonEmpty(req.Room, before.Room)
+	day := firstNonEmpty(req.Day, before.Day)
+	startTime := firstNonEmpty(req.StartTime, before.StartTime)
+	endTime := firstNonEmpty(req.EndTime, before.EndTime)
+	if conflict, err := s.repo.FindScheduleConflict(ctx, tenantID, blockID, groupID, teacherID, room, day, startTime, endTime); err != nil {
+		return nil, err
+	} else if conflict != "" {
+		return nil, fmt.Errorf("%s", conflict)
+	}
 	block, err := s.repo.UpdateScheduleBlock(ctx, tenantID, blockID, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update schedule block: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "schedule.updated", "class_schedule_blocks", blockID, map[string]interface{}{"before": before, "after": block})
 	s.bus.Publish("schedule.updated", map[string]interface{}{"tenant_id": tenantID, "schedule_id": blockID, "updated_by": userID, "timestamp": time.Now()})
 	return block, nil
 }
 
 func (s *Service) DeleteScheduleBlock(ctx context.Context, tenantID, userID, blockID string) error {
+	before, _ := s.repo.GetScheduleBlock(ctx, tenantID, blockID)
 	if err := s.repo.DeleteScheduleBlock(ctx, tenantID, blockID); err != nil {
 		return fmt.Errorf("failed to delete schedule block: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "schedule.deleted", "class_schedule_blocks", blockID, map[string]interface{}{"before": before})
 	s.bus.Publish("schedule.deleted", map[string]interface{}{"tenant_id": tenantID, "schedule_id": blockID, "deleted_by": userID, "timestamp": time.Now()})
 	return nil
 }
 
+func (s *Service) GetStudentSchedule(ctx context.Context, tenantID, studentID string) ([]ScheduleBlockResponse, error) {
+	blocks, err := s.repo.GetStudentSchedule(ctx, tenantID, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student schedule: %w", err)
+	}
+	return blocks, nil
+}
+
 // Attendance use cases
-func (s *Service) GetTodayAttendance(ctx context.Context, tenantID, groupID string) (*AttendanceResponse, error) {
-	attendance, err := s.repo.GetTodayAttendance(ctx, tenantID, groupID)
+func (s *Service) GetTodayAttendance(ctx context.Context, tenantID, groupID, date string) (*AttendanceResponse, error) {
+	attendance, err := s.repo.GetTodayAttendance(ctx, tenantID, groupID, date)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get today's attendance: %w", err)
 	}
@@ -459,6 +496,7 @@ func (s *Service) BulkUpdateAttendance(ctx context.Context, tenantID, userID, gr
 	if err != nil {
 		return fmt.Errorf("failed to update attendance: %w", err)
 	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "attendance.bulk_updated", "attendance_records", groupID, map[string]interface{}{"date": req.Date, "records": req.Records})
 
 	// Publish domain event
 	s.bus.Publish("attendance.bulk_updated", map[string]interface{}{
@@ -539,6 +577,88 @@ func (s *Service) GetGroupFinalGrades(ctx context.Context, tenantID, groupID str
 	}
 
 	return grades, nil
+}
+
+func (s *Service) GenerateReportCard(ctx context.Context, tenantID, userID string, req GenerateReportCardRequest) (*ReportCardResponse, error) {
+	period := req.Period
+	if strings.TrimSpace(period) == "" {
+		period = "current"
+	}
+	reportCard, err := s.repo.GetStudentReportCard(ctx, tenantID, req.StudentID, period)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate report card: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "report_card.generated", "students", req.StudentID, map[string]interface{}{"period": period, "persist_as_document": req.PersistAsDocument})
+	if req.PersistAsDocument {
+		_, _ = s.repo.CreateStudentDocument(ctx, tenantID, userID, CreateStudentDocumentRequest{
+			StudentID:   req.StudentID,
+			Title:       "Boleta " + period,
+			Description: "Boleta generada automaticamente desde calificaciones y asistencia.",
+			Category:    "report_card",
+			FileName:    "boleta-" + req.StudentID + "-" + period + ".pdf",
+			MimeType:    "application/pdf",
+		})
+	}
+	return reportCard, nil
+}
+
+func (s *Service) GetStudentDocuments(ctx context.Context, tenantID, studentID string) ([]StudentDocumentResponse, error) {
+	documents, err := s.repo.GetStudentDocuments(ctx, tenantID, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student documents: %w", err)
+	}
+	return documents, nil
+}
+
+func (s *Service) CreateStudentDocument(ctx context.Context, tenantID, userID string, req CreateStudentDocumentRequest) (*StudentDocumentResponse, error) {
+	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.StudentID) == "" {
+		return nil, fmt.Errorf("student_id and title are required")
+	}
+	document, err := s.repo.CreateStudentDocument(ctx, tenantID, userID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create student document: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.created", "school_documents", document.ID, map[string]interface{}{"after": document})
+	return document, nil
+}
+
+func (s *Service) UpdateStudentDocument(ctx context.Context, tenantID, userID, documentID string, req CreateStudentDocumentRequest) (*StudentDocumentResponse, error) {
+	if strings.TrimSpace(documentID) == "" || strings.TrimSpace(req.Title) == "" {
+		return nil, fmt.Errorf("document_id and title are required")
+	}
+	before, _ := s.repo.GetStudentDocument(ctx, tenantID, documentID)
+	document, err := s.repo.UpdateStudentDocument(ctx, tenantID, documentID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update student document: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.updated", "school_documents", documentID, map[string]interface{}{"before": before, "after": document})
+	return document, nil
+}
+
+func (s *Service) VerifyStudentDocument(ctx context.Context, tenantID, userID, documentID string) (*StudentDocumentResponse, error) {
+	before, _ := s.repo.GetStudentDocument(ctx, tenantID, documentID)
+	document, err := s.repo.VerifyStudentDocument(ctx, tenantID, userID, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify student document: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.verified", "school_documents", documentID, map[string]interface{}{"before": before, "after": document})
+	return document, nil
+}
+
+func (s *Service) DeleteStudentDocument(ctx context.Context, tenantID, userID, documentID string) error {
+	before, _ := s.repo.GetStudentDocument(ctx, tenantID, documentID)
+	if err := s.repo.DeleteStudentDocument(ctx, tenantID, documentID); err != nil {
+		return fmt.Errorf("failed to delete student document: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.deleted", "school_documents", documentID, map[string]interface{}{"before": before})
+	return nil
+}
+
+func firstNonEmpty(value, fallback string) string {
+	if strings.TrimSpace(value) != "" {
+		return value
+	}
+	return fallback
 }
 
 // Business rule validation methods

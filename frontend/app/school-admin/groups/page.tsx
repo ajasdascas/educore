@@ -372,6 +372,7 @@ function SchoolGroupsContent() {
           ) : filteredGroups.length === 0 ? (
             <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center"><BookOpen className="h-10 w-10 text-muted-foreground" /><div><p className="font-medium">No hay grupos con esos filtros</p><p className="text-sm text-muted-foreground">Ajusta la busqueda o crea un grupo.</p></div><Button onClick={openCreate}><Plus className="mr-2 h-4 w-4" />Nuevo grupo</Button></div>
           ) : (
+            <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader><TableRow><TableHead>Grupo</TableHead><TableHead>Ciclo / generacion</TableHead><TableHead>Profesores</TableHead><TableHead>Materias</TableHead><TableHead>Cupo</TableHead><TableHead>Salon</TableHead><TableHead>Estado</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
               <TableBody>
@@ -389,15 +390,16 @@ function SchoolGroupsContent() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-5xl grid-rows-none flex-col overflow-hidden sm:max-w-5xl">
           <DialogHeader><DialogTitle>{editingGroup ? "Editar grupo" : "Nuevo grupo"}</DialogTitle><DialogDescription>Define grado, cupo, salon y profesor titular.</DialogDescription></DialogHeader>
-          <form onSubmit={saveGroup} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+          <form onSubmit={saveGroup} className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1 md:grid-cols-2">
               <div className="space-y-2"><Label htmlFor="name">Nombre</Label><Input id="name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></div>
               <div className="space-y-2"><Label>Grado</Label><Select value={form.grade_level_id} onValueChange={(value) => setForm((current) => ({ ...current, grade_level_id: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{gradeLevels.map((grade) => <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>Ciclo escolar</Label><Select value={form.school_year_id || currentYear?.id || "none"} onValueChange={(value) => setForm((current) => ({ ...current, school_year_id: value === "none" ? "" : value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sin ciclo</SelectItem>{schoolYears.map((year) => <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>)}</SelectContent></Select></div>
@@ -440,7 +442,7 @@ function SchoolGroupsContent() {
                 </div>
               </div>
             </div>
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button></DialogFooter>
+            <DialogFooter className="shrink-0"><Button type="button" variant="outline" onClick={() => setFormOpen(false)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar grupo</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

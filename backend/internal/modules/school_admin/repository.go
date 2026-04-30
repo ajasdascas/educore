@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -70,6 +71,57 @@ func letterGrade(score float64) string {
 	default:
 		return "F"
 	}
+}
+
+func roundFloat(value float64, precision int) float64 {
+	pow := math.Pow(10, float64(precision))
+	return math.Round(value*pow) / pow
+}
+
+func addAttendanceSummary(summary *AttendanceSummary, status string) {
+	addAttendanceSummaryCount(summary, status, 1)
+}
+
+func addAttendanceSummaryCount(summary *AttendanceSummary, status string, count int) {
+	switch status {
+	case "present":
+		summary.Present += count
+	case "absent":
+		summary.Absent += count
+	case "late":
+		summary.Late += count
+	case "sick":
+		summary.Sick += count
+	case "excused":
+		summary.Excused += count
+	}
+}
+
+func attendanceRate(summary AttendanceSummary, total int) float64 {
+	if total <= 0 {
+		return 0
+	}
+	return roundFloat(float64(summary.Present+summary.Late+summary.Sick+summary.Excused)/float64(total)*100, 1)
+}
+
+func effortLabel(score float64) string {
+	switch {
+	case score >= 90:
+		return "Excelente"
+	case score >= 80:
+		return "Bueno"
+	case score >= 70:
+		return "Suficiente"
+	default:
+		return "Requiere apoyo"
+	}
+}
+
+func behaviorLabel(score float64) string {
+	if score >= 70 {
+		return "Adecuado"
+	}
+	return "Seguimiento requerido"
 }
 
 func parseJSONMap(raw []byte) map[string]interface{} {
@@ -331,9 +383,9 @@ func (r *Repository) GetEnabledModules(ctx context.Context, tenantID string) ([]
 	query := `
 		SELECT mc.key, mc.name, COALESCE(mc.description, ''),
 		       CASE
-		         WHEN mc.key IN ('academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'grades', 'reports', 'communication', 'communications')
-		           THEN 'core'
-		         ELSE 'level'
+		         WHEN mc.is_core THEN 'core'
+		         WHEN mc.key = 'database_admin' THEN 'internal'
+		         ELSE COALESCE(mc.metadata->>'layer', 'extension')
 		       END AS layer,
 		       COALESCE(tm.level, ''),
 		       mc.is_core,
@@ -384,7 +436,7 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 
 	if params.Search != "" {
 		argCount++
-		whereClause += fmt.Sprintf(" AND (s.first_name ILIKE $%d OR s.last_name ILIKE $%d OR s.enrollment_number ILIKE $%d)", argCount, argCount, argCount)
+		whereClause += fmt.Sprintf(" AND (s.first_name ILIKE $%d OR s.last_name ILIKE $%d OR s.paternal_last_name ILIKE $%d OR s.maternal_last_name ILIKE $%d OR s.enrollment_number ILIKE $%d)", argCount, argCount, argCount, argCount, argCount)
 		args = append(args, "%"+params.Search+"%")
 	}
 
@@ -392,6 +444,12 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 		argCount++
 		whereClause += fmt.Sprintf(" AND gs.group_id = $%d", argCount)
 		args = append(args, params.GroupID)
+	}
+
+	if params.GradeID != "" {
+		argCount++
+		whereClause += fmt.Sprintf(" AND g.grade_id = $%d", argCount)
+		args = append(args, params.GradeID)
 	}
 
 	if params.Status != "" {
@@ -405,6 +463,7 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 		SELECT COUNT(DISTINCT s.id)
 		FROM students s
 		LEFT JOIN group_students gs ON s.id = gs.student_id
+		LEFT JOIN groups g ON gs.group_id = g.id
 		%s
 	`, whereClause)
 
@@ -416,11 +475,27 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 
 	// Data query
 	offset := (params.Page - 1) * params.PerPage
+	sortColumn := "s.created_at DESC"
+	switch params.SortBy {
+	case "name":
+		sortColumn = "s.last_name ASC, s.first_name ASC"
+	case "grade":
+		sortColumn = "grade_name ASC, group_name ASC, last_name ASC"
+	case "attendance":
+		sortColumn = "attendance_rate DESC NULLS LAST, s.last_name ASC"
+	case "average":
+		sortColumn = "average_grade DESC NULLS LAST, s.last_name ASC"
+	}
+	if strings.EqualFold(params.SortDir, "desc") && (params.SortBy == "name" || params.SortBy == "grade") {
+		sortColumn = strings.ReplaceAll(sortColumn, " ASC", " DESC")
+	}
 	dataQuery := fmt.Sprintf(`
 		SELECT DISTINCT s.id, s.first_name, s.last_name, '' as email, '' as phone,
 			   COALESCE(s.enrollment_number, '') as enrollment_id, s.status,
 			   COALESCE(g.name, '') as group_name,
 			   COALESCE(gl.name, '') as grade_name,
+			   COALESCE((SELECT AVG(score) FROM grade_records gr WHERE gr.tenant_id = s.tenant_id AND gr.student_id = s.id), 0) as average_grade,
+			   COALESCE((SELECT AVG(CASE WHEN ar.status IN ('present','late','sick','excused') THEN 100 ELSE 0 END) FROM attendance_records ar WHERE ar.tenant_id = s.tenant_id AND ar.student_id = s.id), 0) as attendance_rate,
 			   COALESCE((
 			   	SELECT TRIM(CONCAT(u.first_name, ' ', u.last_name))
 			   	FROM parent_student ps
@@ -443,9 +518,9 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 		LEFT JOIN groups g ON gs.group_id = g.id
 		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
 		%s
-		ORDER BY s.created_at DESC
+		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, whereClause, argCount+1, argCount+2)
+	`, whereClause, sortColumn, argCount+1, argCount+2)
 
 	args = append(args, params.PerPage, offset)
 
@@ -458,6 +533,7 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 	var students []StudentResponse
 	for rows.Next() {
 		var student StudentResponse
+		var averageGrade, attendanceRate float64
 		err := rows.Scan(
 			&student.ID,
 			&student.FirstName,
@@ -468,6 +544,8 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 			&student.Status,
 			&student.GroupName,
 			&student.GradeName,
+			&averageGrade,
+			&attendanceRate,
 			&student.ParentName,
 			&student.ParentEmail,
 			&student.CreatedAt,
@@ -2071,8 +2149,69 @@ func (r *Repository) DeleteScheduleBlock(ctx context.Context, tenantID, blockID 
 	return nil
 }
 
-func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID string) (*AttendanceResponse, error) {
-	today := time.Now().Format("2006-01-02")
+func (r *Repository) FindScheduleConflict(ctx context.Context, tenantID, excludeID, groupID, teacherID, room, day, startTime, endTime string) (string, error) {
+	var conflictType, conflictLabel string
+	err := r.db.QueryRow(ctx, `
+		SELECT conflict_type, conflict_label FROM (
+			SELECT 'group' AS conflict_type, COALESCE(g.name, 'Grupo') AS conflict_label
+			FROM class_schedule_blocks cs
+			LEFT JOIN groups g ON g.id = cs.group_id
+			WHERE cs.tenant_id = $1 AND cs.status = 'active'
+			  AND cs.id <> COALESCE(NULLIF($2, '')::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+			  AND cs.day = $3 AND cs.start_time < $5::time AND cs.end_time > $4::time
+			  AND cs.group_id = NULLIF($6, '')::uuid
+			UNION ALL
+			SELECT 'teacher', COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), 'Profesor')
+			FROM class_schedule_blocks cs
+			LEFT JOIN users u ON u.id = cs.teacher_id
+			WHERE cs.tenant_id = $1 AND cs.status = 'active' AND NULLIF($7, '') IS NOT NULL
+			  AND cs.id <> COALESCE(NULLIF($2, '')::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+			  AND cs.day = $3 AND cs.start_time < $5::time AND cs.end_time > $4::time
+			  AND cs.teacher_id = NULLIF($7, '')::uuid
+			UNION ALL
+			SELECT 'classroom', COALESCE(cs.room, 'Salon')
+			FROM class_schedule_blocks cs
+			WHERE cs.tenant_id = $1 AND cs.status = 'active' AND NULLIF(TRIM($8), '') IS NOT NULL
+			  AND cs.id <> COALESCE(NULLIF($2, '')::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+			  AND cs.day = $3 AND cs.start_time < $5::time AND cs.end_time > $4::time
+			  AND LOWER(TRIM(cs.room)) = LOWER(TRIM($8))
+		) conflicts
+		LIMIT 1
+	`, tenantID, excludeID, day, startTime, endTime, groupID, teacherID, room).Scan(&conflictType, &conflictLabel)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to validate schedule conflicts: %w", err)
+	}
+	switch conflictType {
+	case "teacher":
+		return fmt.Sprintf("teacher overlap detected for %s", conflictLabel), nil
+	case "classroom":
+		return fmt.Sprintf("classroom conflict detected for %s", conflictLabel), nil
+	default:
+		return fmt.Sprintf("time conflict detected for %s", conflictLabel), nil
+	}
+}
+
+func (r *Repository) GetStudentSchedule(ctx context.Context, tenantID, studentID string) ([]ScheduleBlockResponse, error) {
+	var groupID string
+	if err := r.db.QueryRow(ctx, `
+		SELECT gs.group_id::text
+		FROM group_students gs
+		INNER JOIN students s ON s.id = gs.student_id AND s.tenant_id = $1
+		WHERE gs.student_id = $2
+		LIMIT 1
+	`, tenantID, studentID).Scan(&groupID); err != nil {
+		return []ScheduleBlockResponse{}, nil
+	}
+	return r.GetSchedule(ctx, tenantID, groupID)
+}
+
+func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID, date string) (*AttendanceResponse, error) {
+	if strings.TrimSpace(date) == "" {
+		date = time.Now().Format("2006-01-02")
+	}
 	groupName := ""
 	_ = r.db.QueryRow(ctx, `SELECT name FROM groups WHERE tenant_id = $1 AND id = $2`, tenantID, groupID).Scan(&groupName)
 
@@ -2084,10 +2223,10 @@ func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID s
 		FROM group_students gs
 		INNER JOIN students s ON gs.student_id = s.id
 		LEFT JOIN attendance_records ar
-		       ON ar.student_id = s.id AND ar.group_id = gs.group_id AND ar.date = CURRENT_DATE
+		       ON ar.student_id = s.id AND ar.group_id = gs.group_id AND ar.date = $3::date
 		WHERE s.tenant_id = $1 AND gs.group_id = $2
 		ORDER BY s.last_name, s.first_name
-	`, tenantID, groupID)
+	`, tenantID, groupID, date)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get today attendance: %w", err)
 	}
@@ -2107,6 +2246,8 @@ func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID s
 			summary.Absent++
 		case "late":
 			summary.Late++
+		case "sick":
+			summary.Sick++
 		case "excused":
 			summary.Excused++
 		}
@@ -2114,13 +2255,13 @@ func (r *Repository) GetTodayAttendance(ctx context.Context, tenantID, groupID s
 	}
 	total := len(students)
 	if total > 0 {
-		summary.Rate = float64(summary.Present+summary.Late+summary.Excused) / float64(total) * 100
+		summary.Rate = roundFloat(float64(summary.Present+summary.Late+summary.Sick+summary.Excused)/float64(total)*100, 1)
 	}
 
 	return &AttendanceResponse{
 		GroupID:     groupID,
 		GroupName:   groupName,
-		Date:        today,
+		Date:        date,
 		Students:    students,
 		Summary:     summary,
 		LastUpdated: time.Now(),
@@ -2156,11 +2297,145 @@ func (r *Repository) BulkUpdateAttendance(ctx context.Context, tenantID, groupID
 }
 
 func (r *Repository) GetStudentAttendanceHistory(ctx context.Context, tenantID, studentID, startDate, endDate string) (*AttendanceHistoryResponse, error) {
-	return &AttendanceHistoryResponse{}, nil
+	if strings.TrimSpace(startDate) == "" {
+		startDate = time.Now().AddDate(0, -1, 0).Format("2006-01-02")
+	}
+	if strings.TrimSpace(endDate) == "" {
+		endDate = time.Now().Format("2006-01-02")
+	}
+	studentName := ""
+	if err := r.db.QueryRow(ctx, `
+		SELECT TRIM(CONCAT(first_name, ' ', paternal_last_name, ' ', maternal_last_name, ' ', last_name))
+		FROM students
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, studentID).Scan(&studentName); err != nil {
+		return nil, fmt.Errorf("failed to verify student tenant access: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT to_char(date, 'YYYY-MM-DD'), status, COALESCE(notes, '')
+		FROM attendance_records
+		WHERE tenant_id = $1 AND student_id = $2 AND date BETWEEN $3::date AND $4::date
+		ORDER BY date DESC
+	`, tenantID, studentID, startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attendance history: %w", err)
+	}
+	defer rows.Close()
+
+	records := []AttendanceItem{}
+	summary := AttendanceSummary{}
+	for rows.Next() {
+		item := AttendanceItem{}
+		if err := rows.Scan(&item.Date, &item.Status, &item.Notes); err != nil {
+			return nil, fmt.Errorf("failed to scan attendance history: %w", err)
+		}
+		addAttendanceSummary(&summary, item.Status)
+		records = append(records, item)
+	}
+	summary.Rate = attendanceRate(summary, len(records))
+	return &AttendanceHistoryResponse{StudentID: studentID, StudentName: studentName, StartDate: startDate, EndDate: endDate, Records: records, Summary: summary}, nil
 }
 
 func (r *Repository) GetMonthlyAttendanceReport(ctx context.Context, tenantID string, year, month int) (*MonthlyAttendanceReport, error) {
-	return &MonthlyAttendanceReport{}, nil
+	now := time.Now()
+	if year == 0 {
+		year = now.Year()
+	}
+	if month == 0 {
+		month = int(now.Month())
+	}
+	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 1, 0)
+
+	report := &MonthlyAttendanceReport{Year: year, Month: month, ByGroup: []GroupAttendance{}, ByDate: []DailyAttendance{}, Trends: []AttendanceTrend{}}
+	rows, err := r.db.Query(ctx, `
+		SELECT status, COUNT(*)
+		FROM attendance_records
+		WHERE tenant_id = $1 AND date >= $2 AND date < $3
+		GROUP BY status
+	`, tenantID, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monthly summary: %w", err)
+	}
+	for rows.Next() {
+		status := ""
+		count := 0
+		if err := rows.Scan(&status, &count); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		addAttendanceSummaryCount(&report.Summary, status, count)
+	}
+	rows.Close()
+	report.Summary.Rate = attendanceRate(report.Summary, report.Summary.Present+report.Summary.Absent+report.Summary.Late+report.Summary.Sick+report.Summary.Excused)
+
+	groupRows, err := r.db.Query(ctx, `
+		SELECT COALESCE(g.id::text, ''), COALESCE(g.name, 'Sin grupo'), ar.status, COUNT(*)
+		FROM attendance_records ar
+		LEFT JOIN groups g ON g.id = ar.group_id AND g.tenant_id = ar.tenant_id
+		WHERE ar.tenant_id = $1 AND ar.date >= $2 AND ar.date < $3
+		GROUP BY g.id, g.name, ar.status
+		ORDER BY g.name
+	`, tenantID, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get monthly groups: %w", err)
+	}
+	groupMap := map[string]*GroupAttendance{}
+	for groupRows.Next() {
+		groupID, groupName, status := "", "", ""
+		count := 0
+		if err := groupRows.Scan(&groupID, &groupName, &status, &count); err != nil {
+			groupRows.Close()
+			return nil, err
+		}
+		item, ok := groupMap[groupID]
+		if !ok {
+			item = &GroupAttendance{GroupID: groupID, GroupName: groupName}
+			groupMap[groupID] = item
+		}
+		addAttendanceSummaryCount(&item.Summary, status, count)
+	}
+	groupRows.Close()
+	for _, item := range groupMap {
+		total := item.Summary.Present + item.Summary.Absent + item.Summary.Late + item.Summary.Sick + item.Summary.Excused
+		item.Summary.Rate = attendanceRate(item.Summary, total)
+		report.ByGroup = append(report.ByGroup, *item)
+	}
+
+	dateRows, err := r.db.Query(ctx, `
+		SELECT to_char(date, 'YYYY-MM-DD'), status, COUNT(*)
+		FROM attendance_records
+		WHERE tenant_id = $1 AND date >= $2 AND date < $3
+		GROUP BY date, status
+		ORDER BY date
+	`, tenantID, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get daily attendance: %w", err)
+	}
+	dateMap := map[string]*DailyAttendance{}
+	for dateRows.Next() {
+		date, status := "", ""
+		count := 0
+		if err := dateRows.Scan(&date, &status, &count); err != nil {
+			dateRows.Close()
+			return nil, err
+		}
+		item, ok := dateMap[date]
+		if !ok {
+			item = &DailyAttendance{Date: date}
+			dateMap[date] = item
+		}
+		addAttendanceSummaryCount(&item.Summary, status, count)
+	}
+	dateRows.Close()
+	for _, item := range dateMap {
+		total := item.Summary.Present + item.Summary.Absent + item.Summary.Late + item.Summary.Sick + item.Summary.Excused
+		item.Summary.Rate = attendanceRate(item.Summary, total)
+		report.ByDate = append(report.ByDate, *item)
+		report.Trends = append(report.Trends, AttendanceTrend{Period: item.Date, Rate: item.Summary.Rate})
+	}
+	return report, nil
 }
 
 func (r *Repository) GetGroupGrades(ctx context.Context, tenantID, groupID, subjectID string) (*GroupGradesResponse, error) {
@@ -2286,9 +2561,262 @@ func (r *Repository) BulkUpdateGrades(ctx context.Context, tenantID, userID stri
 }
 
 func (r *Repository) GetStudentReportCard(ctx context.Context, tenantID, studentID, period string) (*ReportCardResponse, error) {
-	return &ReportCardResponse{}, nil
+	if strings.TrimSpace(period) == "" {
+		period = "current"
+	}
+	card := &ReportCardResponse{StudentID: studentID, Period: period, SubjectGrades: []SubjectGrade{}, Comments: []TeacherComment{}, GeneratedAt: time.Now()}
+	if err := r.db.QueryRow(ctx, `
+		SELECT TRIM(CONCAT(s.first_name, ' ', s.paternal_last_name, ' ', s.maternal_last_name, ' ', s.last_name)),
+		       COALESCE(g.name, 'Sin grupo')
+		FROM students s
+		LEFT JOIN group_students gs ON gs.student_id = s.id
+		LEFT JOIN groups g ON g.id = gs.group_id
+		WHERE s.tenant_id = $1 AND s.id = $2
+		LIMIT 1
+	`, tenantID, studentID).Scan(&card.StudentName, &card.GroupName); err != nil {
+		return nil, fmt.Errorf("failed to get report card student: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT COALESCE(sub.name, 'Materia'), COALESCE(sub.credits, 0),
+		       COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), 'Profesor'),
+		       COALESCE(AVG(gr.score), 0),
+		       COALESCE(MAX(gr.notes), '')
+		FROM grade_records gr
+		LEFT JOIN subjects sub ON sub.id = gr.subject_id AND sub.tenant_id = gr.tenant_id
+		LEFT JOIN class_schedule_blocks cs ON cs.subject_id = gr.subject_id AND cs.group_id = gr.group_id AND cs.tenant_id = gr.tenant_id AND cs.status = 'active'
+		LEFT JOIN users u ON u.id = cs.teacher_id
+		WHERE gr.tenant_id = $1 AND gr.student_id = $2
+		  AND ($3 = 'current' OR gr.period = $3 OR gr.school_year = $3)
+		GROUP BY sub.name, sub.credits, u.first_name, u.last_name
+		ORDER BY sub.name
+	`, tenantID, studentID, period)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get report card grades: %w", err)
+	}
+	defer rows.Close()
+	total := 0.0
+	for rows.Next() {
+		subject := SubjectGrade{}
+		comment := ""
+		if err := rows.Scan(&subject.SubjectName, &subject.Credits, &subject.TeacherName, &subject.Average, &comment); err != nil {
+			return nil, err
+		}
+		subject.Average = roundFloat(subject.Average, 1)
+		subject.LetterGrade = letterGrade(subject.Average)
+		subject.Effort = effortLabel(subject.Average)
+		subject.Behavior = behaviorLabel(subject.Average)
+		card.SubjectGrades = append(card.SubjectGrades, subject)
+		if strings.TrimSpace(comment) != "" {
+			card.Comments = append(card.Comments, TeacherComment{TeacherName: subject.TeacherName, Subject: subject.SubjectName, Comment: comment, Date: time.Now().Format("2006-01-02")})
+		}
+		total += subject.Average
+	}
+	if len(card.SubjectGrades) > 0 {
+		card.OverallGPA = roundFloat(total/float64(len(card.SubjectGrades)), 1)
+	}
+	card.OverallGrade = letterGrade(card.OverallGPA)
+	history, _ := r.GetStudentAttendanceHistory(ctx, tenantID, studentID, "", "")
+	if history != nil {
+		card.AttendanceRate = history.Summary.Rate
+	}
+	return card, nil
 }
 
 func (r *Repository) GetGroupFinalGrades(ctx context.Context, tenantID, groupID string) (*GroupFinalGradesResponse, error) {
-	return &GroupFinalGradesResponse{}, nil
+	groupName := ""
+	_ = r.db.QueryRow(ctx, `SELECT name FROM groups WHERE tenant_id = $1 AND id = $2`, tenantID, groupID).Scan(&groupName)
+	rows, err := r.db.Query(ctx, `
+		SELECT s.id, s.first_name, s.last_name, COALESCE(AVG(gr.score), 0), COUNT(DISTINCT gr.subject_id)
+		FROM group_students gs
+		INNER JOIN students s ON s.id = gs.student_id AND s.tenant_id = $1
+		LEFT JOIN grade_records gr ON gr.student_id = s.id AND gr.group_id = gs.group_id AND gr.tenant_id = s.tenant_id
+		WHERE gs.group_id = $2
+		GROUP BY s.id, s.first_name, s.last_name
+		ORDER BY COALESCE(AVG(gr.score), 0) DESC, s.last_name, s.first_name
+	`, tenantID, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group final grades: %w", err)
+	}
+	defer rows.Close()
+	response := &GroupFinalGradesResponse{GroupID: groupID, GroupName: groupName, Students: []StudentFinalGrade{}}
+	total := 0.0
+	passing := 0
+	for rows.Next() {
+		student := StudentFinalGrade{}
+		subjectCount := 0
+		if err := rows.Scan(&student.StudentID, &student.FirstName, &student.LastName, &student.OverallGPA, &subjectCount); err != nil {
+			return nil, err
+		}
+		student.OverallGPA = roundFloat(student.OverallGPA, 1)
+		student.OverallGrade = letterGrade(student.OverallGPA)
+		student.Status = "active"
+		student.Rank = len(response.Students) + 1
+		student.Credits = subjectCount
+		history, _ := r.GetStudentAttendanceHistory(ctx, tenantID, student.StudentID, "", "")
+		if history != nil {
+			student.AttendanceRate = history.Summary.Rate
+		}
+		if student.OverallGPA >= 60 {
+			passing++
+		}
+		if student.OverallGPA >= 90 {
+			response.Summary.HonorRoll++
+		}
+		if student.OverallGPA < 70 || student.AttendanceRate < 85 {
+			response.Summary.AtRisk++
+		}
+		total += student.OverallGPA
+		response.Students = append(response.Students, student)
+	}
+	if len(response.Students) > 0 {
+		response.Summary.AverageGPA = roundFloat(total/float64(len(response.Students)), 1)
+		response.Summary.PassingRate = roundFloat(float64(passing)/float64(len(response.Students))*100, 1)
+	}
+	return response, nil
+}
+
+func (r *Repository) GetStudentDocuments(ctx context.Context, tenantID, studentID string) ([]StudentDocumentResponse, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT d.id::text, d.student_id::text,
+		       TRIM(CONCAT(s.first_name, ' ', s.paternal_last_name, ' ', s.maternal_last_name, ' ', s.last_name)) AS student_name,
+		       d.title, COALESCE(d.description, ''), d.category, COALESCE(d.file_name, ''),
+		       COALESCE(d.file_url, ''), COALESCE(d.file_size, 0), COALESCE(d.mime_type, ''),
+		       COALESCE(d.storage_status, 'digital_only'), COALESCE(d.is_verified, FALSE),
+		       COALESCE(d.verified_at::text, ''), COALESCE(TRIM(CONCAT(vu.first_name, ' ', vu.last_name)), ''),
+		       d.status, COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''),
+		       d.created_at, d.updated_at
+		FROM school_documents d
+		INNER JOIN students s ON s.id = d.student_id AND s.tenant_id = d.tenant_id
+		LEFT JOIN users u ON u.id = d.uploaded_by
+		LEFT JOIN users vu ON vu.id = d.verified_by
+		WHERE d.tenant_id = $1 AND d.student_id = $2 AND d.status <> 'deleted'
+		ORDER BY d.created_at DESC
+	`, tenantID, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student documents: %w", err)
+	}
+	defer rows.Close()
+	documents := []StudentDocumentResponse{}
+	for rows.Next() {
+		doc := StudentDocumentResponse{}
+		if err := rows.Scan(&doc.ID, &doc.StudentID, &doc.StudentName, &doc.Title, &doc.Description, &doc.Category, &doc.FileName, &doc.FileURL, &doc.FileSize, &doc.MimeType, &doc.StorageStatus, &doc.IsVerified, &doc.VerifiedAt, &doc.VerifiedBy, &doc.Status, &doc.UploadedBy, &doc.CreatedAt, &doc.UpdatedAt); err != nil {
+			return nil, err
+		}
+		documents = append(documents, doc)
+	}
+	return documents, nil
+}
+
+func (r *Repository) GetStudentDocument(ctx context.Context, tenantID, documentID string) (*StudentDocumentResponse, error) {
+	var studentID string
+	if err := r.db.QueryRow(ctx, `SELECT student_id::text FROM school_documents WHERE tenant_id = $1 AND id = $2`, tenantID, documentID).Scan(&studentID); err != nil {
+		return nil, err
+	}
+	documents, err := r.GetStudentDocuments(ctx, tenantID, studentID)
+	if err != nil {
+		return nil, err
+	}
+	for _, doc := range documents {
+		if doc.ID == documentID {
+			return &doc, nil
+		}
+	}
+	return nil, fmt.Errorf("document not found")
+}
+
+func (r *Repository) CreateStudentDocument(ctx context.Context, tenantID, userID string, req CreateStudentDocumentRequest) (*StudentDocumentResponse, error) {
+	category := req.Category
+	if strings.TrimSpace(category) == "" {
+		category = "general"
+	}
+	storageStatus := req.StorageStatus
+	if strings.TrimSpace(storageStatus) == "" {
+		storageStatus = "digital_only"
+	}
+	var documentID string
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO school_documents (tenant_id, student_id, uploaded_by, title, description, category, file_name, file_url, file_size, mime_type, storage_status, audience, status)
+		SELECT $1, s.id, NULLIF($3, '')::uuid, $4, $5, $6, $7, $8, $9, $10, $11, 'staff', 'active'
+		FROM students s
+		WHERE s.tenant_id = $1 AND s.id = $2
+		RETURNING id::text
+	`, tenantID, req.StudentID, userID, req.Title, req.Description, category, req.FileName, req.FileURL, req.FileSize, req.MimeType, storageStatus).Scan(&documentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create student document: %w", err)
+	}
+	return r.GetStudentDocument(ctx, tenantID, documentID)
+}
+
+func (r *Repository) UpdateStudentDocument(ctx context.Context, tenantID, documentID string, req CreateStudentDocumentRequest) (*StudentDocumentResponse, error) {
+	category := req.Category
+	if strings.TrimSpace(category) == "" {
+		category = "general"
+	}
+	storageStatus := req.StorageStatus
+	if strings.TrimSpace(storageStatus) == "" {
+		storageStatus = "digital_only"
+	}
+	result, err := r.db.Exec(ctx, `
+		UPDATE school_documents
+		SET title = $3,
+		    description = $4,
+		    category = $5,
+		    file_name = $6,
+		    file_url = $7,
+		    file_size = $8,
+		    mime_type = $9,
+		    storage_status = $10,
+		    updated_at = NOW()
+		WHERE tenant_id = $1 AND id = $2 AND status <> 'deleted'
+	`, tenantID, documentID, req.Title, req.Description, category, req.FileName, req.FileURL, req.FileSize, req.MimeType, storageStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update student document: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return nil, fmt.Errorf("document not found")
+	}
+	return r.GetStudentDocument(ctx, tenantID, documentID)
+}
+
+func (r *Repository) VerifyStudentDocument(ctx context.Context, tenantID, userID, documentID string) (*StudentDocumentResponse, error) {
+	result, err := r.db.Exec(ctx, `
+		UPDATE school_documents
+		SET is_verified = TRUE,
+		    verified_at = NOW(),
+		    verified_by = NULLIF($3, '')::uuid,
+		    updated_at = NOW()
+		WHERE tenant_id = $1 AND id = $2 AND status <> 'deleted'
+	`, tenantID, documentID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify student document: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return nil, fmt.Errorf("document not found")
+	}
+	return r.GetStudentDocument(ctx, tenantID, documentID)
+}
+
+func (r *Repository) DeleteStudentDocument(ctx context.Context, tenantID, documentID string) error {
+	result, err := r.db.Exec(ctx, `
+		UPDATE school_documents
+		SET status = 'deleted', updated_at = NOW()
+		WHERE tenant_id = $1 AND id = $2 AND status <> 'deleted'
+	`, tenantID, documentID)
+	if err != nil {
+		return fmt.Errorf("failed to delete student document: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("document not found")
+	}
+	return nil
+}
+
+func (r *Repository) AuditSchoolAction(ctx context.Context, tenantID, userID, action, entity, entityID string, metadata map[string]interface{}) error {
+	raw, _ := json.Marshal(metadata)
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO parent_teacher_audit_logs (tenant_id, actor_id, actor_role, action, resource, resource_id, metadata)
+		VALUES ($1, NULLIF($2, '')::uuid, 'SCHOOL_ADMIN', $3, $4, NULLIF($5, '')::uuid, $6::jsonb)
+	`, tenantID, userID, action, entity, entityID, string(raw))
+	return err
 }

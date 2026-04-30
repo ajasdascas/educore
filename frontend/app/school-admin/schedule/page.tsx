@@ -301,18 +301,23 @@ function SchoolScheduleContent() {
       return;
     }
 
-    const conflict = blocks.find((block) =>
-      block.id !== editingBlock?.id &&
-      block.status === "active" &&
-      form.status === "active" &&
-      block.group_id === form.group_id &&
-      block.day === form.day &&
-      overlaps(form.start_time, form.end_time, block.start_time, block.end_time)
-    );
+    const conflict = blocks.find((block) => {
+      if (block.id === editingBlock?.id || block.status !== "active" || form.status !== "active" || block.day !== form.day) return false;
+      if (!overlaps(form.start_time, form.end_time, block.start_time, block.end_time)) return false;
+      const sameGroup = block.group_id === form.group_id;
+      const sameTeacher = Boolean(form.teacher_id && block.teacher_id === form.teacher_id);
+      const sameRoom = Boolean(form.room.trim() && block.room.trim().toLowerCase() === form.room.trim().toLowerCase());
+      return sameGroup || sameTeacher || sameRoom;
+    });
     if (conflict) {
+      const reason = conflict.group_id === form.group_id
+        ? "grupo"
+        : conflict.teacher_id === form.teacher_id
+          ? "profesor"
+          : "salon";
       toast({
         title: "Cruce detectado",
-        description: `Ese grupo ya tiene ${conflict.subject} de ${conflict.start_time} a ${conflict.end_time}.`,
+        description: `Hay conflicto de ${reason} con ${conflict.subject} de ${conflict.start_time} a ${conflict.end_time}.`,
         variant: "destructive",
       });
       return;
@@ -534,11 +539,12 @@ export default function SchoolSchedulePage() {
 
 function hasConflict(block: ScheduleBlock, blocks: ScheduleBlock[]) {
   if (block.status !== "active") return false;
-  return blocks.some((item) =>
-    item.id !== block.id &&
-    item.status === "active" &&
-    item.group_id === block.group_id &&
-    item.day === block.day &&
-    overlaps(block.start_time, block.end_time, item.start_time, item.end_time)
-  );
+  return blocks.some((item) => {
+    if (item.id === block.id || item.status !== "active" || item.day !== block.day) return false;
+    if (!overlaps(block.start_time, block.end_time, item.start_time, item.end_time)) return false;
+    const sameGroup = item.group_id === block.group_id;
+    const sameTeacher = Boolean(block.teacher_id && item.teacher_id === block.teacher_id);
+    const sameRoom = Boolean(block.room && item.room && item.room.trim().toLowerCase() === block.room.trim().toLowerCase());
+    return sameGroup || sameTeacher || sameRoom;
+  });
 }

@@ -201,3 +201,68 @@ Evita duplicar Academic Core y Grading System. Los docentes operan sobre grupos,
 - La regla de 4 Core sigue vigente.
 
 #architecture #teacher_portal #parent_portal #core_modules
+# 30-04-2026 - Boletas, documentos y DB escolar siguen dentro de Core
+
+## Decision
+El cierre de School Admin no crea modulos tenant-facing nuevos. Documentos, boletas, asistencia, horarios y expedientes quedan como capacidades internas sobre Academic Core, Grading System y Users, manteniendo la doctrina de 4 Core.
+
+## Razon
+La prioridad es terminar flujos operativos reales sin fragmentar el producto. Documentos y boletas son extensiones del expediente academico, no modulos independientes.
+
+## Impacto
+- School Admin gana `/documents` y `/report-cards` como vistas operativas.
+- Backend mantiene endpoints tenant-scoped bajo `/api/v1/school-admin/*`.
+- Las acciones criticas se auditan y las operaciones destructivas usan soft delete cuando aplica.
+- La UX responsive evita scroll horizontal global y nombres largos de escuela ya no se enciman.
+
+#architecture #school_admin #academic_core #grading #security #frontend
+
+---
+
+# 30-04-2026 - Expedientes escolares fisicos/digitales en School Admin
+
+## Decision
+Los documentos de estudiantes se manejan como parte del expediente academico del School Admin con estado `physical_only`, `digital_only` o `both`, mas verificacion administrativa.
+
+## Razon
+Muchas escuelas conservan archivo fisico y digital al mismo tiempo. Modelarlo como estado del documento evita duplicar registros y permite que control escolar sepa si falta escaneo, validacion o resguardo fisico.
+
+## Impacto
+- `/school-admin/documents` puede registrar documentos fisicos, subir archivo digital, reemplazarlo, previsualizarlo, marcarlo verificado y eliminarlo con soft delete.
+- El detalle de estudiante muestra documentos como seccion propia del expediente.
+- Backend y mocks conservan metadata tenant-scoped sin crear un modulo nuevo fuera del Core.
+
+#architecture #school_admin #documents #academic_core #security
+# 30-04-2026 - School Admin header no debe renderizar nombre largo en header
+
+## Decision
+El header de School Admin mostrara solo `Panel Escuela`; el nombre completo de la escuela queda en el sidebar con truncado seguro y tooltip/title.
+
+## Razon
+En produccion el nombre `Instituto Tecnologico Don Bosco` podia superponerse con `Panel Escuela` y con controles de usuario en pantallas medianas. Repetir el nombre largo en header no aportaba valor operativo y si rompia la UX.
+
+## Impacto
+- Menos riesgo de overlap con instituciones de nombre largo.
+- Header mas estable en desktop/tablet/mobile.
+- Branding institucional sigue visible en sidebar y puede crecer despues con tooltip o selector de campus.
+
+#decision #frontend #ux #school_admin
+
+---
+
+# 30-04-2026 - Catalogo modular canonico para monetizacion
+
+## Decision
+El catalogo SaaS queda normalizado en 4 Core reales (`auth`, `users`, `academic_core`, `grading`) y extensiones vendibles (`attendance`, `documents`, `report_cards`, `payments`, `qr_access`, etc.) sin crear nuevas pantallas tenant-facing antes de estabilizar los Core.
+
+## Razon
+Giovanni necesita planes y paquetes vendibles, pero la doctrina actual prohibe abrir modulos tenant-facing nuevos hasta que los Core esten production-ready. La solucion segura es clasificar y gatear capacidades existentes, preparando monetizacion sin expandir el producto visual todavia.
+
+## Impacto
+- SuperAdmin puede vender por plan/add-on con keys canonicas.
+- School Admin sigue funcionando porque las extensiones existentes quedan habilitadas por defecto en demo/planes actuales.
+- QR, credentials, workshops y payments quedan modelados para monetizacion, no como features nuevas incompletas.
+
+#decision #architecture #billing #modules #saas
+
+---

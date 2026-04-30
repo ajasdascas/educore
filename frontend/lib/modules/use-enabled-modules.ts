@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CORE_MODULES,
+  DEFAULT_ENABLED_MODULES,
   EnabledModule,
   ModuleKey,
   fetchEnabledModules,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/modules/registry";
 
 export function useEnabledModules() {
-  const [modules, setModules] = useState<EnabledModule[]>(CORE_MODULES);
+  const [modules, setModules] = useState<EnabledModule[]>(DEFAULT_ENABLED_MODULES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -20,7 +20,7 @@ export function useEnabledModules() {
       setError("");
       setModules(await fetchEnabledModules());
     } catch (err) {
-      setModules(CORE_MODULES);
+      setModules(DEFAULT_ENABLED_MODULES);
       setError(err instanceof Error ? err.message : "No se pudo cargar la configuracion modular.");
     } finally {
       setLoading(false);

@@ -108,6 +108,22 @@ type Student = {
   updated_at: string;
   recent_grades?: Array<{ id: string; description: string; score: number; max_score: number; teacher_name: string }>;
   recent_attendance?: Array<{ date: string; status: string; notes: string }>;
+  schedule?: Array<{ id: string; day: string; start_time: string; end_time: string; subject: string; teacher_name: string; room?: string }>;
+  documents?: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    category: string;
+    file_name: string;
+    file_url?: string;
+    file_size?: number;
+    mime_type: string;
+    storage_status?: "physical_only" | "digital_only" | "both";
+    is_verified?: boolean;
+    verified_at?: string;
+    created_at: string;
+  }>;
+  observations?: Array<{ id: string; type: string; note: string; author: string; created_at: string }>;
 };
 
 type GroupOption = {
@@ -220,6 +236,18 @@ function birthDateFromParts(day: string, month: string, year: string) {
   return `${year.padStart(4, "0")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
+function ageFromBirthDate(student: Student) {
+  const raw = student.birth_date || birthDateFromParts(student.birth_day || "", student.birth_month || "", student.birth_year || "");
+  if (!raw) return "Sin fecha";
+  const birth = new Date(raw);
+  if (Number.isNaN(birth.getTime())) return "Sin fecha";
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) age -= 1;
+  return `${age} años`;
+}
+
 function splitBirthDate(date?: string) {
   if (!date) return { day: "", month: "", year: "" };
   const [year, month, day] = date.split("-");
@@ -311,6 +339,27 @@ function statusLabel(status: StudentStatus) {
     withdrawn: "Baja",
   };
   return labels[status] || status;
+}
+
+function documentCategoryLabel(value: string) {
+  const labels: Record<string, string> = {
+    enrollment: "Inscripcion",
+    identification: "Identificacion",
+    medical: "Medico",
+    academic_history: "Historial academico",
+    report_card: "Boleta",
+    other: "Otros",
+  };
+  return labels[value] || value;
+}
+
+function documentStorageLabel(value?: string) {
+  const labels: Record<string, string> = {
+    physical_only: "Solo fisico",
+    digital_only: "Solo digital",
+    both: "Fisico y digital",
+  };
+  return labels[value || "digital_only"] || "Solo digital";
 }
 
 function buildAcademicHistory(student: Student, years: SchoolYear[]): AcademicHistoryItem[] {
@@ -466,10 +515,18 @@ function SchoolStudentsContent() {
     try {
       const response = await authFetch(`/api/v1/school-admin/academic/students/${student.id}`);
       if (response?.success && response.data) {
-        const historyResponse = await authFetch(`/api/v1/school-admin/academic/students/${student.id}/history`).catch(() => null);
+        const [historyResponse, scheduleResponse, attendanceResponse, documentsResponse] = await Promise.all([
+          authFetch(`/api/v1/school-admin/academic/students/${student.id}/history`).catch(() => null),
+          authFetch(`/api/v1/school-admin/academic/students/${student.id}/schedule`).catch(() => null),
+          authFetch(`/api/v1/school-admin/attendance/students/${student.id}/history`).catch(() => null),
+          authFetch(`/api/v1/school-admin/documents/${student.id}`).catch(() => null),
+        ]);
         setSelectedStudent({
           ...response.data,
           academic_history: historyResponse?.success ? historyResponse.data : buildAcademicHistory(response.data, schoolYears),
+          schedule: scheduleResponse?.success ? scheduleResponse.data : [],
+          recent_attendance: attendanceResponse?.success ? attendanceResponse.data?.records || [] : response.data.recent_attendance,
+          documents: documentsResponse?.success ? documentsResponse.data : [],
         });
       }
     } catch {
@@ -837,21 +894,29 @@ function SchoolStudentsContent() {
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{selectedStudent ? fullStudentName(selectedStudent) : "Detalle del estudiante"}</DialogTitle>
-            <DialogDescription>Perfil, padres vinculados e historial academico por ciclo escolar.</DialogDescription>
+            <DialogDescription>Perfil completo, padres, asistencia, horario, documentos e historial por ciclo escolar.</DialogDescription>
           </DialogHeader>
           {selectedStudent && (
-            <Tabs defaultValue="summary" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="summary">Resumen</TabsTrigger>
-                <TabsTrigger value="parents">Padres</TabsTrigger>
-                <TabsTrigger value="history">Historial Academico</TabsTrigger>
+            <Tabs defaultValue="overview" className="space-y-4">
+              <div>
+                <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="academic">Academico</TabsTrigger>
+                <TabsTrigger value="attendance">Asistencia</TabsTrigger>
+                <TabsTrigger value="schedule">Horario</TabsTrigger>
+                <TabsTrigger value="documents">Documentos</TabsTrigger>
+                <TabsTrigger value="history">Historial</TabsTrigger>
+                <TabsTrigger value="observations">Observaciones</TabsTrigger>
               </TabsList>
-              <TabsContent value="summary" className="space-y-4">
+              </div>
+              <TabsContent value="overview" className="space-y-4">
                 <div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
                   <div><p className="text-xs text-muted-foreground">Matricula</p><p className="font-medium">{selectedStudent.enrollment_id}</p></div>
                   <div><p className="text-xs text-muted-foreground">Nacimiento</p><p className="font-medium">{selectedStudent.birth_date || birthDateFromParts(selectedStudent.birth_day || "", selectedStudent.birth_month || "", selectedStudent.birth_year || "") || "Sin fecha"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Edad</p><p className="font-medium">{ageFromBirthDate(selectedStudent)}</p></div>
                   <div><p className="text-xs text-muted-foreground">Grupo</p><p className="font-medium">{selectedStudent.grade_name} {selectedStudent.group_name}</p></div>
                   <div><p className="text-xs text-muted-foreground">Estado</p><p className="font-medium">{statusLabel(selectedStudent.status)}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Direccion</p><p className="font-medium">{selectedStudent.address || "Sin direccion"}</p></div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Asistencia</p><p className="text-xl font-bold">{selectedStudent.attendance_rate || 0}%</p></CardContent></Card>
@@ -859,7 +924,13 @@ function SchoolStudentsContent() {
                   <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Faltas</p><p className="text-xl font-bold">{selectedStudent.total_absences || 0}</p></CardContent></Card>
                 </div>
               </TabsContent>
-              <TabsContent value="parents">
+              <TabsContent value="academic" className="space-y-4">
+                <div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
+                  <div><p className="text-xs text-muted-foreground">Grado actual</p><p className="font-medium">{selectedStudent.grade_name || "Sin grado"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Grupo</p><p className="font-medium">{selectedStudent.group_name || "Sin grupo"}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Promedio</p><p className="font-medium">{selectedStudent.average_grade || 0}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Estado academico</p><p className="font-medium">{statusLabel(selectedStudent.status)}</p></div>
+                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {(selectedStudent.parents?.length ? selectedStudent.parents : [getPrimaryParent(selectedStudent)]).map((parent, index) => (
                     <Card key={`${parent.email}-${index}`}>
@@ -874,6 +945,96 @@ function SchoolStudentsContent() {
                     </Card>
                   ))}
                 </div>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Evaluacion</TableHead><TableHead>Calificacion</TableHead><TableHead>Profesor</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {(selectedStudent.recent_grades || []).map((grade) => (
+                        <TableRow key={grade.id}>
+                          <TableCell className="min-w-56">{grade.description}</TableCell>
+                          <TableCell>{grade.score}/{grade.max_score}</TableCell>
+                          <TableCell className="min-w-48">{grade.teacher_name}</TableCell>
+                        </TableRow>
+                      ))}
+                      {(!selectedStudent.recent_grades || selectedStudent.recent_grades.length === 0) && (
+                        <TableRow><TableCell colSpan={3} className="py-8 text-center text-muted-foreground">Sin calificaciones recientes.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+              <TabsContent value="attendance" className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Asistencia</p><p className="text-xl font-bold">{selectedStudent.attendance_rate || 0}%</p></CardContent></Card>
+                  <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Faltas</p><p className="text-xl font-bold">{selectedStudent.total_absences || 0}</p></CardContent></Card>
+                  <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Registros</p><p className="text-xl font-bold">{selectedStudent.recent_attendance?.length || 0}</p></CardContent></Card>
+                </div>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Estado</TableHead><TableHead>Notas</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {(selectedStudent.recent_attendance || []).map((item) => (
+                        <TableRow key={`${item.date}-${item.status}`}>
+                          <TableCell className="whitespace-nowrap">{item.date}</TableCell>
+                          <TableCell><Badge variant={item.status === "absent" ? "destructive" : "secondary"}>{item.status}</Badge></TableCell>
+                          <TableCell className="min-w-52">{item.notes || "Sin notas"}</TableCell>
+                        </TableRow>
+                      ))}
+                      {(!selectedStudent.recent_attendance || selectedStudent.recent_attendance.length === 0) && (
+                        <TableRow><TableCell colSpan={3} className="py-8 text-center text-muted-foreground">Sin asistencias registradas.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+              <TabsContent value="schedule" className="space-y-4">
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Dia</TableHead><TableHead>Horario</TableHead><TableHead>Materia</TableHead><TableHead>Profesor</TableHead><TableHead>Aula</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {(selectedStudent.schedule || []).map((block) => (
+                        <TableRow key={block.id}>
+                          <TableCell className="whitespace-nowrap">{block.day}</TableCell>
+                          <TableCell className="whitespace-nowrap">{block.start_time} - {block.end_time}</TableCell>
+                          <TableCell>{block.subject}</TableCell>
+                          <TableCell>{block.teacher_name || "Sin profesor"}</TableCell>
+                          <TableCell>{block.room || "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                      {(!selectedStudent.schedule || selectedStudent.schedule.length === 0) && (
+                        <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Sin horario asignado.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+              <TabsContent value="documents" className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {(selectedStudent.documents || []).map((doc) => (
+                    <Card key={doc.id} className="min-w-0">
+                      <CardContent className="space-y-3 p-4">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium" title={doc.title}>{doc.title}</p>
+                            <p className="truncate text-sm text-muted-foreground">{doc.file_name || doc.mime_type || "Documento fisico"}</p>
+                          </div>
+                          <Badge variant="outline" className="shrink-0">{documentCategoryLabel(doc.category)}</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant={doc.storage_status === "physical_only" ? "secondary" : "default"}>{documentStorageLabel(doc.storage_status)}</Badge>
+                          {doc.is_verified && <Badge variant="outline">Verificado</Badge>}
+                        </div>
+                        {doc.description && <p className="line-clamp-2 text-sm text-muted-foreground">{doc.description}</p>}
+                        <Button variant="outline" size="sm" disabled={!doc.file_url} onClick={() => doc.file_url && window.open(doc.file_url, "_blank")}>
+                          <Eye className="mr-2 h-4 w-4" />Preview
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {(!selectedStudent.documents || selectedStudent.documents.length === 0) && (
+                    <div className="col-span-full rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">Sin documentos digitales o fisicos registrados.</div>
+                  )}
+                </div>
               </TabsContent>
               <TabsContent value="history" className="space-y-4">
                 <div className="flex justify-end">
@@ -885,21 +1046,39 @@ function SchoolStudentsContent() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Table>
-                  <TableHeader><TableRow><TableHead>Ciclo</TableHead><TableHead>Grado / grupo</TableHead><TableHead>Promedio</TableHead><TableHead>Asistencia</TableHead><TableHead>Faltas</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {filteredHistory.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.school_year}</TableCell>
-                        <TableCell><div>{item.grade_name}</div><div className="text-xs text-muted-foreground">{item.group_name}</div></TableCell>
-                        <TableCell>{item.average_grade}</TableCell>
-                        <TableCell>{item.attendance_rate}%</TableCell>
-                        <TableCell>{item.absences}</TableCell>
-                        <TableCell>{item.status}</TableCell>
-                      </TableRow>
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Ciclo</TableHead><TableHead>Grado / grupo</TableHead><TableHead>Promedio</TableHead><TableHead>Asistencia</TableHead><TableHead>Faltas</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {filteredHistory.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.school_year}</TableCell>
+                          <TableCell><div>{item.grade_name}</div><div className="text-xs text-muted-foreground">{item.group_name}</div></TableCell>
+                          <TableCell>{item.average_grade}</TableCell>
+                          <TableCell>{item.attendance_rate}%</TableCell>
+                          <TableCell>{item.absences}</TableCell>
+                          <TableCell>{item.status}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+              <TabsContent value="observations" className="space-y-3">
+                <div className="rounded-lg border p-4">
+                  <p className="font-medium">Observaciones</p>
+                  <div className="mt-3 space-y-2">
+                    {(selectedStudent.observations || []).map((item) => (
+                      <div key={item.id} className="rounded-md bg-muted/40 p-3 text-sm">
+                        <p className="font-medium">{item.type}</p>
+                        <p className="text-muted-foreground">{item.note}</p>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                    {(!selectedStudent.observations || selectedStudent.observations.length === 0) && (
+                      <p className="text-sm text-muted-foreground">Sin observaciones registradas.</p>
+                    )}
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           )}

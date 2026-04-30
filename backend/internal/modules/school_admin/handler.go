@@ -59,6 +59,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	academic.Delete("/subjects/:id", h.DeleteSubject)
 
 	academic.Get("/schedule", h.GetSchedule)
+	academic.Get("/students/:id/schedule", h.GetStudentSchedule)
 	academic.Post("/schedule", h.CreateScheduleBlock)
 	academic.Get("/schedule/:id", h.GetScheduleBlock)
 	academic.Put("/schedule/:id", h.UpdateScheduleBlock)
@@ -77,6 +78,13 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	grades.Post("/grades/bulk", h.BulkUpdateGrades)
 	grades.Get("/students/:studentId/report-card", h.GetStudentReportCard)
 	grades.Get("/groups/:groupId/final-grades", h.GetGroupFinalGrades)
+
+	api.Post("/documents", h.CreateStudentDocument)
+	api.Get("/documents/:studentId", h.GetStudentDocuments)
+	api.Put("/documents/:documentId", h.UpdateStudentDocument)
+	api.Patch("/documents/:documentId/verify", h.VerifyStudentDocument)
+	api.Delete("/documents/:documentId", h.DeleteStudentDocument)
+	api.Post("/report-cards/generate", h.GenerateReportCard)
 }
 
 func (h *Handler) GetSettings(c *fiber.Ctx) error {
@@ -181,14 +189,20 @@ func (h *Handler) GetStudents(c *fiber.Ctx) error {
 	perPage := c.QueryInt("per_page", 20)
 	search := c.Query("search")
 	groupID := c.Query("group_id")
+	gradeID := c.Query("grade_id")
 	status := c.Query("status")
+	sortBy := c.Query("sort_by")
+	sortDir := c.Query("sort_dir")
 
 	students, total, err := h.service.GetStudents(c.Context(), tenantID, GetStudentsParams{
 		Page:    page,
 		PerPage: perPage,
 		Search:  search,
 		GroupID: groupID,
+		GradeID: gradeID,
 		Status:  status,
+		SortBy:  sortBy,
+		SortDir: sortDir,
 	})
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -490,6 +504,16 @@ func (h *Handler) GetSchedule(c *fiber.Ctx) error {
 	return response.Success(c, blocks, "Success")
 }
 
+func (h *Handler) GetStudentSchedule(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	studentID := c.Params("id")
+	blocks, err := h.service.GetStudentSchedule(c.Context(), tenantID, studentID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, blocks, "Success")
+}
+
 func (h *Handler) CreateScheduleBlock(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
@@ -543,8 +567,9 @@ func (h *Handler) DeleteScheduleBlock(c *fiber.Ctx) error {
 func (h *Handler) GetTodayAttendance(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	groupID := c.Params("groupId")
+	date := c.Query("date")
 
-	attendance, err := h.service.GetTodayAttendance(c.Context(), tenantID, groupID)
+	attendance, err := h.service.GetTodayAttendance(c.Context(), tenantID, groupID, date)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
@@ -654,4 +679,78 @@ func (h *Handler) GetGroupFinalGrades(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, grades, "Success")
+}
+
+func (h *Handler) GenerateReportCard(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req GenerateReportCardRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	reportCard, err := h.service.GenerateReportCard(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, reportCard, "Success")
+}
+
+func (h *Handler) GetStudentDocuments(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	studentID := c.Params("studentId")
+	documents, err := h.service.GetStudentDocuments(c.Context(), tenantID, studentID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, documents, "Success")
+}
+
+func (h *Handler) CreateStudentDocument(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req CreateStudentDocumentRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	document, err := h.service.CreateStudentDocument(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, document, "Success")
+}
+
+func (h *Handler) UpdateStudentDocument(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	documentID := c.Params("documentId")
+	var req CreateStudentDocumentRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	document, err := h.service.UpdateStudentDocument(c.Context(), tenantID, userID, documentID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, document, "Success")
+}
+
+func (h *Handler) VerifyStudentDocument(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	documentID := c.Params("documentId")
+	document, err := h.service.VerifyStudentDocument(c.Context(), tenantID, userID, documentID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, document, "Success")
+}
+
+func (h *Handler) DeleteStudentDocument(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	documentID := c.Params("documentId")
+	if err := h.service.DeleteStudentDocument(c.Context(), tenantID, userID, documentID); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.SuccessMessage(c, "Document deleted successfully")
 }

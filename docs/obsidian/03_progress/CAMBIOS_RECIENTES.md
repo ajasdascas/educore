@@ -274,3 +274,72 @@
 - Resultado: GitHub Actions `25138255245` en verde y despliegue a Hostinger completado.
 
 #deploy #hostinger #github_actions #ci_cd
+# [30-04-2026] - Cierre School Admin academico y responsive
+
+## Backend
+- `school_admin`: endpoints nuevos para documentos por alumno, horario por alumno y generacion de boletas.
+- Reportes academicos reemplazan stubs: historial de asistencia por alumno, reporte mensual, boleta por alumno y calificaciones finales por grupo.
+- Horarios validan cruces por grupo, profesor y salon antes de crear/editar.
+- Acciones criticas quedan auditadas en `parent_teacher_audit_logs`: estudiantes, horarios, asistencias, documentos y boletas.
+- Migracion `015_school_admin_panel_completion.sql`: estado `sick`, categorias de documentos escolares, observaciones e indices de performance.
+
+## Frontend
+- Corregido encimado de texto por nombres largos de escuela en `school-admin/layout.tsx`.
+- `/school-admin/students`: detalle enriquecido con edad, direccion, asistencia, horario, documentos, historial y observaciones.
+- `/school-admin/documents`: nueva vista de expediente documental por alumno.
+- `/school-admin/report-cards`: nueva vista para generar/preview/exportar boletas.
+- `/school-admin/attendance`: estado Enfermo y tarjetas responsive.
+- `/school-admin/schedule`: deteccion local de conflictos por grupo/profesor/salon.
+- `/super-admin/database`: ajuste menor para mantener scroll interno en tablas de schema.
+
+## Verificacion
+- `go test ./...` OK.
+- `npm run build` OK.
+- `git diff --check` OK, solo warnings CRLF.
+- Smoke headless local en `attendance`, `documents` y `report-cards` sin overflow horizontal global.
+
+#module #school_admin #academic_core #grading #frontend #backend #responsive
+
+---
+
+# [30-04-2026] - Auditoria visual y documentos digitales School Admin
+
+## UX/Layout
+- Header y contenedor principal de School Admin endurecidos para nombres largos: `min-w-0`, truncado seguro, controles con `shrink-0` y sin overflow horizontal global.
+- Modal de crear/editar grupo ajustado a viewport con ancho responsive, scroll interno y footer fijo para laptop/mobile.
+- Tablas de grupos y detalle de estudiante protegidas con scroll interno cuando el contenido crece.
+
+## Documentos digitales
+- `/school-admin/documents` ampliado con upload PDF/JPG/PNG, preview modal, reemplazo, soft delete, verificacion y filtros por alumno/categoria/estado.
+- Estados de expediente: `physical_only`, `digital_only`, `both`.
+- Categoria nueva: `academic_history`.
+- Detalle de estudiante reorganizado con tabs de overview, academico, asistencia, horario, documentos, historial y observaciones.
+
+## Backend/Mocks
+- Endpoints School Admin de documentos agregan update y verify.
+- `school_documents` agrega metadata de estado fisico/digital y verificacion.
+- `frontend/lib/auth.ts` persiste documentos demo en `localStorage` con reemplazo/verificacion/soft delete.
+
+#school_admin #frontend #backend #ux #documents #responsive
+
+---
+
+# [30-04-2026] - Fix definitivo de header y alineacion modular SaaS
+
+## UX/Layout
+- Identificado el origen del texto superpuesto en School Admin: el nombre largo de escuela podia escapar del ancho del sidebar y el header repetia el nombre institucional junto a `Panel Escuela`.
+- `school-admin/layout.tsx` ahora bloquea overflow horizontal global, trunca el nombre de escuela solo dentro del sidebar y deja el header con un unico titulo estable: `Panel Escuela`.
+- Navegacion lateral protegida con `min-w-0`, `overflow-x-hidden`, iconos `shrink-0` y labels truncados.
+
+## Modular SaaS
+- El registry frontend queda alineado con la doctrina de 4 Core reales: `auth`, `users`, `academic_core`, `grading`.
+- Las capacidades existentes se clasifican como extensiones vendibles: horarios, asistencia, documentos, boletas, comunicaciones, portales, pagos, QR, credenciales, talleres y analytics.
+- Migracion `016_modular_saas_catalog_and_plans.sql` agrega `category`, paquetes modulares y normaliza los planes Basic/Profesional/Enterprise con module keys canonicos.
+
+## Verificacion
+- `go test ./...` OK.
+- `npm run build` OK.
+- `git diff --check` OK, solo warnings CRLF.
+- Smoke Browser Use en `http://localhost:4187/school-admin/dashboard/`: header sin texto encimado y layout mobile limpio.
+
+#school_admin #frontend #backend #ux #modules #billing #saas

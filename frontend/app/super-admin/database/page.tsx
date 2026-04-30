@@ -289,8 +289,8 @@ export default function DatabaseAdminPage() {
                 </div>
               ) : (
                 <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-                  <div className="min-w-0 overflow-hidden rounded-md border">
-                    <Table className="min-w-[520px]">
+                  <div className="min-w-0 overflow-x-auto rounded-md border">
+                    <Table className="min-w-[480px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Columna</TableHead>

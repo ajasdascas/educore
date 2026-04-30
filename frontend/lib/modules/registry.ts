@@ -9,21 +9,31 @@ export type EducationLevel =
   | "prepa_tecnica"
   | "universidad";
 
-export type ModuleLayer = "core" | "level";
+export type ModuleLayer = "core" | "extension" | "internal" | "level";
 
 export type ModuleKey =
+  | "auth"
   | "academic_core"
   | "users"
+  | "grading"
   | "students"
   | "groups"
   | "schedules"
   | "attendance"
   | "grades"
+  | "report_cards"
+  | "documents"
   | "reports"
   | "communication"
   | "communications"
+  | "payments"
+  | "workshops"
+  | "qr_access"
+  | "credentials"
   | "parent_portal"
   | "teacher_portal"
+  | "analytics"
+  | "database_admin"
   | string;
 
 export type EnabledModule = {
@@ -40,27 +50,47 @@ export type EnabledModule = {
 };
 
 export const CORE_MODULES: EnabledModule[] = [
+  { key: "auth", name: "Auth + Tenant + RBAC", layer: "core", is_core: true, is_required: true, enabled: true },
   { key: "academic_core", name: "Academico Core", layer: "core", is_core: true, is_required: true, enabled: true },
   { key: "users", name: "Usuarios", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "students", name: "Alumnos", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "groups", name: "Grupos", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "schedules", name: "Horarios", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "attendance", name: "Asistencias", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "grades", name: "Calificaciones", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "reports", name: "Reportes", layer: "core", is_core: true, is_required: true, enabled: true },
-  { key: "communications", name: "Comunicaciones", layer: "core", is_core: true, is_required: true, enabled: true },
+  { key: "grading", name: "Grading System", layer: "core", is_core: true, is_required: true, enabled: true },
+];
+
+export const DEFAULT_ENABLED_MODULES: EnabledModule[] = [
+  ...CORE_MODULES,
+  { key: "schedules", name: "Horarios", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "attendance", name: "Asistencias", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "documents", name: "Expedientes digitales", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "report_cards", name: "Boletas", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "reports", name: "Reportes", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "communications", name: "Comunicaciones", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "parent_portal", name: "Portal de Padres", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "teacher_portal", name: "Portal de Profesores", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
 ];
 
 export const MODULE_ALIASES: Record<string, string[]> = {
-  users: ["users", "students"],
-  students: ["students", "users"],
-  groups: ["groups", "academic_core"],
-  schedules: ["schedules", "academic_core"],
-  attendance: ["attendance", "academic_core"],
-  grades: ["grades", "academic_core"],
-  reports: ["reports"],
+  auth: ["auth"],
+  users: ["users"],
+  students: ["users", "students"],
+  groups: ["academic_core", "groups"],
+  schedules: ["schedules"],
+  attendance: ["attendance"],
+  grading: ["grading", "grades"],
+  grades: ["grading", "grades"],
+  report_cards: ["report_cards", "grades"],
+  documents: ["documents"],
+  reports: ["reports", "analytics"],
   communications: ["communications", "communication"],
   communication: ["communication", "communications"],
+  payments: ["payments", "billing"],
+  billing: ["payments", "billing"],
+  workshops: ["workshops"],
+  qr_access: ["qr_access"],
+  credentials: ["credentials"],
+  parent_portal: ["parent_portal"],
+  teacher_portal: ["teacher_portal"],
+  analytics: ["analytics", "reports"],
+  database_admin: ["database_admin"],
   academic_core: ["academic_core"],
 };
 
@@ -87,5 +117,5 @@ export function moduleMatches(enabled: EnabledModule[], moduleKey: ModuleKey) {
 export async function fetchEnabledModules() {
   const response = await authFetch("/api/v1/school-admin/modules/enabled");
   const modules = normalizeEnabledModules(response);
-  return modules.length > 0 ? modules : CORE_MODULES;
+  return modules.length > 0 ? modules : DEFAULT_ENABLED_MODULES;
 }

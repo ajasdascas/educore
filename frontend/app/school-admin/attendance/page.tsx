@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
-type AttendanceStatus = "present" | "absent" | "late" | "excused";
+type AttendanceStatus = "present" | "absent" | "late" | "sick" | "excused";
 
 type GroupOption = {
   id: string;
@@ -34,6 +34,7 @@ const statusLabels: Record<AttendanceStatus, string> = {
   present: "Presente",
   absent: "Ausente",
   late: "Retardo",
+  sick: "Enfermo",
   excused: "Justificado",
 };
 
@@ -97,10 +98,11 @@ function AttendanceContent() {
     const total = students.length || 1;
     const present = students.filter((student) => student.status === "present").length;
     const late = students.filter((student) => student.status === "late").length;
+    const sick = students.filter((student) => student.status === "sick").length;
     const absent = students.filter((student) => student.status === "absent").length;
     const excused = students.filter((student) => student.status === "excused").length;
-    const rate = Math.round(((present + late + excused) / total) * 100);
-    return { present, late, absent, excused, rate, total: students.length };
+    const rate = Math.round(((present + late + sick + excused) / total) * 100);
+    return { present, late, sick, absent, excused, rate, total: students.length };
   }, [students]);
 
   const updateStudent = (studentID: string, patch: Partial<AttendanceStudent>) => {
@@ -158,10 +160,11 @@ function AttendanceContent() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Asistencia</CardTitle><CalendarDays className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{summary.rate}%</div><p className="text-xs text-muted-foreground">{summary.total} alumnos</p></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Presentes</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{summary.present}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Retardos</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-amber-600">{summary.late}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Enfermos</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-sky-600">{summary.sick}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Ausentes</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{summary.absent}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Justificados</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600">{summary.excused}</div></CardContent></Card>
       </div>

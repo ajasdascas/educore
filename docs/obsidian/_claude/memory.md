@@ -460,3 +460,28 @@ Verificacion realizada: `go test ./...`, `npm run build`, smoke estatico local d
 Se recupero el repo despues de un reinicio que corrompio `.git/index` y `refs/heads/master`, se preservaron los commits locales de cierre Parent/Teacher y se empujaron correctamente. Luego se endurecio `.github/workflows/deploy.yml` porque GitHub Actions fallaba en Hostinger por una prueba FTP fragil. El workflow ahora usa conexion pasiva, retries, timeouts mas amplios y verificacion directa del directorio remoto. La corrida `25138255245` termino en verde y Hostinger recibio el deploy.
 
 #memory #deploy #hostinger #github_actions #recovery
+# 30-04-2026 - School Admin academico y responsive
+
+Se cerro una tanda de School Admin enfocada en operacion academica real: fix de header/sidebar con nombres largos de escuela, documentos por alumno, boletas, asistencia historica, estado `sick`, validacion de cruces por grupo/profesor/salon y endpoints backend tenant-scoped. Se agrego migracion `015_school_admin_panel_completion.sql`, mocks estaticos en `frontend/lib/auth.ts` y UI responsive en `/school-admin/documents` y `/school-admin/report-cards`.
+
+Verificacion realizada: `go test ./...` OK, `npm run build` OK, `git diff --check` OK con warnings CRLF, smoke headless local de `/school-admin/attendance`, `/school-admin/documents` y `/school-admin/report-cards` sin overflow horizontal global.
+
+#memory #school_admin #academic_core #grading #frontend #backend #responsive
+
+---
+
+# 30-04-2026 - Auditoria visual School Admin y expedientes digitales
+
+Se ejecuto la correccion posterior a auditoria visual de School Admin. Se reforzo el layout global para evitar letras encimadas con nombres largos de escuela, se ajusto el modal de crear grupo para que no se salga del viewport y se completo el expediente documental digital por alumno con PDF/JPG/PNG, preview, reemplazo, verificacion, soft delete y estados fisico/digital/ambos. El detalle de estudiante queda organizado por tabs, incluyendo documentos y observaciones como secciones propias.
+
+#memory #school_admin #frontend #backend #documents #ux
+
+---
+
+# 30-04-2026 - Fix header y catalogo modular SaaS
+
+Se identifico que el encimado persistente venia del nombre largo de escuela escapando del contenedor del sidebar/header. Se corrigio `frontend/app/school-admin/layout.tsx` para truncar duro en sidebar, ocultar el nombre largo del header y dejar solo `Panel Escuela` como titulo estable. Tambien se alineo el sistema modular: 4 Core reales (`auth`, `users`, `academic_core`, `grading`) y extensiones vendibles por plan/add-on. Se agrego migracion `016_modular_saas_catalog_and_plans.sql` con categorias, paquetes y planes canonicos.
+
+Verificacion realizada: `go test ./...`, `npm run build`, `git diff --check` y smoke Browser Use local en `4187` OK.
+
+#memory #school_admin #frontend #modules #billing #saas

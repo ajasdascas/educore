@@ -8,7 +8,10 @@ type GetStudentsParams struct {
 	PerPage int    `json:"per_page"`
 	Search  string `json:"search"`
 	GroupID string `json:"group_id"`
+	GradeID string `json:"grade_id"`
 	Status  string `json:"status"`
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
 }
 
 type CreateStudentRequest struct {
@@ -216,7 +219,7 @@ type UpdateScheduleBlockRequest struct {
 
 type AttendanceRecord struct {
 	StudentID string `json:"student_id" validate:"required"`
-	Status    string `json:"status" validate:"required,oneof=present absent late excused"`
+	Status    string `json:"status" validate:"required,oneof=present absent late sick excused"`
 	Notes     string `json:"notes"`
 }
 
@@ -236,6 +239,27 @@ type GradeRecord struct {
 
 type BulkGradesRequest struct {
 	Grades []GradeRecord `json:"grades" validate:"required,dive"`
+}
+
+type CreateStudentDocumentRequest struct {
+	StudentID     string `json:"student_id" validate:"required"`
+	Title         string `json:"title" validate:"required"`
+	Description   string `json:"description"`
+	Category      string `json:"category"`
+	FileName      string `json:"file_name"`
+	FileURL       string `json:"file_url"`
+	FileSize      int64  `json:"file_size"`
+	MimeType      string `json:"mime_type"`
+	StorageStatus string `json:"storage_status"`
+}
+
+type GenerateReportCardRequest struct {
+	StudentID         string `json:"student_id" validate:"required"`
+	Period            string `json:"period"`
+	IncludeAttendance bool   `json:"include_attendance"`
+	IncludeComments   bool   `json:"include_comments"`
+	PersistAsDocument bool   `json:"persist_as_document"`
+	ConfirmationText  string `json:"confirmation_text"`
 }
 
 // Response DTOs
@@ -344,17 +368,49 @@ type StudentResponse struct {
 
 type StudentDetailResponse struct {
 	*StudentResponse
-	BirthDate        string                `json:"birth_date"`
-	BirthDay         string                `json:"birth_day"`
-	BirthMonth       string                `json:"birth_month"`
-	BirthYear        string                `json:"birth_year"`
-	Address          string                `json:"address"`
-	AttendanceRate   float64               `json:"attendance_rate"`
-	AverageGrade     float64               `json:"average_grade"`
-	TotalAbsences    int                   `json:"total_absences"`
-	AcademicHistory  []AcademicHistoryItem `json:"academic_history"`
-	RecentGrades     []GradeResponse       `json:"recent_grades"`
-	RecentAttendance []AttendanceItem      `json:"recent_attendance"`
+	BirthDate        string                    `json:"birth_date"`
+	BirthDay         string                    `json:"birth_day"`
+	BirthMonth       string                    `json:"birth_month"`
+	BirthYear        string                    `json:"birth_year"`
+	Address          string                    `json:"address"`
+	AttendanceRate   float64                   `json:"attendance_rate"`
+	AverageGrade     float64                   `json:"average_grade"`
+	TotalAbsences    int                       `json:"total_absences"`
+	AcademicHistory  []AcademicHistoryItem     `json:"academic_history"`
+	RecentGrades     []GradeResponse           `json:"recent_grades"`
+	RecentAttendance []AttendanceItem          `json:"recent_attendance"`
+	Schedule         []ScheduleBlockResponse   `json:"schedule"`
+	Documents        []StudentDocumentResponse `json:"documents"`
+	Observations     []StudentObservation      `json:"observations"`
+}
+
+type StudentDocumentResponse struct {
+	ID            string    `json:"id"`
+	StudentID     string    `json:"student_id"`
+	StudentName   string    `json:"student_name"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	Category      string    `json:"category"`
+	FileName      string    `json:"file_name"`
+	FileURL       string    `json:"file_url"`
+	FileSize      int64     `json:"file_size"`
+	MimeType      string    `json:"mime_type"`
+	StorageStatus string    `json:"storage_status"`
+	IsVerified    bool      `json:"is_verified"`
+	VerifiedAt    string    `json:"verified_at"`
+	VerifiedBy    string    `json:"verified_by"`
+	Status        string    `json:"status"`
+	UploadedBy    string    `json:"uploaded_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type StudentObservation struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Note      string    `json:"note"`
+	Author    string    `json:"author"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type ParentContact struct {
@@ -516,6 +572,7 @@ type AttendanceSummary struct {
 	Present int     `json:"present"`
 	Absent  int     `json:"absent"`
 	Late    int     `json:"late"`
+	Sick    int     `json:"sick"`
 	Excused int     `json:"excused"`
 	Rate    float64 `json:"rate"`
 }

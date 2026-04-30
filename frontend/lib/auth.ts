@@ -154,8 +154,8 @@ const defaultMockPlans = [
     currency: "MXN",
     max_students: 120,
     max_teachers: 12,
-    modules: JSON.stringify(["students", "attendance", "grades"]),
-    features: JSON.stringify(["Gestion de alumnos", "Asistencia", "Calificaciones", "Soporte por email"]),
+    modules: JSON.stringify(["auth", "users", "academic_core", "grading"]),
+    features: JSON.stringify(["Auth + RBAC", "Usuarios y alumnos", "Nucleo academico", "Calificaciones base", "Soporte por email"]),
     is_active: true,
     is_featured: false,
     created_at: "2026-04-20T08:00:00.000Z",
@@ -169,8 +169,8 @@ const defaultMockPlans = [
     currency: "MXN",
     max_students: 500,
     max_teachers: 45,
-    modules: JSON.stringify(["students", "attendance", "grades", "reports", "communications"]),
-    features: JSON.stringify(["Reportes academicos", "Portal de padres", "Comunicacion escolar", "Soporte prioritario"]),
+    modules: JSON.stringify(["auth", "users", "academic_core", "grading", "schedules", "attendance", "documents", "report_cards", "communications", "parent_portal", "teacher_portal"]),
+    features: JSON.stringify(["Todo Basic", "Asistencia rapida", "Horarios", "Boletas", "Expedientes digitales", "Portal de padres"]),
     is_active: true,
     is_featured: true,
     created_at: "2026-04-20T08:00:00.000Z",
@@ -184,8 +184,8 @@ const defaultMockPlans = [
     currency: "MXN",
     max_students: 0,
     max_teachers: 0,
-    modules: JSON.stringify(["students", "attendance", "grades", "reports", "communications", "billing", "transport"]),
-    features: JSON.stringify(["Alumnos ilimitados", "SLA empresarial", "Integraciones a medida", "Acompanamiento dedicado"]),
+    modules: JSON.stringify(["auth", "users", "academic_core", "grading", "schedules", "attendance", "documents", "report_cards", "communications", "parent_portal", "teacher_portal", "payments", "qr_access", "credentials", "workshops", "analytics"]),
+    features: JSON.stringify(["Alumnos ilimitados", "Todos los modulos vendibles", "SLA empresarial", "Integraciones a medida", "Acompanamiento dedicado"]),
     is_active: true,
     is_featured: false,
     created_at: "2026-04-20T08:00:00.000Z",
@@ -744,17 +744,23 @@ const mockGradeLevels = [
 ];
 
 const modulesCatalog = [
-  { key: "academic_core", name: "Academico Core", description: "Ciclos, materias, grupos y horarios.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
-  { key: "users", name: "Usuarios", description: "Alumnos, padres, docentes y administrativos.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
-  { key: "students", name: "Alumnos", description: "Expedientes, inscripciones y datos academicos.", is_core: true, price_monthly_mxn: 0 },
-  { key: "groups", name: "Grupos", description: "Grados, generaciones y asignaciones.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
-  { key: "schedules", name: "Horarios", description: "Agenda semanal por grupo, profesor y materia.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
-  { key: "attendance", name: "Asistencias", description: "Registro diario y reportes de asistencia.", is_core: true, price_monthly_mxn: 0 },
-  { key: "grades", name: "Calificaciones", description: "Evaluaciones, boletas y promedios.", is_core: true, price_monthly_mxn: 0 },
-  { key: "reports", name: "Reportes", description: "Indicadores academicos y administrativos.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
-  { key: "communications", name: "Comunicaciones", description: "Avisos, mensajes y notificaciones.", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", price_monthly_mxn: 0 },
-  { key: "billing", name: "Cobranza", description: "Pagos, adeudos y facturacion escolar.", is_core: false, price_monthly_mxn: 399 },
-  { key: "transport", name: "Transporte", description: "Rutas, unidades y seguimiento operativo.", is_core: false, price_monthly_mxn: 349 },
+  { key: "auth", name: "Auth + Tenant + RBAC", description: "Login, sesiones, roles, permisos y tenant context.", category: "core", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", dependencies: [], price_monthly_mxn: 0 },
+  { key: "users", name: "Usuarios", description: "Personas unificadas: alumnos, padres, docentes y staff.", category: "core", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", dependencies: ["auth"], price_monthly_mxn: 0 },
+  { key: "academic_core", name: "Academico Core", description: "Ciclos, grados, grupos, materias, inscripciones e historial.", category: "core", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", dependencies: ["auth", "users"], price_monthly_mxn: 0 },
+  { key: "grading", name: "Grading System", description: "Calificaciones, promedios, evaluaciones y comentarios.", category: "core", is_core: true, is_required: true, enabled: true, source: "core", layer: "core", dependencies: ["academic_core"], price_monthly_mxn: 0 },
+  { key: "schedules", name: "Horarios", description: "Agenda semanal por grupo, profesor, salon y materia.", category: "academic_extension", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["academic_core"], price_monthly_mxn: 249 },
+  { key: "attendance", name: "Asistencias", description: "Registro rapido, ausencias, retardos y alertas.", category: "academic_extension", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["academic_core"], price_monthly_mxn: 299 },
+  { key: "documents", name: "Expedientes digitales", description: "PDF/JPG/PNG por alumno con preview y verificacion.", category: "operations", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["users"], price_monthly_mxn: 349 },
+  { key: "report_cards", name: "Boletas", description: "Preview y export de boletas con calificaciones y asistencia.", category: "grading_extension", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["grading", "attendance"], price_monthly_mxn: 299 },
+  { key: "communications", name: "Comunicaciones", description: "Avisos, mensajes y notificaciones por segmento.", category: "operations", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["users"], price_monthly_mxn: 249 },
+  { key: "parent_portal", name: "Portal de Padres", description: "Hijos, asistencia, calificaciones, pagos, documentos y mensajes.", category: "portal", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["users", "academic_core"], price_monthly_mxn: 399 },
+  { key: "teacher_portal", name: "Portal de Profesores", description: "Clases, asistencia, calificaciones y mensajes docentes.", category: "portal", is_core: false, is_required: false, enabled: true, source: "plan", layer: "extension", dependencies: ["users", "academic_core"], price_monthly_mxn: 399 },
+  { key: "payments", name: "Pagos y cobranza escolar", description: "Adeudos, recibos, recordatorios y reportes de cobranza.", category: "monetization", is_core: false, is_required: false, enabled: true, source: "addon", layer: "extension", dependencies: ["users"], price_monthly_mxn: 499 },
+  { key: "qr_access", name: "QR acceso y salida", description: "Entrada, salida y pickup auditado por QR.", category: "operations", is_core: false, is_required: false, enabled: true, source: "addon", layer: "extension", dependencies: ["users"], price_monthly_mxn: 449 },
+  { key: "credentials", name: "Credenciales", description: "Credenciales imprimibles con foto, logo y QR.", category: "operations", is_core: false, is_required: false, enabled: true, source: "addon", layer: "extension", dependencies: ["users", "qr_access"], price_monthly_mxn: 299 },
+  { key: "workshops", name: "Talleres", description: "Catalogo, inscripcion, horarios, asistencia y cobros de talleres.", category: "academic_extension", is_core: false, is_required: false, enabled: true, source: "addon", layer: "extension", dependencies: ["academic_core"], price_monthly_mxn: 399 },
+  { key: "analytics", name: "Analytics", description: "Indicadores operativos, academic risk y uso por modulo.", category: "analytics", is_core: false, is_required: false, enabled: true, source: "addon", layer: "extension", dependencies: ["academic_core"], price_monthly_mxn: 499 },
+  { key: "database_admin", name: "Database Admin", description: "Herramienta interna SuperAdmin para inspeccion/export/import.", category: "internal", is_core: false, is_required: false, enabled: true, source: "internal", layer: "internal", dependencies: [], price_monthly_mxn: 0 },
 ];
 
 function readMockList<T>(key: string, fallback: T[]): T[] {
@@ -1870,6 +1876,7 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     });
     const present = data.filter((item) => item.status === "present").length;
     const late = data.filter((item) => item.status === "late").length;
+    const sick = data.filter((item) => item.status === "sick").length;
     const absent = data.filter((item) => item.status === "absent").length;
     const excused = data.filter((item) => item.status === "excused").length;
     return {
@@ -1878,7 +1885,7 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
         group_id: groupID,
         date,
         students: data,
-        summary: { present, late, absent, excused, rate: data.length ? Math.round(((present + late + excused) / data.length) * 100) : 0 },
+        summary: { present, late, sick, absent, excused, rate: data.length ? Math.round(((present + late + sick + excused) / data.length) * 100) : 0 },
         last_updated: nowIso(),
       },
     };
@@ -1907,7 +1914,7 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       if (student.group_id !== groupID) return student;
       const studentRecords = [...next, ...withoutDay].filter((record: any) => record.student_id === student.id);
       if (studentRecords.length === 0) return student;
-      const healthy = studentRecords.filter((record: any) => ["present", "late", "excused"].includes(record.status)).length;
+      const healthy = studentRecords.filter((record: any) => ["present", "late", "sick", "excused"].includes(record.status)).length;
       const absent = studentRecords.filter((record: any) => record.status === "absent").length;
       return {
         ...student,
@@ -1918,6 +1925,35 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     });
     writeMockList("mock_school_students", updatedStudents);
     return { success: true, message: "Asistencia guardada en modo demo" };
+  }
+
+  const attendanceHistoryMatch = path.match(/\/school-admin\/attendance\/students\/([^/]+)\/history$/);
+  if (attendanceHistoryMatch) {
+    const studentID = decodeURIComponent(attendanceHistoryMatch[1]);
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const student = students.find((item: any) => item.id === studentID);
+    const records = readMockList("mock_school_attendance", [])
+      .filter((record: any) => record.student_id === studentID)
+      .sort((a: any, b: any) => String(b.date).localeCompare(String(a.date)));
+    const fallback = records.length ? records : [
+      { date: "2026-04-30", status: "present", notes: "", student_id: studentID },
+      { date: "2026-04-29", status: "present", notes: "", student_id: studentID },
+      { date: "2026-04-28", status: "late", notes: "Llego 10 minutos tarde", student_id: studentID },
+    ];
+    const present = fallback.filter((item: any) => item.status === "present").length;
+    const late = fallback.filter((item: any) => item.status === "late").length;
+    const sick = fallback.filter((item: any) => item.status === "sick").length;
+    const absent = fallback.filter((item: any) => item.status === "absent").length;
+    const excused = fallback.filter((item: any) => item.status === "excused").length;
+    return {
+      success: true,
+      data: {
+        student_id: studentID,
+        student_name: student ? `${student.first_name} ${student.last_name}` : "",
+        records: fallback,
+        summary: { present, late, sick, absent, excused, rate: fallback.length ? Math.round(((present + late + sick + excused) / fallback.length) * 100) : 0 },
+      },
+    };
   }
 
   const groupGradesMatch = path.match(/\/school-admin\/grades\/groups\/([^/]+)\/subjects\/([^/]+)$/);
@@ -1989,6 +2025,136 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       };
     }));
     return { success: true, data: { updated: created.length }, message: "Calificaciones guardadas en modo demo" };
+  }
+
+  if (path.endsWith("/school-admin/report-cards/generate") && method === "POST") {
+    const body = parseBody(options);
+    const student = readMockList("mock_school_students", defaultMockStudents).find((item: any) => item.id === body.student_id);
+    const subjects = readMockList("mock_school_subjects", defaultMockSubjects);
+    const grades = readMockList("mock_school_grades", []);
+    const subjectGrades = subjects.slice(0, 6).map((subject: any) => {
+      const subjectRecords = grades.filter((grade: any) => grade.student_id === body.student_id && grade.subject_id === subject.id);
+      const average = subjectRecords.length
+        ? Math.round(subjectRecords.reduce((sum: number, grade: any) => sum + Number(grade.score || 0), 0) / subjectRecords.length)
+        : Number(student?.average_grade || 88);
+      return {
+        subject_name: subject.name,
+        teacher_name: "Coordinacion academica",
+        average,
+        letter_grade: average >= 90 ? "A" : average >= 80 ? "B" : average >= 70 ? "C" : average >= 60 ? "D" : "F",
+        credits: subject.credits || 0,
+        effort: average >= 85 ? "Excelente" : average >= 70 ? "Bueno" : "Requiere apoyo",
+        behavior: average >= 70 ? "Adecuado" : "Seguimiento requerido",
+      };
+    });
+    const overall = subjectGrades.length ? Math.round(subjectGrades.reduce((sum: number, item: any) => sum + item.average, 0) / subjectGrades.length) : 0;
+    return {
+      success: true,
+      data: {
+        student_id: body.student_id,
+        student_name: student ? `${student.first_name} ${student.last_name}` : "Alumno demo",
+        group_name: student?.group_name || "",
+        period: body.period || "current",
+        overall_gpa: overall,
+        overall_grade: overall >= 90 ? "A" : overall >= 80 ? "B" : overall >= 70 ? "C" : overall >= 60 ? "D" : "F",
+        attendance_rate: Number(student?.attendance_rate || 100),
+        subject_grades: subjectGrades,
+        comments: [{ teacher_name: "Coordinacion academica", subject: "General", comment: "Boleta generada con datos demo tenant-scoped.", date: new Date().toISOString().slice(0, 10) }],
+        generated_at: nowIso(),
+      },
+    };
+  }
+
+  if (path.endsWith("/school-admin/documents") && method === "POST") {
+    const body = parseBody(options);
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const student = students.find((item: any) => item.id === body.student_id);
+    const documents = readMockList("mock_school_documents", []);
+    const created = {
+      id: `doc-${Date.now()}`,
+      student_id: body.student_id,
+      student_name: student ? `${student.first_name} ${student.last_name}` : "",
+      title: body.title,
+      description: body.description || "",
+      category: body.category || "other",
+      file_name: body.file_name || "",
+      file_url: body.file_url || "",
+      file_size: Number(body.file_size || 0),
+      mime_type: body.mime_type || "application/pdf",
+      storage_status: body.storage_status || "digital_only",
+      is_verified: false,
+      verified_at: "",
+      verified_by: "",
+      status: "active",
+      uploaded_by: "Admin Escuela",
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    writeMockList("mock_school_documents", [created, ...documents]);
+    return { success: true, data: created, message: "Documento guardado en modo demo" };
+  }
+
+  const schoolDocumentVerifyMatch = path.match(/\/school-admin\/documents\/([^/]+)\/verify$/);
+  if (schoolDocumentVerifyMatch && method === "PATCH") {
+    const id = decodeURIComponent(schoolDocumentVerifyMatch[1]);
+    const documents = readMockList("mock_school_documents", []);
+    const updated = documents.map((item: any) => item.id === id ? { ...item, is_verified: true, verified_at: nowIso(), verified_by: "Admin Escuela", updated_at: nowIso() } : item);
+    const found = updated.find((item: any) => item.id === id);
+    writeMockList("mock_school_documents", updated);
+    return { success: true, data: found, message: "Documento verificado en modo demo" };
+  }
+
+  const schoolDocumentMatch = path.match(/\/school-admin\/documents\/([^/]+)$/);
+  if (schoolDocumentMatch) {
+    const id = decodeURIComponent(schoolDocumentMatch[1]);
+    const documents = readMockList("mock_school_documents", []);
+    if (method === "PUT") {
+      const body = parseBody(options);
+      const updated = documents.map((item: any) => item.id === id ? {
+        ...item,
+        title: body.title || item.title,
+        description: body.description || "",
+        category: body.category || item.category || "other",
+        file_name: body.file_name || "",
+        file_url: body.file_url || "",
+        file_size: Number(body.file_size || 0),
+        mime_type: body.mime_type || item.mime_type || "application/pdf",
+        storage_status: body.storage_status || item.storage_status || "digital_only",
+        updated_at: nowIso(),
+      } : item);
+      const found = updated.find((item: any) => item.id === id);
+      writeMockList("mock_school_documents", updated);
+      return { success: true, data: found, message: "Documento actualizado en modo demo" };
+    }
+    if (method === "DELETE") {
+      writeMockList("mock_school_documents", documents.map((item: any) => item.id === id ? { ...item, status: "deleted", updated_at: nowIso() } : item));
+      return { success: true, message: "Documento eliminado en modo demo" };
+    }
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const existing = documents.filter((item: any) => item.student_id === id && item.status !== "deleted");
+    const student = students.find((item: any) => item.id === id);
+    const fallback = existing.length || !student ? existing : [
+      {
+        id: `doc-${id}-enrollment`,
+        student_id: id,
+        student_name: `${student.first_name} ${student.last_name}`,
+        title: "Acta de nacimiento",
+        description: "Documento de inscripcion",
+        category: "enrollment",
+        file_name: "acta-nacimiento.pdf",
+        file_url: "",
+        file_size: 0,
+        mime_type: "application/pdf",
+        storage_status: "both",
+        is_verified: true,
+        verified_at: nowIso(),
+        verified_by: "Control Escolar",
+        status: "active",
+        created_at: nowIso(),
+        updated_at: nowIso(),
+      },
+    ];
+    return { success: true, data: fallback };
   }
 
   if (path.endsWith("/school-admin/reports/metrics")) {
@@ -2407,13 +2573,25 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     const search = (url.searchParams.get("search") || "").toLowerCase();
     const status = url.searchParams.get("status") || "";
     const groupID = url.searchParams.get("group_id") || "";
+    const gradeID = url.searchParams.get("grade_id") || "";
+    const sortBy = url.searchParams.get("sort_by") || "";
+    const sortDir = url.searchParams.get("sort_dir") || "asc";
     const page = Number(url.searchParams.get("page") || "1");
     const perPage = Number(url.searchParams.get("per_page") || "20");
-    const filtered = students.filter((student) => {
-      const matchesSearch = !search || `${student.first_name} ${student.last_name} ${student.enrollment_id} ${student.parent_name}`.toLowerCase().includes(search);
+    let filtered = students.filter((student) => {
+      const matchesSearch = !search || `${student.first_name} ${student.paternal_last_name || ""} ${student.maternal_last_name || ""} ${student.last_name} ${student.enrollment_id} ${student.parent_name}`.toLowerCase().includes(search);
       const matchesStatus = !status || status === "all" || student.status === status;
       const matchesGroup = !groupID || groupID === "all" || student.group_id === groupID;
-      return matchesSearch && matchesStatus && matchesGroup;
+      const matchesGrade = !gradeID || gradeID === "all" || student.grade_id === gradeID || student.grade_name === gradeID;
+      return matchesSearch && matchesStatus && matchesGroup && matchesGrade;
+    });
+    filtered = [...filtered].sort((a: any, b: any) => {
+      const dir = sortDir === "desc" ? -1 : 1;
+      if (sortBy === "grade") return `${a.grade_name} ${a.group_name}`.localeCompare(`${b.grade_name} ${b.group_name}`) * dir;
+      if (sortBy === "attendance") return (Number(b.attendance_rate || 0) - Number(a.attendance_rate || 0)) * dir;
+      if (sortBy === "average") return (Number(b.average_grade || 0) - Number(a.average_grade || 0)) * dir;
+      if (sortBy === "name") return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`) * dir;
+      return 0;
     });
     const { items, meta } = paginate(filtered, page, perPage);
     return { success: true, data: items, meta };
@@ -2427,6 +2605,14 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
     return student
       ? { success: true, data: buildMockStudentHistory(student) }
       : { success: false, message: "Estudiante no encontrado" };
+  }
+
+  const studentScheduleMatch = path.match(/\/school-admin\/academic\/students\/([^/]+)\/schedule$/);
+  if (studentScheduleMatch) {
+    const id = decodeURIComponent(studentScheduleMatch[1]);
+    const student = readMockList("mock_school_students", defaultMockStudents).find((item: any) => item.id === id);
+    const blocks = readMockList("mock_school_schedule", defaultMockScheduleBlocks).filter((block: any) => !student?.group_id || block.group_id === student.group_id);
+    return { success: true, data: blocks };
   }
 
   const studentMatch = path.match(/\/school-admin\/academic\/students\/([^/]+)$/);
@@ -2567,8 +2753,8 @@ async function mockSuperAdminFetch(endpoint: string, options: RequestInit = {}) 
     id: mod.key,
     status: mod.enabled === false ? "inactive" : index > 9 ? "in_development" : "active",
     version: index < 8 ? "1.0.0" : "0.9.0",
-    dependencies: mod.is_core ? [] : ["academic_core"],
-    required_level: mod.layer === "level" ? mod.key : "all",
+    dependencies: (mod as any).dependencies || (mod.is_core ? [] : ["academic_core"]),
+    required_level: (mod as any).required_level || ((mod as any).layer === "level" ? mod.key : "all"),
     global_enabled: mod.enabled !== false,
     active_tenants: mod.is_core ? 3 : 1,
     error_rate: index % 4 === 0 ? 1.8 : 0.2,

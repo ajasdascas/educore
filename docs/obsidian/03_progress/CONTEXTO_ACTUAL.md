@@ -63,3 +63,18 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Siguiente foco recomendado:** smoke productivo de Teacher/Parent y despues endurecer cuotas por plan y reportes/analytics, sin abrir modulos tenant-facing nuevos fuera de los 4 Core.
 
 #module #architecture #super_admin #school_admin
+
+## Avance 30-04-2026
+- **School Admin > Layout responsive:** corregido encimado de textos con nombres largos de escuela. El sidebar trunca de forma segura y el header separa "Panel Escuela" del nombre institucional sin generar scroll horizontal global.
+- **School Admin > Estudiantes:** detalle ampliado con edad calculada, direccion, asistencia historica, horario semanal, documentos e historial/observaciones.
+- **School Admin > Horarios:** validacion reforzada en frontend y backend para evitar cruces por grupo, profesor y salon; acciones auditadas.
+- **School Admin > Asistencias:** agregado estado `sick/enfermo`, lectura por fecha real y calculo historico por alumno/mes en backend.
+- **School Admin > Documentos:** nueva ruta `/school-admin/documents` con filtros, categorias de expediente, preview y soft delete.
+- **School Admin > Boletas:** nueva ruta `/school-admin/report-cards` con preview generado desde calificaciones, asistencia y comentarios; export demo listo.
+- **Backend:** migracion `015_school_admin_panel_completion.sql`, endpoints de documentos, schedule por alumno, generacion de boletas, report card real y final grades reales.
+- **Verificacion:** `go test ./...`, `npm run build`, `git diff --check` y smoke headless local en `/school-admin/attendance`, `/documents`, `/report-cards` OK sin overflow horizontal.
+- **Auditoria visual School Admin:** se corrigio el modal de crear grupo para no salirse del viewport, se reforzo el header/sidebar contra nombres largos y se completo expediente documental digital/fisico por alumno con preview, reemplazo, verificacion y soft delete.
+- **Fix definitivo de header School Admin:** el header ya no repite nombres largos de escuela; el nombre institucional queda truncado dentro del sidebar para evitar texto encimado en produccion.
+- **Catalogo modular SaaS:** se alinearon 4 Core reales (`auth`, `users`, `academic_core`, `grading`) y extensiones vendibles por plan/add-on con migracion `016_modular_saas_catalog_and_plans.sql`.
+
+#module #school_admin #academic_core #grading #frontend #backend #security
