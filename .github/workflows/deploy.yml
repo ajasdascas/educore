@@ -46,7 +46,7 @@ jobs:
 
       - name: Verify FTP access
         run: |
-          cat <<'EOF' > ftp-verify.lftp
+          cat <<EOF > ftp-verify.lftp
           set cmd:fail-exit yes
           set ftp:ssl-allow no
           set ftp:ssl-force no
@@ -76,7 +76,7 @@ jobs:
 
       - name: Deploy to FTP server
         run: |
-          cat <<'EOF' > ftp-deploy.lftp
+          cat <<EOF > ftp-deploy.lftp
           set cmd:fail-exit yes
           set ftp:ssl-allow no
           set ftp:ssl-force no
@@ -105,7 +105,7 @@ jobs:
 
       - name: Verify uploaded files
         run: |
-          cat <<'EOF' > ftp-postcheck.lftp
+          cat <<EOF > ftp-postcheck.lftp
           set cmd:fail-exit yes
           set ftp:ssl-allow no
           set ftp:ssl-force no
