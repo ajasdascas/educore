@@ -347,3 +347,33 @@ Dos propietarios necesitan acceso total a Super Admin en produccion, pero la con
 #decision #security #auth #super_admin #database
 
 ---
+
+# 02-05-2026 - Hostinger VPS completo como ruta de produccion
+
+## Decision
+Usar Hostinger VPS completo para la API productiva (`api.onlineu.mx`) con Go/Fiber, MariaDB local, Nginx y systemd.
+
+## Razon
+Evita depender de Railway Static Outbound IP para Remote MySQL y reduce puntos de fallo. Mantiene phpMyAdmin como herramienta administrativa y conserva la ruta futura hacia PostgreSQL/NoSQL.
+
+## Impacto
+Se agregan artefactos de deploy VPS y se mantiene `DB_DRIVER=mysql` bloqueado hasta que los repositorios tenant-scoped se porten a SQL portable.
+
+#decision #vps #hostinger #mysql #deployment
+
+---
+
+# 02-05-2026 - No versionar .env
+
+## Decision
+Remover `.env` y `backend/.env` del indice git.
+
+## Razon
+Estaban trackeados y contenian secretos locales. Aunque `.gitignore` ya incluia `.env`, seguian dentro del historial/index.
+
+## Impacto
+Los archivos permanecen locales e ignorados; la configuracion compartible debe vivir en `.env.example` y `deploy/vps/api.env.production.example` sin secretos reales.
+
+#decision #security #secrets
+
+---

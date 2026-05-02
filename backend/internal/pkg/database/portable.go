@@ -46,6 +46,13 @@ func RequireTenantID(tenantID string) error {
 	return nil
 }
 
+func GlobalTenantKey(tenantID string) string {
+	if strings.TrimSpace(tenantID) == "" {
+		return "__global__"
+	}
+	return strings.TrimSpace(tenantID)
+}
+
 func MySQLRuntimeReady(enabled bool, pending []string) error {
 	if !enabled {
 		return nil

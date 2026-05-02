@@ -46,13 +46,14 @@ func main() {
 	_, err = db.ExecContext(ctx, `
 		INSERT INTO users (
 			id, tenant_id, email, password_hash, first_name, last_name, role,
-			is_active, password_must_change, email_verified_at, created_at, updated_at
+			is_active, password_must_change, email_verified_at, global_tenant_key, created_at, updated_at
 		)
-		VALUES (UUID(), NULL, ?, ?, 'Giovanni', 'SuperAdmin', 'SUPER_ADMIN', TRUE, TRUE, NOW(), NOW(), NOW())
+		VALUES (UUID(), NULL, ?, ?, 'Giovanni', 'SuperAdmin', 'SUPER_ADMIN', TRUE, TRUE, NOW(), '__global__', NOW(), NOW())
 		ON DUPLICATE KEY UPDATE
 			password_hash = VALUES(password_hash),
 			is_active = TRUE,
 			password_must_change = TRUE,
+			global_tenant_key = '__global__',
 			updated_at = NOW()
 	`, email, string(hash))
 	if err != nil {

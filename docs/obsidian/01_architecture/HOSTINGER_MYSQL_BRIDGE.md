@@ -7,6 +7,7 @@ EduCore mantiene Go/Fiber como API unica. Hostinger/phpMyAdmin se usa solo como 
 
 ## Estado implementado
 - Schema puente: `backend/migrations_mysql/001_hostinger_core.sql`.
+- Reset seguro para imports parciales: `backend/migrations_mysql/000_reset_hostinger_core.sql`.
 - Seed seguro para propietarios SuperAdmin: `go run backend/scripts/seed_owner_admins.go`.
 - Catalogo de niveles con activos actuales (`preescolar`, `kinder`, `primaria`) y futuros conservados pero deshabilitados (`secundaria`, `prepa`, `universidad`).
 - Catalogo de modulos vendibles con metadata `global_enabled`, `visible`, `supported_now`, `educational_level`, `plan_required` y `dependencies`.
@@ -19,6 +20,25 @@ EduCore mantiene Go/Fiber como API unica. Hostinger/phpMyAdmin se usa solo como 
 
 ## Bloqueo tecnico
 El runtime productivo no debe activarse con `DB_DRIVER=mysql` todavia. Los modulos actuales siguen dependiendo de `pgxpool` y muchas queries usan sintaxis PostgreSQL (`$1`, `::jsonb`, `date_trunc`, `INTERVAL`, `RETURNING`, arrays). El servidor valida conexion MySQL, pero falla cerrado si se intenta arrancar en modo MySQL antes de portar repositorios.
+
+## Incidente Hostinger #1901
+Al importar el primer schema en phpMyAdmin de Hostinger, MariaDB rechazo:
+
+```sql
+global_tenant_key VARCHAR(80) GENERATED ALWAYS AS (COALESCE(tenant_id, '__global__')) STORED
+```
+
+Causa: la version MariaDB/Hostinger no permite esa expresion con `COALESCE` dentro de una columna generada. Solucion aplicada:
+
+- `global_tenant_key` ahora es una columna normal con default `__global__`.
+- Triggers `trg_users_global_key_bi` y `trg_users_global_key_bu` sincronizan el valor antes de insert/update.
+- Los scripts de seed tambien escriben `global_tenant_key='__global__'` como fallback de aplicacion.
+
+Para limpiar una importacion parcial en phpMyAdmin:
+
+1. Seleccionar la DB puente.
+2. Importar `backend/migrations_mysql/000_reset_hostinger_core.sql`.
+3. Importar de nuevo `backend/migrations_mysql/001_hostinger_core.sql`.
 
 ## Matriz de port pendiente
 - `auth`: login/reset/invitations usan `pgxpool`, `$1` e intervalos Postgres.
@@ -35,8 +55,9 @@ Cada modulo debe migrarse a repositorios `database/sql` portables y tests negati
 1. Crear DB MySQL en hPanel.
 2. Crear usuario con contrasena fuerte.
 3. Habilitar Remote MySQL solo para la IP de salida del backend Railway.
-4. Importar `backend/migrations_mysql/001_hostinger_core.sql` desde phpMyAdmin.
-5. Ejecutar seed de propietarios:
+4. Si hubo error previo, importar primero `backend/migrations_mysql/000_reset_hostinger_core.sql`.
+5. Importar `backend/migrations_mysql/001_hostinger_core.sql` desde phpMyAdmin.
+6. Ejecutar seed de propietarios:
 
 ```bash
 cd backend
@@ -47,7 +68,18 @@ EDUCORE_OWNER_ADMIN_PASSWORD='set-this-as-a-secret' \
 go run ./scripts/seed_owner_admins.go
 ```
 
-6. Portar repositorios tenant-scoped a `database/sql` portable antes de activar `DB_DRIVER=mysql`.
+7. Portar repositorios tenant-scoped a `database/sql` portable antes de activar `DB_DRIVER=mysql`.
+
+## Opcion C seleccionada: Hostinger VPS completo
+La ruta recomendada ya no depende de Remote MySQL entre Railway y Hostinger. El objetivo productivo es:
+
+- Backend Go/Fiber en Hostinger VPS.
+- MariaDB local en el mismo VPS.
+- phpMyAdmin protegido y solo administrativo.
+- Nginx reverse proxy en `api.onlineu.mx`.
+- Cloudflare `Full (strict)` cuando el certificado del VPS este activo.
+
+Ver runbook: `docs/obsidian/02_development/VPS_BACKEND_DEPLOY.md`.
 
 ## Seguridad
 - No usar Remote MySQL con `%`.

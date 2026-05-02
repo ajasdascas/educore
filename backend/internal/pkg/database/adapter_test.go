@@ -59,6 +59,15 @@ func TestRequireTenantID(t *testing.T) {
 	}
 }
 
+func TestGlobalTenantKey(t *testing.T) {
+	if got := GlobalTenantKey(""); got != "__global__" {
+		t.Fatalf("empty global tenant key = %q", got)
+	}
+	if got := GlobalTenantKey(" tenant-1 "); got != "tenant-1" {
+		t.Fatalf("tenant global key = %q", got)
+	}
+}
+
 func TestMySQLRuntimeReady(t *testing.T) {
 	if err := MySQLRuntimeReady(false, []string{"auth"}); err != nil {
 		t.Fatalf("postgres mode should not be blocked: %v", err)

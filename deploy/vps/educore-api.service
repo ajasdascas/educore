@@ -1,0 +1,22 @@
+[Unit]
+Description=EduCore Go/Fiber API
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=educore
+Group=educore
+WorkingDirectory=/opt/educore/api
+EnvironmentFile=/etc/educore/api.env
+ExecStart=/opt/educore/api/educore-api
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/educore/api /var/log/educore
+
+[Install]
+WantedBy=multi-user.target

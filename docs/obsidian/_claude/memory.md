@@ -539,3 +539,17 @@ Se endurecio seguridad: `TenantResolver` ya no confia en `X-Tenant-ID`, CORS eli
 Verificacion: `go test ./...` OK, `npx tsc --noEmit` OK, `NEXT_PUBLIC_DEMO_MODE=false npm run build` OK, schema MySQL importo en MariaDB local, seed de propietarios funciono en MariaDB local, y busqueda en `frontend/out` no encontro `mock-token`, contrasena real, `MYSQL_DSN` ni secretos Stripe.
 
 #memory #security #super_admin #hostinger #cloudflare #mysql #deployment
+
+---
+
+# 02-05-2026 - Correccion Hostinger #1901 y plan VPS completo
+
+Se corrigio el schema MySQL puente porque Hostinger/MariaDB rechazo la columna generada `global_tenant_key` con `COALESCE` durante import en phpMyAdmin. La columna ahora es normal, con triggers `BEFORE INSERT/UPDATE` y fallback en scripts de seed. Se agrego reset seguro `backend/migrations_mysql/000_reset_hostinger_core.sql` para limpiar imports parciales antes de reimportar.
+
+Se eligio la ruta de produccion con Hostinger VPS completo: Go/Fiber API + MariaDB local + Nginx + systemd + `api.onlineu.mx`, manteniendo frontend estatico en Hostinger y Cloudflare como DNS/proxy. Se agregaron artefactos de VPS, runbook y matriz de portabilidad MySQL. `DB_DRIVER=mysql` sigue bloqueado porque los repositorios principales aun tienen deuda `pgxpool`/PostgreSQL-specific.
+
+Hallazgo de seguridad: `.env` y `backend/.env` estaban versionados con secretos locales. Se removieron del indice git con `git rm --cached` y quedan ignorados localmente por `.gitignore`.
+
+Verificacion: schema reset/import OK en MariaDB 10.4 local, triggers creados, seed de propietarios probado con password temporal, `go test ./...`, `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, scan de bundle sin secretos.
+
+#memory #hostinger #vps #mysql #security #deployment #backend

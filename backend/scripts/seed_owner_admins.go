@@ -84,9 +84,9 @@ func upsertOwner(ctx context.Context, db *sql.DB, driver, email, hash string) er
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO users (
 				id, tenant_id, email, password_hash, first_name, last_name, role,
-				is_active, password_must_change, email_verified_at, created_at, updated_at
+				is_active, password_must_change, email_verified_at, global_tenant_key, created_at, updated_at
 			)
-			VALUES (?, NULL, ?, ?, ?, ?, 'SUPER_ADMIN', TRUE, FALSE, NOW(), NOW(), NOW())
+			VALUES (?, NULL, ?, ?, ?, ?, 'SUPER_ADMIN', TRUE, FALSE, NOW(), '__global__', NOW(), NOW())
 			ON DUPLICATE KEY UPDATE
 				password_hash = VALUES(password_hash),
 				first_name = VALUES(first_name),
@@ -94,6 +94,7 @@ func upsertOwner(ctx context.Context, db *sql.DB, driver, email, hash string) er
 				role = 'SUPER_ADMIN',
 				is_active = TRUE,
 				password_must_change = FALSE,
+				global_tenant_key = '__global__',
 				email_verified_at = COALESCE(email_verified_at, NOW()),
 				deleted_at = NULL,
 				updated_at = NOW()

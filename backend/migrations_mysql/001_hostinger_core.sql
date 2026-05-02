@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS users (
   invitation_token TEXT NULL,
   invitation_expires_at DATETIME NULL,
   last_login_at DATETIME NULL,
-  global_tenant_key VARCHAR(80) GENERATED ALWAYS AS (COALESCE(tenant_id, '__global__')) STORED,
+  global_tenant_key VARCHAR(80) NOT NULL DEFAULT '__global__',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL,
@@ -104,6 +104,33 @@ CREATE TABLE IF NOT EXISTS users (
   KEY idx_users_tenant (tenant_id),
   CONSTRAINT fk_users_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TRIGGER IF EXISTS trg_users_global_key_bi;
+DROP TRIGGER IF EXISTS trg_users_global_key_bu;
+
+DELIMITER $$
+CREATE TRIGGER trg_users_global_key_bi
+BEFORE INSERT ON users
+FOR EACH ROW
+BEGIN
+  IF NEW.tenant_id IS NULL THEN
+    SET NEW.global_tenant_key = '__global__';
+  ELSE
+    SET NEW.global_tenant_key = NEW.tenant_id;
+  END IF;
+END$$
+
+CREATE TRIGGER trg_users_global_key_bu
+BEFORE UPDATE ON users
+FOR EACH ROW
+BEGIN
+  IF NEW.tenant_id IS NULL THEN
+    SET NEW.global_tenant_key = '__global__';
+  ELSE
+    SET NEW.global_tenant_key = NEW.tenant_id;
+  END IF;
+END$$
+DELIMITER ;
 
 CREATE TABLE IF NOT EXISTS school_years (
   id CHAR(36) NOT NULL PRIMARY KEY,
