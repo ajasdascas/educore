@@ -189,12 +189,16 @@ func (h *Handler) DeletePlan(c *fiber.Ctx) error {
 
 	// Verificar si hay escuelas usando este plan (lógica simple para ahora)
 	// En un escenario real, no se borra, se desactiva.
-	_, err := h.db.Exec(c.UserContext(), "DELETE FROM subscription_plans WHERE id = $1", id)
+	tag, err := h.db.Exec(c.UserContext(), "UPDATE subscription_plans SET is_active = false, updated_at = NOW() WHERE id = $1", id)
 	if err != nil {
-		return response.Error(c, fiber.StatusConflict, "Cannot delete plan, might be in use")
+		return response.Error(c, fiber.StatusInternalServerError, "Error deactivating plan")
+	}
+	if tag.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Plan not found")
 	}
 
-	return response.Success(c, nil, "Plan deleted")
+	h.auditSuperAdmin(c, "plan.deactivate", "subscription_plans", id, "warning", fiber.Map{"plan_id": id}, "")
+	return response.Success(c, nil, "Plan deactivated")
 }
 
 func (h *Handler) TogglePlan(c *fiber.Ctx) error {

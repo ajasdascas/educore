@@ -37,7 +37,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
 
   return (
     <RoleGuard allowedRoles={["TEACHER"]}>
-      <div className="min-h-screen bg-background flex flex-col lg:flex-row">
+      <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background flex flex-col lg:flex-row">
         {sidebarOpen && (
           <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
@@ -82,20 +82,20 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
           </nav>
         </aside>
 
-        <main className="flex flex-col flex-1 min-w-0">
-          <header className="h-16 bg-card border-b border-border flex items-center justify-between px-3 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-10 transition-colors">
-            <div className="flex items-center">
+        <main className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden">
+          <header className="h-16 overflow-visible bg-card border-b border-border flex items-center justify-between gap-2 px-3 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-40 transition-colors">
+            <div className="flex min-w-0 flex-1 items-center overflow-hidden">
               <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-md hover:bg-muted lg:hidden mr-2">
                 <Menu className="w-5 h-5" />
               </button>
-              <h1 className="text-lg font-semibold text-foreground">Portal de Profesores</h1>
+              <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">Portal de Profesores</h1>
             </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-4">
               <ThemeToggle />
               <ProfileDropdown userInitials={userInitials} userRole="Profesor" />
             </div>
           </header>
-          <div className="p-3 sm:p-4 lg:p-5 flex-1 overflow-auto">{children}</div>
+          <div className="min-w-0 max-w-full p-3 sm:p-4 lg:p-5 flex-1 overflow-x-hidden overflow-y-auto">{children}</div>
         </main>
         <Toaster />
       </div>

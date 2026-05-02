@@ -1,6 +1,7 @@
 import { authFetch } from "@/lib/auth";
 
 export type EducationLevel =
+  | "preescolar"
   | "kinder"
   | "primaria"
   | "secundaria_general"
@@ -45,8 +46,31 @@ export type EnabledModule = {
   is_core: boolean;
   is_required: boolean;
   enabled: boolean;
+  visible?: boolean;
+  supported_now?: boolean;
+  educational_level?: EducationLevel | "";
+  plan_required?: string;
+  dependencies?: ModuleKey[];
   source?: "core" | "level" | "plan" | "manual" | string;
   price_monthly_mxn?: number;
+};
+
+export const ACTIVE_EDUCATION_LEVELS: EducationLevel[] = ["preescolar", "kinder", "primaria"];
+
+export const EDUCATION_LEVEL_CATALOG: Record<EducationLevel, {
+  label: string;
+  enabled: boolean;
+  visible: boolean;
+  supported_now: boolean;
+}> = {
+  preescolar: { label: "Preescolar", enabled: true, visible: true, supported_now: true },
+  kinder: { label: "Kinder", enabled: true, visible: true, supported_now: true },
+  primaria: { label: "Primaria", enabled: true, visible: true, supported_now: true },
+  secundaria_general: { label: "Secundaria", enabled: false, visible: false, supported_now: false },
+  secundaria_tecnica: { label: "Secundaria tecnica", enabled: false, visible: false, supported_now: false },
+  prepa_general: { label: "Preparatoria", enabled: false, visible: false, supported_now: false },
+  prepa_tecnica: { label: "Preparatoria tecnica", enabled: false, visible: false, supported_now: false },
+  universidad: { label: "Universidad", enabled: false, visible: false, supported_now: false },
 };
 
 export const CORE_MODULES: EnabledModule[] = [
@@ -95,7 +119,8 @@ export const MODULE_ALIASES: Record<string, string[]> = {
 };
 
 export const MODULES_BY_LEVEL: Record<EducationLevel, ModuleKey[]> = {
-  kinder: ["academic_core", "users", "students", "groups", "schedules", "attendance", "reports", "communications"],
+  preescolar: ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"],
+  kinder: ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"],
   primaria: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
   secundaria_general: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
   secundaria_tecnica: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],

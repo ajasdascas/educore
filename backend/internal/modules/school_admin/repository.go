@@ -2,6 +2,7 @@ package school_admin
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -20,6 +21,20 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{
 		db: db,
 	}
+}
+
+func (r *Repository) IsModuleEnabled(ctx context.Context, tenantID, moduleKey string) bool {
+	var enabled bool
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(tm.enabled, tm.is_active, false)
+		FROM tenant_modules tm
+		INNER JOIN modules_catalog mc ON mc.key = tm.module_key
+		WHERE tm.tenant_id = $1
+		  AND tm.module_key = $2
+		  AND COALESCE(mc.global_enabled, true) = true
+		LIMIT 1
+	`, tenantID, moduleKey).Scan(&enabled)
+	return err == nil && enabled
 }
 
 func mapBoolStatus(isActive bool) string {
@@ -2819,4 +2834,184 @@ func (r *Repository) AuditSchoolAction(ctx context.Context, tenantID, userID, ac
 		VALUES ($1, NULLIF($2, '')::uuid, 'SCHOOL_ADMIN', $3, $4, NULLIF($5, '')::uuid, $6::jsonb)
 	`, tenantID, userID, action, entity, entityID, string(raw))
 	return err
+}
+
+func (r *Repository) GetPayments(ctx context.Context, tenantID string, params GetPaymentsParams) (*StudentPaymentsResponse, error) {
+	where := []string{"p.tenant_id = $1", "p.deleted_at IS NULL"}
+	args := []interface{}{tenantID}
+	nextArg := 2
+
+	if strings.TrimSpace(params.StudentID) != "" {
+		where = append(where, fmt.Sprintf("p.student_id = $%d", nextArg))
+		args = append(args, params.StudentID)
+		nextArg++
+	}
+	if strings.TrimSpace(params.GroupID) != "" {
+		where = append(where, fmt.Sprintf("g.id = $%d", nextArg))
+		args = append(args, params.GroupID)
+		nextArg++
+	}
+	if strings.TrimSpace(params.Status) != "" && params.Status != "all" {
+		where = append(where, fmt.Sprintf("p.status = $%d", nextArg))
+		args = append(args, params.Status)
+		nextArg++
+	}
+	if strings.TrimSpace(params.Concept) != "" && params.Concept != "all" {
+		where = append(where, fmt.Sprintf("LOWER(p.concept) LIKE LOWER($%d)", nextArg))
+		args = append(args, "%"+params.Concept+"%")
+		nextArg++
+	}
+	if strings.TrimSpace(params.FromDate) != "" {
+		where = append(where, fmt.Sprintf("p.due_date >= NULLIF($%d, '')::date", nextArg))
+		args = append(args, params.FromDate)
+		nextArg++
+	}
+	if strings.TrimSpace(params.ToDate) != "" {
+		where = append(where, fmt.Sprintf("p.due_date <= NULLIF($%d, '')::date", nextArg))
+		args = append(args, params.ToDate)
+		nextArg++
+	}
+
+	query := fmt.Sprintf(`
+		SELECT p.id::text,
+		       s.id::text,
+		       TRIM(CONCAT(s.first_name, ' ', s.last_name)) AS student_name,
+		       COALESCE(s.enrollment_number, '') AS student_code,
+		       COALESCE(g.id::text, '') AS group_id,
+		       COALESCE(g.name, '') AS group_name,
+		       p.concept,
+		       COALESCE(p.description, ''),
+		       p.amount::float8,
+		       p.currency,
+		       TO_CHAR(p.due_date, 'YYYY-MM-DD'),
+		       p.paid_at,
+		       COALESCE(p.payment_method, ''),
+		       COALESCE(p.receipt_number, ''),
+		       COALESCE(p.receipt_url, ''),
+		       p.status,
+		       COALESCE(p.metadata->>'notes', ''),
+		       p.created_at
+		FROM student_payments p
+		INNER JOIN students s ON s.id = p.student_id AND s.tenant_id = p.tenant_id
+		LEFT JOIN group_students gs ON gs.student_id = s.id
+		LEFT JOIN groups g ON g.id = gs.group_id AND g.tenant_id = p.tenant_id
+		WHERE %s
+		ORDER BY CASE WHEN p.status = 'overdue' THEN 0 WHEN p.status = 'pending' THEN 1 WHEN p.status = 'partial' THEN 2 ELSE 3 END,
+		         p.due_date DESC, p.created_at DESC
+	`, strings.Join(where, " AND "))
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	resp := &StudentPaymentsResponse{Payments: []StudentPaymentResponse{}, Summary: StudentPaymentSummary{Currency: "MXN"}}
+	for rows.Next() {
+		var item StudentPaymentResponse
+		var paidAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.StudentCode, &item.GroupID, &item.GroupName, &item.Concept, &item.Description, &item.Amount, &item.Currency, &item.DueDate, &paidAt, &item.PaymentMethod, &item.ReceiptNumber, &item.ReceiptURL, &item.Status, &item.Notes, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		if paidAt.Valid {
+			item.PaidAt = &paidAt.Time
+		}
+		if item.Currency != "" {
+			resp.Summary.Currency = item.Currency
+		}
+		switch item.Status {
+		case "paid":
+			resp.Summary.TotalPaid += item.Amount
+			resp.Summary.PaidCount++
+		case "overdue":
+			resp.Summary.TotalDue += item.Amount
+			resp.Summary.TotalOverdue += item.Amount
+			resp.Summary.OverdueCount++
+		case "partial":
+			resp.Summary.TotalDue += item.Amount
+			resp.Summary.PartialCount++
+		case "cancelled":
+			resp.Summary.CancelledCount++
+		default:
+			resp.Summary.TotalDue += item.Amount
+			resp.Summary.PendingCount++
+		}
+		resp.Payments = append(resp.Payments, item)
+	}
+	return resp, rows.Err()
+}
+
+func (r *Repository) GetPayment(ctx context.Context, tenantID, paymentID string) (*StudentPaymentResponse, error) {
+	resp, err := r.GetPayments(ctx, tenantID, GetPaymentsParams{})
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range resp.Payments {
+		if item.ID == paymentID {
+			return &item, nil
+		}
+	}
+	return nil, fmt.Errorf("payment not found")
+}
+
+func (r *Repository) CreateStudentCharge(ctx context.Context, tenantID, userID string, req CreateStudentChargeRequest) (*StudentPaymentResponse, error) {
+	metadata, _ := json.Marshal(map[string]interface{}{"notes": req.Notes})
+	var id string
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO student_payments (tenant_id, student_id, concept, description, amount, currency, due_date, status, created_by, metadata)
+		SELECT $1, s.id, $3, $4, $5, $6, NULLIF($7, '')::date, 'pending', NULLIF($8, '')::uuid, $9::jsonb
+		FROM students s
+		WHERE s.tenant_id = $1 AND s.id = $2
+		RETURNING id::text
+	`, tenantID, req.StudentID, req.Concept, req.Description, req.Amount, req.Currency, req.DueDate, userID, string(metadata)).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+	return r.GetPayment(ctx, tenantID, id)
+}
+
+func (r *Repository) RecordStudentPayment(ctx context.Context, tenantID, userID, paymentID string, req RecordStudentPaymentRequest) (*StudentPaymentResponse, error) {
+	before, err := r.GetPayment(ctx, tenantID, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if req.Amount > before.Amount {
+		return nil, fmt.Errorf("payment amount exceeds charge amount")
+	}
+	status := "paid"
+	if req.Amount < before.Amount {
+		status = "partial"
+	}
+	receiptNumber := before.ReceiptNumber
+	if receiptNumber == "" {
+		suffix := paymentID
+		if len(suffix) > 8 {
+			suffix = suffix[len(suffix)-8:]
+		}
+		receiptNumber = "REC-" + time.Now().Format("20060102") + "-" + strings.ToUpper(suffix)
+	}
+	metadata, _ := json.Marshal(map[string]interface{}{
+		"notes":            strings.TrimSpace(req.Notes),
+		"reference":        strings.TrimSpace(req.Reference),
+		"registered_by":    userID,
+		"amount_collected": req.Amount,
+	})
+	tag, err := r.db.Exec(ctx, `
+		UPDATE student_payments
+		SET status = $1,
+		    paid_at = NOW(),
+		    payment_method = $2,
+		    receipt_number = $3,
+		    receipt_url = COALESCE(NULLIF(receipt_url, ''), '#'),
+		    metadata = metadata || $4::jsonb,
+		    updated_at = NOW()
+		WHERE tenant_id = $5 AND id = $6 AND deleted_at IS NULL
+	`, status, req.Method, receiptNumber, string(metadata), tenantID, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, fmt.Errorf("payment not found")
+	}
+	return r.GetPayment(ctx, tenantID, paymentID)
 }

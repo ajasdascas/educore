@@ -64,20 +64,21 @@ const planColors = {
 };
 
 const educationLevelOptions = [
-  { value: "kinder", label: "Kinder / Preescolar" },
-  { value: "primaria", label: "Primaria" },
-  { value: "secundaria_general", label: "Secundaria General" },
-  { value: "secundaria_tecnica", label: "Secundaria Tecnica" },
-  { value: "prepa_general", label: "Preparatoria General" },
-  { value: "prepa_tecnica", label: "Preparatoria Tecnica" },
-  { value: "universidad", label: "Universidad" },
+  { value: "preescolar", label: "Preescolar", supportedNow: true },
+  { value: "kinder", label: "Kinder", supportedNow: true },
+  { value: "primaria", label: "Primaria", supportedNow: true },
+  { value: "secundaria_general", label: "Secundaria", supportedNow: false },
+  { value: "secundaria_tecnica", label: "Secundaria tecnica", supportedNow: false },
+  { value: "prepa_general", label: "Preparatoria", supportedNow: false },
+  { value: "prepa_tecnica", label: "Preparatoria tecnica", supportedNow: false },
+  { value: "universidad", label: "Universidad", supportedNow: false },
 ];
 
 const premiumModuleOptions = [
-  { value: "billing", label: "Cobranza" },
-  { value: "transport", label: "Transporte" },
-  { value: "cafeteria", label: "Cafeteria" },
-  { value: "uniforms_store", label: "Tienda de Uniformes" },
+  { value: "payments", label: "Pagos y cobranza" },
+  { value: "workshops", label: "Talleres" },
+  { value: "qr_access", label: "Acceso QR" },
+  { value: "credentials", label: "Credenciales" },
 ];
 
 interface School {
@@ -189,11 +190,12 @@ export default function SchoolsPage() {
     fetchPlans();
   }, []);
 
-  const handleLevelToggle = (level: string) => {
-    const newLevels = formData.levels.includes(level)
-      ? formData.levels.filter(l => l !== level)
-      : [...formData.levels, level];
-    setFormData({ ...formData, levels: newLevels });
+  const handleLevelSelect = (level: string) => {
+    setFormData({
+      ...formData,
+      levels: [level],
+      eval_scheme: level === "primaria" ? "0-10" : "cualitativa",
+    });
   };
 
   const handleModuleToggle = (mod: string) => {
@@ -205,6 +207,14 @@ export default function SchoolsPage() {
 
   const handleCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.levels.length === 0) {
+      toast({
+        title: "Selecciona el nivel escolar",
+        description: "Elige Preescolar, Kinder o Primaria antes de crear la escuela.",
+        variant: "destructive",
+      });
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -334,9 +344,10 @@ export default function SchoolsPage() {
                         <Badge 
                           key={level.value}
                           variant={formData.levels.includes(level.value) ? "default" : "outline"}
-                          className="cursor-pointer" 
-                          onClick={() => handleLevelToggle(level.value)}>
-                          {level.label}
+                          className={level.supportedNow ? "cursor-pointer" : "cursor-not-allowed opacity-50"}
+                          title={level.supportedNow ? level.label : `${level.label} estara disponible proximamente`}
+                          onClick={() => level.supportedNow && handleLevelSelect(level.value)}>
+                          {level.label}{!level.supportedNow ? " - Proximamente" : ""}
                         </Badge>
                       ))}
                     </div>

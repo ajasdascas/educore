@@ -262,6 +262,37 @@ type GenerateReportCardRequest struct {
 	ConfirmationText  string `json:"confirmation_text"`
 }
 
+type GetPaymentsParams struct {
+	StudentID string `json:"student_id"`
+	GroupID   string `json:"group_id"`
+	Status    string `json:"status"`
+	Concept   string `json:"concept"`
+	FromDate  string `json:"from_date"`
+	ToDate    string `json:"to_date"`
+}
+
+type CreateStudentChargeRequest struct {
+	StudentID   string  `json:"student_id" validate:"required"`
+	Concept     string  `json:"concept" validate:"required"`
+	Description string  `json:"description"`
+	Amount      float64 `json:"amount" validate:"required,min=0"`
+	Currency    string  `json:"currency"`
+	DueDate     string  `json:"due_date" validate:"required"`
+	Notes       string  `json:"notes"`
+}
+
+type RecordStudentPaymentRequest struct {
+	Method    string  `json:"method" validate:"required"`
+	Amount    float64 `json:"amount" validate:"required,min=0"`
+	Reference string  `json:"reference"`
+	Notes     string  `json:"notes"`
+}
+
+type CreateCardCheckoutSessionRequest struct {
+	SuccessURL string `json:"success_url"`
+	CancelURL  string `json:"cancel_url"`
+}
+
 // Response DTOs
 type DashboardResponse struct {
 	Stats          *DashboardStats `json:"stats"`
@@ -423,6 +454,44 @@ type ParentContact struct {
 	Relationship     string `json:"relationship"`
 	IsPrimary        bool   `json:"is_primary"`
 	Notes            string `json:"notes"`
+}
+
+type StudentPaymentResponse struct {
+	ID            string     `json:"id"`
+	StudentID     string     `json:"student_id"`
+	StudentName   string     `json:"student_name"`
+	StudentCode   string     `json:"student_code"`
+	GroupID       string     `json:"group_id"`
+	GroupName     string     `json:"group_name"`
+	Concept       string     `json:"concept"`
+	Description   string     `json:"description"`
+	Amount        float64    `json:"amount"`
+	Currency      string     `json:"currency"`
+	DueDate       string     `json:"due_date"`
+	PaidAt        *time.Time `json:"paid_at,omitempty"`
+	PaymentMethod string     `json:"payment_method"`
+	ReceiptNumber string     `json:"receipt_number"`
+	ReceiptURL    string     `json:"receipt_url"`
+	Status        string     `json:"status"`
+	Notes         string     `json:"notes"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+type StudentPaymentSummary struct {
+	TotalDue       float64 `json:"total_due"`
+	TotalPaid      float64 `json:"total_paid"`
+	TotalOverdue   float64 `json:"total_overdue"`
+	PendingCount   int     `json:"pending_count"`
+	PaidCount      int     `json:"paid_count"`
+	OverdueCount   int     `json:"overdue_count"`
+	PartialCount   int     `json:"partial_count"`
+	CancelledCount int     `json:"cancelled_count"`
+	Currency       string  `json:"currency"`
+}
+
+type StudentPaymentsResponse struct {
+	Payments []StudentPaymentResponse `json:"payments"`
+	Summary  StudentPaymentSummary    `json:"summary"`
 }
 
 type AcademicHistoryItem struct {

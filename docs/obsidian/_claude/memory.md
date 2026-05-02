@@ -485,3 +485,29 @@ Se identifico que el encimado persistente venia del nombre largo de escuela esca
 Verificacion realizada: `go test ./...`, `npm run build`, `git diff --check` y smoke Browser Use local en `4187` OK.
 
 #memory #school_admin #frontend #modules #billing #saas
+
+---
+
+# 02-05-2026 - Dropdown perfil y alcance de niveles escolares
+
+Se reemplazo el dropdown manual de perfil por el `DropdownMenu` portalizado compartido, para que el menu de cuenta abra correctamente y no pueda quedar cortado por headers o contenedores con overflow. Se reforzaron headers de School Admin, Super Admin, Teacher y Parent con `overflow-visible`, `z-40`, truncado seguro y `min-w-0`.
+
+Tambien se limito el flujo activo de creacion de escuela a `preescolar`, `kinder` y `primaria` en frontend/backend. Preescolar queda como nivel propio, con documentos incluidos por defecto junto con usuarios, grupos, horarios, asistencia, reportes y comunicaciones. El backend rechaza niveles fuera del alcance actual.
+
+Verificacion realizada: `npm run build` OK, `go test ./...` OK y `git diff --check` OK. `npx tsc --noEmit` sigue fallando por errores JSX preexistentes en Database Admin.
+
+#memory #frontend #school_admin #super_admin #ux #modules
+
+---
+
+# 02-05-2026 - Dropdown definitivo, pagos escolares e hardening
+
+Se reemplazo el menu de perfil por un dropdown controlado manualmente y portalizado a `document.body`, con `position: fixed`, `z-index` alto, cierre por Escape/click externo y `data-testid` para QA. Se valido en navegador en School Admin, Super Admin, Teacher y Parent: el menu abre, no queda cortado y logout regresa al login.
+
+Tambien se corrigieron los errores JSX de Database Admin, `npx tsc --noEmit` quedo OK, y se agrego cobranza School Admin con historial por alumno, filtros, registro de efectivo/transferencia, recibos y vista Parent de adeudos/historial por hijo. Se conservaron secundaria/prepa/universidad en catalogo como niveles futuros deshabilitados/proximamente.
+
+Stripe quedo como adapter backend seguro via Checkout Sessions, bloqueado por `EDUCORE_STRIPE_ENABLED` y `STRIPE_SECRET_KEY`; el backend toma el monto desde `student_payments`, nunca desde el frontend.
+
+Verificacion realizada: `npx tsc --noEmit` OK, `npm run build` OK, `go test ./...` OK, `git diff --check` OK con warnings CRLF. Smoke Browser Use local en puerto limpio `4199`: dropdown/logout en los 4 roles, `/school-admin/payments`, `/parent/payments` y modal de alta de escuela.
+
+#memory #frontend #backend #security #payments #school_admin #parent_portal

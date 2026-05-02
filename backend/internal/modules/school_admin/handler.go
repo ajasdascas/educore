@@ -85,6 +85,27 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	api.Patch("/documents/:documentId/verify", h.VerifyStudentDocument)
 	api.Delete("/documents/:documentId", h.DeleteStudentDocument)
 	api.Post("/report-cards/generate", h.GenerateReportCard)
+
+	payments := api.Group("/payments", h.RequireModule("payments"))
+	payments.Get("", h.GetPayments)
+	payments.Get("/", h.GetPayments)
+	payments.Post("/charges", h.CreateStudentCharge)
+	payments.Post("/:id/record-payment", h.RecordStudentPayment)
+	payments.Post("/:id/card-checkout-session", h.CreatePaymentCheckoutSession)
+	payments.Get("/:id/receipt", h.GetPaymentReceipt)
+}
+
+func (h *Handler) RequireModule(moduleKey string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		tenantID, ok := c.Locals("tenant_id").(string)
+		if !ok || tenantID == "" {
+			return response.Error(c, fiber.StatusUnauthorized, "Tenant context required")
+		}
+		if !h.service.IsModuleEnabled(c.Context(), tenantID, moduleKey) {
+			return response.Error(c, fiber.StatusForbidden, "Module not enabled for this tenant")
+		}
+		return c.Next()
+	}
 }
 
 func (h *Handler) GetSettings(c *fiber.Ctx) error {
@@ -753,4 +774,71 @@ func (h *Handler) DeleteStudentDocument(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
 	return response.SuccessMessage(c, "Document deleted successfully")
+}
+
+func (h *Handler) GetPayments(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	payments, err := h.service.GetPayments(c.Context(), tenantID, GetPaymentsParams{
+		StudentID: c.Query("student_id"),
+		GroupID:   c.Query("group_id"),
+		Status:    c.Query("status"),
+		Concept:   c.Query("concept"),
+		FromDate:  c.Query("from"),
+		ToDate:    c.Query("to"),
+	})
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, payments, "Success")
+}
+
+func (h *Handler) CreateStudentCharge(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req CreateStudentChargeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	payment, err := h.service.CreateStudentCharge(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, payment, "Charge created")
+}
+
+func (h *Handler) RecordStudentPayment(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req RecordStudentPaymentRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	payment, err := h.service.RecordStudentPayment(c.Context(), tenantID, userID, c.Params("id"), req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, payment, "Payment recorded")
+}
+
+func (h *Handler) GetPaymentReceipt(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	receipt, err := h.service.GetPaymentReceipt(c.Context(), tenantID, c.Params("id"))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
+	}
+	return response.Success(c, receipt, "Success")
+}
+
+func (h *Handler) CreatePaymentCheckoutSession(c *fiber.Ctx) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	var req CreateCardCheckoutSessionRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	session, err := h.service.CreateStripeCheckoutSession(c.Context(), tenantID, userID, c.Params("id"), req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusServiceUnavailable, err)
+	}
+	return response.Success(c, session, "Stripe checkout session created")
 }

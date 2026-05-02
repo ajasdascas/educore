@@ -30,6 +30,8 @@ interface Toast {
   description?: string
   variant?: "default" | "success" | "destructive" | "warning"
   action?: React.ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface ToastState {
@@ -41,7 +43,7 @@ const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 type Action =
   | { type: "ADD_TOAST"; toast: Toast }
   | { type: "UPDATE_TOAST"; id: string; toast: Partial<Toast> }
-  | { type: "DISMISS_TOAST"; id: string }
+  | { type: "DISMISS_TOAST"; id?: string }
   | { type: "REMOVE_TOAST"; id: string }
 
 let count = 0

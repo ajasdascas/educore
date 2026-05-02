@@ -106,11 +106,11 @@ export function AccountSettingsPage({ roleLabel, scopeLabel }: AccountPageProps)
           <CardDescription>Estos ajustes se guardan localmente en modo demo.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {[
+          {([
             ["Notificaciones por email", "Recibir avisos importantes en tu correo.", emailEnabled, setEmailEnabled],
             ["Notificaciones push", "Ver alertas dentro de EduCore.", pushEnabled, setPushEnabled],
             ["Vista compacta", "Reducir espacios para revisar mas informacion.", compactMode, setCompactMode],
-          ].map(([title, description, checked, setChecked]) => (
+          ] as Array<[string, string, boolean, (checked: boolean) => void]>).map(([title, description, checked, setChecked]) => (
             <div key={String(title)} className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <p className="text-sm font-medium">{title}</p>

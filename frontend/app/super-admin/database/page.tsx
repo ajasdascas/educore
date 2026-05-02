@@ -323,7 +323,7 @@ export default function DatabaseAdminPage() {
                       <div className="space-y-2">
                         {relationships.map((rel) => (
                           <div key={`${rel.column}-${rel.foreign_table}`} className="break-words rounded-md bg-muted px-3 py-2 text-sm">
-                            {rel.column} -> {rel.foreign_table}.{rel.foreign_column}
+                            {rel.column} {"->"} {rel.foreign_table}.{rel.foreign_column}
                           </div>
                         ))}
                       </div>

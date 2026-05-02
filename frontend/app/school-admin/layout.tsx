@@ -16,6 +16,7 @@ import {
   FolderOpen,
   MessageCircle,
   Database,
+  CreditCard,
   Settings,
   Menu,
   X
@@ -39,6 +40,7 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: Modu
   { href: "/school-admin/grades", label: "Calificaciones", icon: NotebookPen, moduleKey: "grading" },
   { href: "/school-admin/report-cards", label: "Boletas", icon: FileCheck2, moduleKey: "report_cards" },
   { href: "/school-admin/documents", label: "Documentos", icon: FolderOpen, moduleKey: "documents" },
+  { href: "/school-admin/payments", label: "Pagos", icon: CreditCard, moduleKey: "payments" },
   { href: "/school-admin/reports", label: "Reportes", icon: FileText, moduleKey: "reports" },
   { href: "/school-admin/communications", label: "Comunicaciones", icon: MessageCircle, moduleKey: "communications" },
   { href: "/school-admin/database", label: "Base de datos", icon: Database },
@@ -136,7 +138,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
-        <header className="min-h-16 overflow-hidden bg-card border-b border-border flex items-center justify-between gap-2 px-3 py-2 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-10 transition-colors">
+        <header className="min-h-16 overflow-visible bg-card border-b border-border flex items-center justify-between gap-2 px-3 py-2 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-40 transition-colors">
           <div className="flex min-w-0 flex-1 items-center overflow-hidden">
             <button
               onClick={() => setSidebarOpen(true)}

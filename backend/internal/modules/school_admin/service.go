@@ -2,7 +2,12 @@ package school_admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
+	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -72,6 +77,10 @@ func (s *Service) GetEnabledModules(ctx context.Context, tenantID string) ([]Ena
 		return nil, fmt.Errorf("failed to get enabled modules: %w", err)
 	}
 	return modules, nil
+}
+
+func (s *Service) IsModuleEnabled(ctx context.Context, tenantID, moduleKey string) bool {
+	return s.repo.IsModuleEnabled(ctx, tenantID, moduleKey)
 }
 
 func (s *Service) GetSchoolYears(ctx context.Context, tenantID string) ([]SchoolYearResponse, error) {
@@ -652,6 +661,133 @@ func (s *Service) DeleteStudentDocument(ctx context.Context, tenantID, userID, d
 	}
 	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.deleted", "school_documents", documentID, map[string]interface{}{"before": before})
 	return nil
+}
+
+func (s *Service) GetPayments(ctx context.Context, tenantID string, params GetPaymentsParams) (*StudentPaymentsResponse, error) {
+	return s.repo.GetPayments(ctx, tenantID, params)
+}
+
+func (s *Service) CreateStudentCharge(ctx context.Context, tenantID, userID string, req CreateStudentChargeRequest) (*StudentPaymentResponse, error) {
+	if strings.TrimSpace(req.StudentID) == "" || strings.TrimSpace(req.Concept) == "" || strings.TrimSpace(req.DueDate) == "" {
+		return nil, fmt.Errorf("student_id, concept and due_date are required")
+	}
+	if req.Amount <= 0 {
+		return nil, fmt.Errorf("amount must be greater than zero")
+	}
+	if req.Currency == "" {
+		req.Currency = "MXN"
+	}
+	payment, err := s.repo.CreateStudentCharge(ctx, tenantID, userID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create student charge: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "payment.charge_created", "student_payments", payment.ID, map[string]interface{}{"after": payment})
+	return payment, nil
+}
+
+func (s *Service) RecordStudentPayment(ctx context.Context, tenantID, userID, paymentID string, req RecordStudentPaymentRequest) (*StudentPaymentResponse, error) {
+	method := strings.ToLower(strings.TrimSpace(req.Method))
+	if method != "cash" && method != "transfer" && method != "card" && method != "efectivo" && method != "transferencia" && method != "tarjeta" {
+		return nil, fmt.Errorf("invalid payment method")
+	}
+	if req.Amount <= 0 {
+		return nil, fmt.Errorf("amount must be greater than zero")
+	}
+	before, _ := s.repo.GetPayment(ctx, tenantID, paymentID)
+	payment, err := s.repo.RecordStudentPayment(ctx, tenantID, userID, paymentID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to record student payment: %w", err)
+	}
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "payment.recorded", "student_payments", paymentID, map[string]interface{}{"before": before, "after": payment, "method": req.Method})
+	return payment, nil
+}
+
+func (s *Service) GetPaymentReceipt(ctx context.Context, tenantID, paymentID string) (map[string]interface{}, error) {
+	payment, err := s.repo.GetPayment(ctx, tenantID, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payment receipt: %w", err)
+	}
+	return map[string]interface{}{
+		"folio":        payment.ReceiptNumber,
+		"school":       "EduCore",
+		"student":      payment.StudentName,
+		"student_code": payment.StudentCode,
+		"concept":      payment.Concept,
+		"amount":       payment.Amount,
+		"currency":     payment.Currency,
+		"method":       payment.PaymentMethod,
+		"date":         payment.PaidAt,
+		"status":       payment.Status,
+		"notes":        payment.Notes,
+	}, nil
+}
+
+func (s *Service) CreateStripeCheckoutSession(ctx context.Context, tenantID, userID, paymentID string, req CreateCardCheckoutSessionRequest) (map[string]interface{}, error) {
+	if strings.ToLower(os.Getenv("EDUCORE_STRIPE_ENABLED")) != "true" {
+		return nil, fmt.Errorf("stripe payments are disabled for this tenant/environment")
+	}
+	secretKey := os.Getenv("STRIPE_SECRET_KEY")
+	if strings.TrimSpace(secretKey) == "" {
+		return nil, fmt.Errorf("stripe secret key is not configured")
+	}
+	payment, err := s.repo.GetPayment(ctx, tenantID, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payment: %w", err)
+	}
+	if payment.Status == "paid" || payment.Status == "cancelled" {
+		return nil, fmt.Errorf("payment is not payable")
+	}
+	if payment.Amount <= 0 {
+		return nil, fmt.Errorf("payment amount must be greater than zero")
+	}
+	successURL := strings.TrimSpace(req.SuccessURL)
+	cancelURL := strings.TrimSpace(req.CancelURL)
+	if successURL == "" || cancelURL == "" {
+		return nil, fmt.Errorf("success_url and cancel_url are required")
+	}
+
+	form := url.Values{}
+	form.Set("mode", "payment")
+	form.Set("success_url", successURL)
+	form.Set("cancel_url", cancelURL)
+	form.Set("client_reference_id", payment.ID)
+	form.Set("line_items[0][price_data][currency]", strings.ToLower(firstNonEmpty(payment.Currency, "MXN")))
+	form.Set("line_items[0][price_data][product_data][name]", fmt.Sprintf("%s - %s", payment.Concept, payment.StudentName))
+	form.Set("line_items[0][price_data][unit_amount]", fmt.Sprintf("%.0f", math.Round(payment.Amount*100)))
+	form.Set("line_items[0][quantity]", "1")
+	form.Set("metadata[tenant_id]", tenantID)
+	form.Set("metadata[payment_id]", payment.ID)
+	form.Set("metadata[student_id]", payment.StudentID)
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.stripe.com/v1/checkout/sessions", strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	request.SetBasicAuth(secretKey, "")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Stripe-Version", "2026-02-25.clover")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("stripe checkout request failed")
+	}
+	defer response.Body.Close()
+
+	var payload map[string]interface{}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("invalid stripe response")
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("stripe checkout session could not be created")
+	}
+
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "payment.stripe_checkout_created", "student_payments", paymentID, map[string]interface{}{"provider": "stripe", "mode": "checkout"})
+	return map[string]interface{}{
+		"provider":   "stripe",
+		"mode":       "checkout",
+		"session_id": payload["id"],
+		"url":        payload["url"],
+	}, nil
 }
 
 func firstNonEmpty(value, fallback string) string {

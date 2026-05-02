@@ -484,7 +484,7 @@ function SchoolStudentsContent() {
   }, [currentRows, mapping]);
 
   const importValidation = useMemo(() => {
-    const required = importFields.filter((field) => field.required).map((field) => field.key);
+    const required = importFields.filter((field) => (field as any).required).map((field) => field.key);
     const missing = required.filter((field) => !mapping[field]);
     const validRows = mappedImportRows.filter((row) => required.every((field) => String(row[field] || "").trim())).length;
     return { missing, validRows, totalRows: currentRows.length };
@@ -1117,7 +1117,7 @@ function SchoolStudentsContent() {
                   <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
                     {importFields.map((field) => (
                       <div key={field.key} className="space-y-1">
-                        <Label>{field.label}{field.required ? " *" : ""}</Label>
+                        <Label>{field.label}{(field as any).required ? " *" : ""}</Label>
                         <Select value={mapping[field.key] || "none"} onValueChange={(value) => setMapping((current) => ({ ...current, [field.key]: value === "none" ? "" : value }))}>
                           <SelectTrigger><SelectValue placeholder="Seleccionar columna" /></SelectTrigger>
                           <SelectContent>

@@ -763,7 +763,7 @@ const modulesCatalog = [
   { key: "database_admin", name: "Database Admin", description: "Herramienta interna SuperAdmin para inspeccion/export/import.", category: "internal", is_core: false, is_required: false, enabled: true, source: "internal", layer: "internal", dependencies: [], price_monthly_mxn: 0 },
 ];
 
-function readMockList<T>(key: string, fallback: T[]): T[] {
+function readMockList<T>(key: string, fallback: T[]): any[] {
   if (typeof window === "undefined") return fallback;
   const raw = localStorage.getItem(key);
   if (!raw) {
@@ -1039,6 +1039,7 @@ function getMockTeacherStudents(groupId: string) {
   const students = readMockList("mock_school_students", defaultMockStudents);
   return students.slice(0, 12).map((student: any, index: number) => ({
     id: student.id,
+    student_id: student.id,
     first_name: student.first_name,
     last_name: student.last_name,
     enrollment_id: student.enrollment_id || `ALU-${index + 1}`,
@@ -1254,7 +1255,8 @@ async function mockParentFetch(endpoint: string, options: RequestInit = {}) {
       { id: `pay-${child.id}-may`, student_id: child.id, student_name: `${child.first_name} ${child.last_name}`, concept: "Colegiatura mayo", description: "Pago mensual escolar", amount: 1850 + index * 150, currency: "MXN", due_date: "2026-05-05", paid_at: null, payment_method: "", receipt_number: "", receipt_url: "", status: index === 0 ? "pending" : "paid" },
       { id: `pay-${child.id}-ins`, student_id: child.id, student_name: `${child.first_name} ${child.last_name}`, concept: "Material academico", description: "Cuota de material y plataforma", amount: 450, currency: "MXN", due_date: "2026-04-15", paid_at: "2026-04-12T10:00:00.000Z", payment_method: "Transferencia", receipt_number: `REC-${index + 1}`, receipt_url: "#", status: "paid" },
     ]);
-    const payments = readMockList("mock_parent_payments", fallback);
+    const payments = readMockList("mock_school_payments", readMockList("mock_parent_payments", fallback))
+      .filter((item: any) => children.some((child: any) => child.id === item.student_id));
     return {
       success: true,
       data: {
@@ -2155,6 +2157,106 @@ async function mockSchoolAdminFetch(endpoint: string, options: RequestInit = {})
       },
     ];
     return { success: true, data: fallback };
+  }
+
+  const schoolPaymentRecordMatch = path.match(/\/school-admin\/payments\/([^/]+)\/record-payment$/);
+  if (schoolPaymentRecordMatch && method === "POST") {
+    const id = decodeURIComponent(schoolPaymentRecordMatch[1]);
+    const body = parseBody(options);
+    const payments = readMockList("mock_school_payments", []);
+    const updated = payments.map((item: any) => {
+      if (item.id !== id) return item;
+      const receiptNumber = item.receipt_number || `REC-${Date.now().toString().slice(-8)}`;
+      return {
+        ...item,
+        status: Number(body.amount || item.amount) >= Number(item.amount || 0) ? "paid" : "partial",
+        paid_at: nowIso(),
+        payment_method: body.method || "efectivo",
+        receipt_number: receiptNumber,
+        receipt_url: "#",
+        notes: body.notes || item.notes || "",
+        updated_at: nowIso(),
+      };
+    });
+    writeMockList("mock_school_payments", updated);
+    return { success: true, data: updated.find((item: any) => item.id === id), message: "Pago registrado en modo demo" };
+  }
+
+  const schoolPaymentReceiptMatch = path.match(/\/school-admin\/payments\/([^/]+)\/receipt$/);
+  if (schoolPaymentReceiptMatch && method === "GET") {
+    const id = decodeURIComponent(schoolPaymentReceiptMatch[1]);
+    const payments = readMockList("mock_school_payments", []);
+    const payment = payments.find((item: any) => item.id === id);
+    return payment
+      ? { success: true, data: { folio: payment.receipt_number, school: "EduCore Demo", student: payment.student_name, student_code: payment.student_code, concept: payment.concept, amount: payment.amount, currency: payment.currency, method: payment.payment_method, date: payment.paid_at, status: payment.status, notes: payment.notes || "" } }
+      : { success: false, message: "Recibo no encontrado" };
+  }
+
+  if (path.endsWith("/school-admin/payments/charges") && method === "POST") {
+    const body = parseBody(options);
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const student = students.find((item: any) => item.id === body.student_id);
+    if (!student || Number(body.amount || 0) <= 0) {
+      return { success: false, message: "Cargo invalido" };
+    }
+    const payments = readMockList("mock_school_payments", []);
+    const created = {
+      id: `pay-${Date.now()}`,
+      student_id: student.id,
+      student_name: `${student.first_name} ${student.last_name}`,
+      student_code: student.enrollment_id || "",
+      group_id: student.group_id || "",
+      group_name: student.group_name || "",
+      concept: body.concept,
+      description: body.description || "",
+      amount: Number(body.amount || 0),
+      currency: body.currency || "MXN",
+      due_date: body.due_date,
+      paid_at: null,
+      payment_method: "",
+      receipt_number: "",
+      receipt_url: "",
+      status: "pending",
+      notes: body.notes || "",
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    writeMockList("mock_school_payments", [created, ...payments]);
+    return { success: true, data: created, message: "Cargo creado en modo demo" };
+  }
+
+  if (path.endsWith("/school-admin/payments")) {
+    const students = readMockList("mock_school_students", defaultMockStudents);
+    const fallback = students.flatMap((student: any, index: number) => [
+      { id: `pay-${student.id}-may`, student_id: student.id, student_name: `${student.first_name} ${student.last_name}`, student_code: student.enrollment_id || `ALU-${index + 1}`, group_id: student.group_id || "", group_name: student.group_name || "", concept: "Colegiatura", description: "Colegiatura mayo", amount: 1850 + index * 100, currency: "MXN", due_date: "2026-05-05", paid_at: null, payment_method: "", receipt_number: "", receipt_url: "", status: index % 3 === 0 ? "overdue" : "pending", notes: "", created_at: nowIso() },
+      { id: `pay-${student.id}-mat`, student_id: student.id, student_name: `${student.first_name} ${student.last_name}`, student_code: student.enrollment_id || `ALU-${index + 1}`, group_id: student.group_id || "", group_name: student.group_name || "", concept: "Material academico", description: "Cuota de materiales", amount: 450, currency: "MXN", due_date: "2026-04-15", paid_at: "2026-04-12T10:00:00.000Z", payment_method: "transferencia", receipt_number: `REC-${index + 1}`, receipt_url: "#", status: "paid", notes: "", created_at: nowIso() },
+    ]);
+    let payments = readMockList("mock_school_payments", fallback);
+    const studentID = url.searchParams.get("student_id") || "";
+    const status = url.searchParams.get("status") || "";
+    const concept = (url.searchParams.get("concept") || "").toLowerCase();
+    const from = url.searchParams.get("from") || "";
+    const to = url.searchParams.get("to") || "";
+    payments = payments.filter((payment: any) => {
+      const matchesStudent = !studentID || payment.student_id === studentID;
+      const matchesStatus = !status || payment.status === status;
+      const matchesConcept = !concept || String(payment.concept || "").toLowerCase().includes(concept);
+      const matchesFrom = !from || String(payment.due_date || "") >= from;
+      const matchesTo = !to || String(payment.due_date || "") <= to;
+      return matchesStudent && matchesStatus && matchesConcept && matchesFrom && matchesTo;
+    });
+    const summary = {
+      total_due: payments.filter((item: any) => item.status !== "paid" && item.status !== "cancelled").reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
+      total_paid: payments.filter((item: any) => item.status === "paid").reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
+      total_overdue: payments.filter((item: any) => item.status === "overdue").reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
+      pending_count: payments.filter((item: any) => item.status === "pending").length,
+      paid_count: payments.filter((item: any) => item.status === "paid").length,
+      overdue_count: payments.filter((item: any) => item.status === "overdue").length,
+      partial_count: payments.filter((item: any) => item.status === "partial").length,
+      cancelled_count: payments.filter((item: any) => item.status === "cancelled").length,
+      currency: "MXN",
+    };
+    return { success: true, data: { payments, summary } };
   }
 
   if (path.endsWith("/school-admin/reports/metrics")) {

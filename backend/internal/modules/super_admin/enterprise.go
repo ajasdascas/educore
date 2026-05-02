@@ -739,7 +739,7 @@ func (h *Handler) GenerateInvoice(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid invoice payload")
 	}
 	if req.Total <= 0 {
-		req.Total = 0
+		return response.Error(c, fiber.StatusBadRequest, "Invoice total must be greater than zero")
 	}
 	folio := fmt.Sprintf("EDU-%s", strings.ToUpper(hex.EncodeToString(randomBytes(4))))
 	var id string

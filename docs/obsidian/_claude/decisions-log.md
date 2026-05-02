@@ -266,3 +266,54 @@ Giovanni necesita planes y paquetes vendibles, pero la doctrina actual prohibe a
 #decision #architecture #billing #modules #saas
 
 ---
+
+# 02-05-2026 - Alcance activo limitado a preescolar, kinder y primaria
+
+## Decision
+El flujo activo de creacion de escuelas solo acepta `preescolar`, `kinder` y `primaria`. Niveles superiores quedan fuera del alcance operativo actual.
+
+## Razon
+El roadmap mas reciente prioriza una plataforma altamente pulida para preescolar, kinder y primaria antes de expandir niveles. Limitar el alta evita provisionar estructuras academicas incorrectas y reduce deuda UX/producto.
+
+## Impacto
+- SuperAdmin solo muestra esos tres niveles al crear escuela.
+- Backend rechaza niveles no soportados aunque un cliente intente enviarlos manualmente.
+- Preescolar queda separado de kinder para permitir templates, evaluacion cualitativa y documentos propios por nivel.
+
+#decision #architecture #super_admin #modules #ux
+
+---
+
+# 02-05-2026 - Dropdown sin dependencia de wrappers UI
+
+## Decision
+El dropdown de perfil queda implementado como overlay manual portalizado a `document.body`, no como wrapper dependiente de componentes terceros.
+
+## Razon
+El bug productivo persistia aunque se usara un DropdownMenu portalizado. Para un control critico como logout, la solucion debe ser independiente de `overflow`, stacking contexts y cambios internos de librerias UI.
+
+## Impacto
+- El menu abre en School Admin, Super Admin, Teacher y Parent.
+- Logout queda accesible para QA y operacion.
+- Se mantiene teclado con Escape, atributos ARIA y selectores `data-testid` para smoke tests.
+
+#decision #frontend #ux #security
+
+---
+
+# 02-05-2026 - Niveles futuros conservados, no eliminados
+
+## Decision
+Secundaria, secundaria tecnica, prepa, prepa tecnica y universidad permanecen en el catalogo interno como niveles futuros, pero deshabilitados en el flujo activo.
+
+## Razon
+Giovanni quiere enfocarse en preescolar, kinder y primaria sin perder arquitectura futura. Eliminarlos crearia retrabajo; habilitarlos ahora aumentaria alcance y riesgo UX.
+
+## Impacto
+- Super Admin muestra niveles futuros como "Proximamente".
+- Backend sigue rechazando niveles fuera del alcance operativo actual.
+- El catalogo puede activarse despues sin reescribir la estructura modular.
+
+#decision #architecture #modules #super_admin
+
+---

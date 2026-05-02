@@ -226,7 +226,8 @@ type CreateSchoolRequest struct {
 }
 
 var modulesByEducationLevel = map[string][]string{
-	"kinder":             {"academic_core", "users", "students", "groups", "schedules", "attendance", "reports", "communications"},
+	"preescolar":         {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"},
+	"kinder":             {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"},
 	"primaria":           {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
 	"secundaria_general": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
 	"secundaria_tecnica": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
@@ -236,6 +237,9 @@ var modulesByEducationLevel = map[string][]string{
 }
 
 func normalizeEducationLevel(level string) string {
+	if strings.EqualFold(strings.TrimSpace(level), "preescolar") {
+		return "preescolar"
+	}
 	switch level {
 	case "Kínder", "Kinder", "KÃ­nder", "kinder", "preescolar":
 		return "kinder"
@@ -256,10 +260,27 @@ func normalizeEducationLevel(level string) string {
 	}
 }
 
+func isSupportedEducationLevel(level string) bool {
+	switch normalizeEducationLevel(level) {
+	case "preescolar", "kinder", "primaria":
+		return true
+	default:
+		return false
+	}
+}
+
 func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	var req CreateSchoolRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	if len(req.Levels) == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "Selecciona un nivel escolar: preescolar, kinder o primaria")
+	}
+	for _, level := range req.Levels {
+		if !isSupportedEducationLevel(level) {
+			return response.Error(c, fiber.StatusBadRequest, "Nivel escolar no soportado. Usa preescolar, kinder o primaria")
+		}
 	}
 
 	// 1. Validate plan exists
