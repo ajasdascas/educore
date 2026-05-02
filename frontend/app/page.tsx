@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { apiRequest } from "@/lib/api";
-import { getDashboardPath } from "@/lib/auth";
+import { DEMO_MODE_ENABLED, getDashboardPath } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { User, Users, GraduationCap, Building2 } from "lucide-react";
 
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedRole, setSelectedRole] = useState<{ id: string; name: string } | null>(null);
+  const demoTokenForRole = (role: string) => ["mock", "token", role.toLowerCase().replace("_", "-")].join("-");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,21 +27,16 @@ export default function LoginPage() {
     setError("");
 
     // --- MOCK PARA USUARIOS DEMO (Bypass temporal para diseño/pruebas) ---
-    const demoUsers: Record<string, { role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT"; token: string }> = {
-      "school@educore.mx": { role: "SCHOOL_ADMIN", token: "mock-token-school" },
-      "profe@educore.mx": { role: "TEACHER", token: "mock-token-teacher" },
-      "padre@educore.mx": { role: "PARENT", token: "mock-token-parent" },
+    const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
+    const demoUsers: Record<string, { role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" }> = {
+      "school@educore.mx": { role: "SCHOOL_ADMIN" },
+      "profe@educore.mx": { role: "TEACHER" },
+      "padre@educore.mx": { role: "PARENT" },
     };
 
     const selectedDemoRole = selectedRole?.id as "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | undefined;
-    const fixedAdminDemo = email === "admin@educore.mx" && password === "admin123" && selectedDemoRole;
-    if (fixedAdminDemo) {
-      const tokenByRole: Record<string, string> = {
-        SUPER_ADMIN: "mock-token-admin",
-        SCHOOL_ADMIN: "mock-token-school",
-        TEACHER: "mock-token-teacher",
-        PARENT: "mock-token-parent",
-      };
+    const fixedAdminDemo = demoPassword !== "" && email === "admin@educore.mx" && password === demoPassword && selectedDemoRole;
+    if (DEMO_MODE_ENABLED && fixedAdminDemo) {
       const mockUser = {
         id: `mock-${selectedDemoRole.toLowerCase()}`,
         email,
@@ -49,13 +45,13 @@ export default function LoginPage() {
         tenant_id: selectedDemoRole === "SUPER_ADMIN" ? "" : "school-don-bosco",
       };
 
-      login(tokenByRole[selectedDemoRole], mockUser);
+      login(demoTokenForRole(selectedDemoRole), mockUser);
       router.push(getDashboardPath(mockUser.role));
       setLoading(false);
       return;
     }
 
-    if (demoUsers[email] && password === email.split('@')[0] + '123') {
+    if (DEMO_MODE_ENABLED && demoPassword !== "" && demoUsers[email] && password === demoPassword) {
       const mockUser = {
         id: "mock-id",
         email: email,
@@ -64,7 +60,7 @@ export default function LoginPage() {
         tenant_id: demoUsers[email].role === "SUPER_ADMIN" ? "" : "school-don-bosco"
       };
       
-      login(demoUsers[email].token, mockUser);
+      login(demoTokenForRole(demoUsers[email].role), mockUser);
       const destination = getDashboardPath(mockUser.role);
       router.push(destination);
       setLoading(false);

@@ -1,5 +1,7 @@
 import { API_URL, isNgrok } from "./api";
 
+export const DEMO_MODE_ENABLED = process.env.NEXT_PUBLIC_DEMO_MODE === "true" || process.env.NODE_ENV !== "production";
+
 export interface User {
   id: string;
   email: string;
@@ -60,8 +62,16 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
   }
 
   // --- DEMO INTERCEPTOR ---
-  if (token && token.startsWith("mock-")) {
+  if (token && token.startsWith("mock-") && DEMO_MODE_ENABLED) {
     return mockDemoFetch(endpoint, options);
+  }
+  if (token && token.startsWith("mock-") && !DEMO_MODE_ENABLED) {
+    clearAuth();
+    if (typeof window !== "undefined") {
+      const basePath = window.location.pathname.startsWith("/educore") ? "/educore" : "";
+      window.location.href = basePath || "/";
+    }
+    return { success: false, error: "Demo mode is disabled in production" };
   }
   // ------------------------
 

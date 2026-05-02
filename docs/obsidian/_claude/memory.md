@@ -511,3 +511,31 @@ Stripe quedo como adapter backend seguro via Checkout Sessions, bloqueado por `E
 Verificacion realizada: `npx tsc --noEmit` OK, `npm run build` OK, `go test ./...` OK, `git diff --check` OK con warnings CRLF. Smoke Browser Use local en puerto limpio `4199`: dropdown/logout en los 4 roles, `/school-admin/payments`, `/parent/payments` y modal de alta de escuela.
 
 #memory #frontend #backend #security #payments #school_admin #parent_portal
+
+---
+
+# 02-05-2026 - Puente Hostinger MySQL preparado
+
+Se preparo la etapa puente para usar MySQL/MariaDB de Hostinger administrado por phpMyAdmin sin abandonar el backend Go/Fiber ni romper la futura migracion a PostgreSQL. Se agregaron variables `DB_DRIVER`, `MYSQL_DSN`, `ALLOW_DEMO_LOGIN` y `NEXT_PUBLIC_DEMO_MODE`; los mocks quedan bloqueados en build productivo cuando `NEXT_PUBLIC_DEMO_MODE=false`.
+
+Se agrego `backend/migrations_mysql/001_hostinger_core.sql` como schema base importable en phpMyAdmin, `backend/scripts/seed_hostinger_mysql.go` para crear/actualizar SuperAdmin temporal con bcrypt y `password_must_change=true`, y documentacion en `docs/obsidian/01_architecture/HOSTINGER_MYSQL_BRIDGE.md`.
+
+Decision de seguridad: el servidor falla cerrado si se intenta arrancar con `DB_DRIVER=mysql` antes de portar todos los repositorios tenant-scoped desde `pgxpool`/sintaxis PostgreSQL a queries SQL-portables. Esto evita activar una produccion parcialmente rota o sin aislamiento equivalente a RLS.
+
+Verificacion realizada: `go test ./...` OK, `npx tsc --noEmit` OK, `npm run build` con `NEXT_PUBLIC_DEMO_MODE=false` OK, `git diff --check` OK con warnings CRLF.
+
+#memory #hostinger #mysql #security #backend #frontend #database
+
+---
+
+# 02-05-2026 - SuperAdmins propietarios y hardening produccion
+
+Se agrego `backend/scripts/seed_owner_admins.go` para crear/actualizar los dos propietarios globales (`gioescudero2007@gmail.com` y `jagustin_ramosp@hotmail.com`) como `SUPER_ADMIN` con `tenant_id = NULL`, usando password bcrypt generado desde `EDUCORE_OWNER_ADMIN_PASSWORD`. No se guardo la contrasena real en git.
+
+Se agrego la migracion Postgres `018_owner_super_admins_hardening.sql` para `password_must_change` y unicidad de email global. El schema MySQL de Hostinger ahora incluye `global_tenant_key` para evitar duplicados con `tenant_id NULL`, catalogo de niveles activos/futuros, pagos, recibos, adjuntos y auditoria.
+
+Se endurecio seguridad: `TenantResolver` ya no confia en `X-Tenant-ID`, CORS elimino `http://onlineu.mx`, cookies refresh usan `Secure` cuando llega HTTPS, y scripts antiguos dejaron de incluir DSN local con password hardcoded. Cloudflare tiene zona `onlineu.mx` pendiente con nameservers `aleena.ns.cloudflare.com` y `rene.ns.cloudflare.com`; registros no-web quedaron DNS-only.
+
+Verificacion: `go test ./...` OK, `npx tsc --noEmit` OK, `NEXT_PUBLIC_DEMO_MODE=false npm run build` OK, schema MySQL importo en MariaDB local, seed de propietarios funciono en MariaDB local, y busqueda en `frontend/out` no encontro `mock-token`, contrasena real, `MYSQL_DSN` ni secretos Stripe.
+
+#memory #security #super_admin #hostinger #cloudflare #mysql #deployment

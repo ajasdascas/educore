@@ -35,6 +35,27 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	if database.IsMySQL(cfg.DBDriver) {
+		sqlDB, err := database.NewSQLDBForDriver(ctx, cfg.DBDriver, cfg.DatabaseURL, cfg.MySQLDSN)
+		if err != nil {
+			log.Fatalf("Failed to connect to Hostinger MySQL: %v", err)
+		}
+		_ = sqlDB.Close()
+		pendingModules := []string{
+			"auth",
+			"tenants",
+			"super_admin",
+			"school_admin",
+			"teacher",
+			"parent",
+			"reports",
+			"communications",
+		}
+		if err := database.MySQLRuntimeReady(true, pendingModules); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	db, err := database.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -42,7 +63,7 @@ func main() {
 	defer db.Close()
 
 	// Create SQL DB adapter for modules that use database/sql
-	sqlDB, err := database.NewSQLDBFromURL(cfg.DatabaseURL)
+	sqlDB, err := database.NewSQLDBForDriver(ctx, cfg.DBDriver, cfg.DatabaseURL, cfg.MySQLDSN)
 	if err != nil {
 		log.Fatalf("Failed to create SQL DB adapter: %v", err)
 	}
@@ -72,8 +93,8 @@ func main() {
 		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
 	}))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000, http://localhost:3001, http://localhost:3002, http://localhost:3003, https://onlineu.mx, http://onlineu.mx, https://educore-production-beef.up.railway.app",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Tenant-ID, ngrok-skip-browser-warning",
+		AllowOrigins:     "http://localhost:3000, http://localhost:3001, http://localhost:3002, http://localhost:3003, https://onlineu.mx, https://www.onlineu.mx, https://educore-production-beef.up.railway.app",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, ngrok-skip-browser-warning",
 		AllowCredentials: true,
 	}))
 
@@ -89,11 +110,14 @@ func main() {
 	// Health check
 	api.Get("/health", func(c *fiber.Ctx) error {
 		tenantID := c.Locals("tenant_id")
+		dbDriver := database.NormalizeDriver(cfg.DBDriver)
 		return response.Success(c, fiber.Map{
-			"status": "ok",
-			"env":    cfg.AppEnv,
-			"tenant": tenantID,
-			"redis":  redisClient.IsAvailable(),
+			"status":         "ok",
+			"env":            cfg.AppEnv,
+			"tenant":         tenantID,
+			"db_driver":      dbDriver,
+			"db_mysql_ready": dbDriver == "mysql",
+			"redis":          redisClient.IsAvailable(),
 		}, "API is healthy")
 	})
 

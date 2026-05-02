@@ -10,21 +10,18 @@ import (
 
 func TenantResolver(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// 1. Try to get tenant from header X-Tenant-ID
-		tenantID := c.Get("X-Tenant-ID")
+		tenantID := ""
 
-		// 2. Try to get tenant from subdomain
-		if tenantID == "" {
-			host := c.Hostname()
-			parts := strings.Split(host, ".")
-			if len(parts) > 1 && parts[0] != "www" && parts[0] != "api" {
-				slug := parts[0]
-				// Lookup tenant ID from DB based on slug
-				var id string
-				err := db.QueryRow(context.Background(), "SELECT id FROM tenants WHERE slug = $1 AND status = 'active'", slug).Scan(&id)
-				if err == nil {
-					tenantID = id
-				}
+		// Public/pre-auth tenant context can only be inferred from the host.
+		// Protected routes overwrite this with the JWT tenant in middleware.Protected.
+		host := c.Hostname()
+		parts := strings.Split(host, ".")
+		if len(parts) > 1 && parts[0] != "www" && parts[0] != "api" {
+			slug := parts[0]
+			var id string
+			err := db.QueryRow(context.Background(), "SELECT id FROM tenants WHERE slug = $1 AND status = 'active'", slug).Scan(&id)
+			if err == nil {
+				tenantID = id
 			}
 		}
 

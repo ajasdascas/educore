@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
@@ -354,7 +355,17 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		adminFirstName = nameParts[0]
 		adminLastName = strings.Join(nameParts[1:], " ")
 	}
-	passwordHash := "$2a$10$MJsfnrvcdfz1LtAsrYyiYeKhFbK/LdUbGuKMhfEu0rxfaKjzpVMV." // "admin123" for testing, or use a better default
+	defaultPassword := os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD")
+	if defaultPassword == "" {
+		return response.Error(c, fiber.StatusInternalServerError, "EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD is required for school provisioning")
+	}
+	if len(defaultPassword) < 12 {
+		return response.Error(c, fiber.StatusInternalServerError, "EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD must be at least 12 characters")
+	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error preparing admin password")
+	}
 
 	_, err = tx.Exec(c.UserContext(),
 		`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
@@ -366,7 +377,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		               role = 'SCHOOL_ADMIN',
 		               is_active = true,
 		               updated_at = NOW()`,
-		tenantID, adminEmail, passwordHash, adminFirstName, adminLastName)
+		tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error creating admin user")

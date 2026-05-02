@@ -140,12 +140,13 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	_, _ = h.db.Exec(c.Context(), "UPDATE users SET last_login_at = NOW() WHERE id = $1", id)
 
 	// Set refresh token as httpOnly cookie
+	secureCookie := c.Protocol() == "https" || c.Get("X-Forwarded-Proto") == "https"
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Expires:  time.Now().Add(h.refreshExpiry),
 		HTTPOnly: true,
-		Secure:   false, // true in production
+		Secure:   secureCookie,
 		SameSite: "Lax",
 		Path:     "/",
 	})
@@ -185,11 +186,14 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 }
 
 func (h *Handler) Logout(c *fiber.Ctx) error {
+	secureCookie := c.Protocol() == "https" || c.Get("X-Forwarded-Proto") == "https"
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour),
 		HTTPOnly: true,
+		Secure:   secureCookie,
+		SameSite: "Lax",
 		Path:     "/",
 	})
 	return response.Success(c, nil, "Logged out")

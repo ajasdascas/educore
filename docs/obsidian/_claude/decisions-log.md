@@ -52,6 +52,18 @@ Evitar que `handler.go` se convierta en un archivo masivo difícil de mantener, 
 
 #backend #database #school_admin #groups
 
+---
+
+## 02-05-2026 - Hostinger MySQL como puente, no como runtime parcial
+
+**Decision:** Preparar schema, DSN y seed para Hostinger MySQL/phpMyAdmin, pero bloquear `DB_DRIVER=mysql` en runtime hasta portar repositorios desde `pgxpool`/PostgreSQL a SQL portable.
+
+**Razon:** MySQL no ofrece RLS equivalente y el backend actual tiene cientos de queries con sintaxis PostgreSQL; activar MySQL sin migracion completa romperia modulos y podria debilitar aislamiento tenant.
+
+**Impacto:** Se puede crear/importar la base Hostinger y validar conectividad, pero produccion API debe seguir en PostgreSQL/Railway hasta completar la migracion de repositorios y pruebas cross-tenant.
+
+#decision #hostinger #mysql #security #backend
+
 ## 29-04-2026 - Horarios opera primero como agenda estatica persistente
 
 **Decision:** El submodulo School Admin > Horarios se implemento en frontend con mock persistente en `localStorage` y contrato `authFetch` bajo `/api/v1/school-admin/academic/schedule`, sin agregar tablas nuevas todavia.
@@ -315,5 +327,23 @@ Giovanni quiere enfocarse en preescolar, kinder y primaria sin perder arquitectu
 - El catalogo puede activarse despues sin reescribir la estructura modular.
 
 #decision #architecture #modules #super_admin
+
+---
+
+# 02-05-2026 - Propietarios SuperAdmin por seed secreto
+
+## Decision
+Los propietarios globales de EduCore se crean con un seed multi-driver (`postgres` o `mysql`) usando `EDUCORE_OWNER_ADMIN_EMAILS` y `EDUCORE_OWNER_ADMIN_PASSWORD`.
+
+## Razon
+Dos propietarios necesitan acceso total a Super Admin en produccion, pero la contrasena no debe guardarse en codigo, migraciones, frontend ni documentacion. El seed genera bcrypt en runtime y hace upsert de usuarios globales con `tenant_id = NULL`.
+
+## Impacto
+- `gioescudero2007@gmail.com` y `jagustin_ramosp@hotmail.com` quedan como `SUPER_ADMIN` globales.
+- Postgres agrega `password_must_change` y unicidad por email global con tenant NULL.
+- MySQL agrega clave generada para evitar duplicados globales aunque `tenant_id` sea NULL.
+- La contrasena compartida debe vivir solo como secret temporal y rotarse despues de la primera verificacion.
+
+#decision #security #auth #super_admin #database
 
 ---

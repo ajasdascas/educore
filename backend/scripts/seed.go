@@ -12,7 +12,10 @@ import (
 )
 
 func main() {
-	dbURL := "postgres://postgres:Peju751015@localhost:5432/educore_dev?sslmode=disable"
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
 	ctx := context.Background()
 
 	db, err := pgxpool.New(ctx, dbURL)

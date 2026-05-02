@@ -12,7 +12,7 @@ import (
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgres://postgres:Peju751015@localhost:5432/educore_dev?sslmode=disable"
+		log.Fatal("DATABASE_URL is required")
 	}
 
 	ctx := context.Background()
