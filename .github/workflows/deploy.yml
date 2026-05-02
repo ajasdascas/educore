@@ -8,6 +8,10 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      FTP_HOST: ftp.onlineu.mx
+      FTP_USER: u550473909
+      FTP_TARGET_DIR: /domains/onlineu.mx/public_html/educore/
 
     steps:
       - name: Checkout code
@@ -53,8 +57,8 @@ jobs:
           set net:timeout 20
           set net:max-retries 2
           set net:reconnect-interval-base 5
-          open -u "u550473909,${{ secrets.FTP_PASSWORD }}" ftp://onlineu.mx
-          cd /domains/onlineu.mx/public_html/educore/
+          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          cd ${FTP_TARGET_DIR}
           pwd
           bye
           EOF
@@ -83,8 +87,8 @@ jobs:
           set net:timeout 30
           set net:max-retries 3
           set net:reconnect-interval-base 5
-          open -u "u550473909,${{ secrets.FTP_PASSWORD }}" ftp://onlineu.mx
-          mirror --reverse --delete --verbose --parallel=2 frontend/out/ /domains/onlineu.mx/public_html/educore/
+          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          mirror --reverse --delete --verbose --parallel=2 frontend/out/ ${FTP_TARGET_DIR}
           bye
           EOF
 
@@ -110,8 +114,8 @@ jobs:
           set ssl:verify-certificate no
           set dns:order inet
           set net:timeout 20
-          open -u "u550473909,${{ secrets.FTP_PASSWORD }}" ftp://onlineu.mx
-          cd /domains/onlineu.mx/public_html/educore/
+          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          cd ${FTP_TARGET_DIR}
           cls -1
           bye
           EOF
