@@ -26,8 +26,9 @@ func SeedFromEnv(ctx context.Context, db *database.DB, appEnv string) error {
 		log.Println("Owner SuperAdmin seed skipped: EDUCORE_OWNER_ADMIN_PASSWORD is not configured")
 		return nil
 	}
-	if len(password) < 12 {
-		return fmt.Errorf("EDUCORE_OWNER_ADMIN_PASSWORD must be at least 12 characters")
+	minLength := minimumOwnerPasswordLength(appEnv)
+	if len(password) < minLength {
+		return fmt.Errorf("EDUCORE_OWNER_ADMIN_PASSWORD must be at least %d characters", minLength)
 	}
 	if len(emails) == 0 {
 		return fmt.Errorf("EDUCORE_OWNER_ADMIN_EMAILS must include at least one owner email")
@@ -52,6 +53,13 @@ func shouldSeed(appEnv string) bool {
 		return true
 	}
 	return strings.EqualFold(strings.TrimSpace(appEnv), "staging")
+}
+
+func minimumOwnerPasswordLength(appEnv string) int {
+	if strings.EqualFold(strings.TrimSpace(appEnv), "staging") {
+		return 10
+	}
+	return 12
 }
 
 func upsertOwner(ctx context.Context, db *database.DB, email, hash string) error {

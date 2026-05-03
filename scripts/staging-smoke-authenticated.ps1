@@ -90,10 +90,17 @@ function Login {
 
 $script:Results = @()
 $stamp = Get-Date -Format "yyyyMMddHHmmss"
-$ownerEmail = Read-Host "Owner email"
-if (-not $ownerEmail) {
-  $ownerEmail = "gioescudero2007@gmail.com"
-}
+do {
+  $ownerEmail = Read-Host "Owner email [Enter = gioescudero2007@gmail.com]"
+  if ([string]::IsNullOrWhiteSpace($ownerEmail)) {
+    $ownerEmail = "gioescudero2007@gmail.com"
+  }
+  $ownerEmail = $ownerEmail.Trim()
+  if ($ownerEmail -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') {
+    Write-Host "Correo invalido. Escribe solo el correo, por ejemplo gioescudero2007@gmail.com, o presiona Enter." -ForegroundColor Yellow
+    $ownerEmail = ""
+  }
+} while ([string]::IsNullOrWhiteSpace($ownerEmail))
 $ownerPasswordSecure = Read-Host "Owner password (no se guarda ni se imprime)" -AsSecureString
 $schoolAdminPasswordSecure = Read-Host "Password temporal School Admin / Teacher / Parent en staging" -AsSecureString
 $ownerPassword = Convert-SecureStringToPlainText $ownerPasswordSecure
@@ -122,9 +129,14 @@ try {
     throw "Health failed"
   }
 
-  $owner = Login -Email $ownerEmail -Password $ownerPassword -Role "SUPER_ADMIN"
-  $ownerToken = $owner.access_token
-  Add-Result "login owner super admin" "PASS" $owner.user.email
+  try {
+    $owner = Login -Email $ownerEmail -Password $ownerPassword -Role "SUPER_ADMIN"
+    $ownerToken = $owner.access_token
+    Add-Result "login owner super admin" "PASS" $owner.user.email
+  } catch {
+    Add-Result "login owner super admin" "FAIL" "HTTP 401 o credenciales/seed no coinciden"
+    throw "No se pudo iniciar sesion como owner. Revisa que el correo sea correcto, que el ultimo deploy este verde y que Railway tenga EDUCORE_OWNER_ADMIN_PASSWORD configurado."
+  }
 
   $stats = Invoke-Json -Method "GET" -Path "/api/v1/super-admin/stats" -Token $ownerToken
   Add-Result "super admin stats" ($(if ($stats.ok) { "PASS" } else { "FAIL" })) "HTTP $($stats.status)"

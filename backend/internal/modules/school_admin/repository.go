@@ -30,7 +30,7 @@ func defaultStagingPortalPasswordHash() string {
 		return ""
 	}
 	password := cleanStagingSecret(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
-	if len(password) < 12 {
+	if len(password) < minimumStagingPortalPasswordLength() {
 		return ""
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -50,6 +50,13 @@ func cleanStagingSecret(value string) string {
 		}
 	}
 	return cleaned
+}
+
+func minimumStagingPortalPasswordLength() int {
+	if strings.EqualFold(os.Getenv("APP_ENV"), "staging") {
+		return 10
+	}
+	return 12
 }
 
 func (r *Repository) IsModuleEnabled(ctx context.Context, tenantID, moduleKey string) bool {

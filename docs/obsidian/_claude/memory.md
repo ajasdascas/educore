@@ -621,3 +621,13 @@ El primer smoke autenticado contra Railway staging paso `health` pero fallo el l
 No se pidio ni se guardo la contrasena. Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server` y `git diff --check` OK.
 
 #memory #railway #mysql #auth #security #qa
+
+---
+
+# 03-05-2026 - Password temporal staging y variable faltante
+
+Giovanni confirmo que `EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD` no estaba configurada en Railway staging y que la contrasena temporal elegida para el smoke tiene 10 caracteres. Se ajusto solo el runtime `APP_ENV=staging` para aceptar minimo 10 caracteres en `EDUCORE_OWNER_ADMIN_PASSWORD` y `EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD`; produccion conserva minimo 12. Esto desbloquea el seed de owners y los usuarios School Admin/Teacher/Parent creados durante el smoke sin relajar reglas productivas.
+
+Root cause del `401`: `health` confirmaba API/MySQL vivos, asi que el fallo venia de credenciales/seed. Para validar staging, Railway debe tener ambas variables secretas configuradas y redeployar hasta ver logs `Owner SuperAdmin ready: ...`.
+
+#memory #railway #mysql #staging #auth #security
