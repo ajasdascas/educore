@@ -3,11 +3,18 @@ const ftp = require("basic-ftp");
 async function explore() {
     const client = new ftp.Client();
     client.ftp.verbose = false;
+
+    const host = process.env.FTP_HOST || "onlineu.mx";
+    const user = process.env.FTP_USER;
+    const password = process.env.FTP_PASSWORD;
+    if (!user || !password) {
+        throw new Error("FTP_USER and FTP_PASSWORD must be set in the environment");
+    }
     
     await client.access({
-        host: "onlineu.mx",
-        user: "u550473909",
-        password: "Peju751015",
+        host,
+        user,
+        password,
         secure: false
     });
 

@@ -9,6 +9,9 @@ const fs = require("fs");
 const { execSync } = require("child_process");
 
 const IGNORE = new Set(["node_modules", ".next", ".git", ".env", "out"]);
+const FTP_HOST = process.env.FTP_HOST || "onlineu.mx";
+const FTP_USER = process.env.FTP_USER;
+const FTP_PASSWORD = process.env.FTP_PASSWORD;
 
 async function uploadDir(client, localDir, remoteDir) {
     await client.ensureDir(remoteDir);
@@ -45,11 +48,14 @@ async function deploy() {
 
     // Paso 2: FTP
     try {
+        if (!FTP_USER || !FTP_PASSWORD) {
+            throw new Error("FTP_USER and FTP_PASSWORD must be set in the environment");
+        }
         console.log("Conectando al FTP...");
         await client.access({
-            host: "onlineu.mx",
-            user: "u550473909",
-            password: "Peju751015",
+            host: FTP_HOST,
+            user: FTP_USER,
+            password: FTP_PASSWORD,
             secure: false
         });
 

@@ -8,16 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
-	db *pgxpool.Pool
+	db *database.DB
 }
 
-func NewHandler(db *pgxpool.Pool) *Handler {
+func NewHandler(db *database.DB) *Handler {
 	return &Handler{db: db}
 }
 
@@ -398,7 +398,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	// 4. Activate core modules and selected premium modules
 	_, err = tx.Exec(c.UserContext(),
 		`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-		 SELECT $1, key, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
+		 SELECT $1, `+h.moduleCatalogKey("")+`, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
 		 ON CONFLICT (tenant_id, module_key)
 		 DO UPDATE SET is_active = true, enabled = true, is_required = true, updated_at = NOW()`,
 		tenantID)
@@ -561,9 +561,10 @@ func (h *Handler) GetSchool(c *fiber.Ctx) error {
 
 func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 	id := c.Params("id")
+	moduleKey := h.moduleCatalogKey("mc")
 
 	rows, err := h.db.Query(c.UserContext(),
-		`SELECT mc.key, mc.name, mc.description, mc.is_core, mc.price_monthly_mxn,
+		`SELECT `+moduleKey+`, mc.name, mc.description, mc.is_core, mc.price_monthly_mxn,
 		 COALESCE(tm.is_active, false) as is_active,
 		 COALESCE(tm.enabled, tm.is_active, false) as enabled,
 		 COALESCE(tm.level, '') as level,
@@ -620,7 +621,7 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 
 	// Required modules are protected because they are part of the tenant's base contract.
 	var isCore bool
-	if err := h.db.QueryRow(c.UserContext(), "SELECT is_core FROM modules_catalog WHERE key = $1", req.ModuleKey).Scan(&isCore); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT is_core FROM modules_catalog WHERE "+h.moduleCatalogKey("")+" = $1", req.ModuleKey).Scan(&isCore); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Module not found in catalog")
 	}
 	var isRequired bool
@@ -654,8 +655,9 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
+	moduleKey := h.moduleCatalogKey("")
 	rows, err := h.db.Query(c.UserContext(),
-		"SELECT key, name, description, is_core, price_monthly_mxn FROM modules_catalog ORDER BY is_core DESC, name")
+		"SELECT "+moduleKey+", name, description, is_core, price_monthly_mxn FROM modules_catalog ORDER BY is_core DESC, name")
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching catalog")
 	}
@@ -683,6 +685,17 @@ func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.Map{"modules": modules}, "Catalog retrieved")
+}
+
+func (h *Handler) moduleCatalogKey(alias string) string {
+	prefix := ""
+	if alias != "" {
+		prefix = alias + "."
+	}
+	if database.IsMySQL(h.db.Driver()) {
+		return prefix + "`key`"
+	}
+	return prefix + "key"
 }
 
 func (h *Handler) UploadLogo(c *fiber.Ctx) error {

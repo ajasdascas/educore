@@ -1,19 +1,19 @@
 package tenants
 
 import (
-	"strconv"
 	"educore/internal/pkg/response"
+	"strconv"
 
+	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
-	db *pgxpool.Pool
+	db *database.DB
 }
 
-func NewHandler(db *pgxpool.Pool) *Handler {
+func NewHandler(db *database.DB) *Handler {
 	return &Handler{db: db}
 }
 
@@ -29,16 +29,16 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 // --- DTOs ---
 
 type CreateTenantRequest struct {
-	Name     string `json:"name"`
-	Slug     string `json:"slug"`
-	LogoURL  string `json:"logo_url"`
-	Level    string `json:"level"`
-	Country  string `json:"country"`
-	State    string `json:"state"`
-	Phone    string `json:"phone"`
-	Plan     string `json:"plan"`
-	TrialDays int   `json:"trial_days"`
-	Director struct {
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	LogoURL   string `json:"logo_url"`
+	Level     string `json:"level"`
+	Country   string `json:"country"`
+	State     string `json:"state"`
+	Phone     string `json:"phone"`
+	Plan      string `json:"plan"`
+	TrialDays int    `json:"trial_days"`
+	Director  struct {
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 		Email     string `json:"email"`
@@ -227,14 +227,14 @@ func (h *Handler) GetByID(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.Map{
-		"id":            id,
-		"slug":          slug,
-		"name":          name,
-		"logo_url":      logo,
-		"status":        tstatus,
-		"plan":          tplan,
-		"created_at":    createdAt,
-		"updated_at":    updatedAt,
+		"id":             id,
+		"slug":           slug,
+		"name":           name,
+		"logo_url":       logo,
+		"status":         tstatus,
+		"plan":           tplan,
+		"created_at":     createdAt,
+		"updated_at":     updatedAt,
 		"total_students": studentCount,
 		"total_users":    userCount,
 	}, "Tenant retrieved")

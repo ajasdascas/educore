@@ -3,6 +3,7 @@ package communications
 import (
 	"context"
 	"database/sql"
+	"educore/internal/pkg/database"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -12,10 +13,10 @@ import (
 )
 
 type Repository struct {
-	db *sql.DB
+	db *database.DB
 }
 
-func NewRepository(db *sql.DB) *Repository {
+func NewRepository(db *database.DB) *Repository {
 	return &Repository{db: db}
 }
 
@@ -77,22 +78,22 @@ func (r *Repository) CreateMessage(ctx context.Context, tenantID, senderID strin
 	attachments, _ := r.getAttachments(ctx, tenantID, id)
 
 	return &MessageResponse{
-		ID:            id,
+		ID:             id,
 		ConversationID: conversationID,
-		SenderID:      senderID,
-		SenderName:    senderInfo.Name,
-		SenderAvatar:  senderInfo.Avatar,
-		RecipientID:   req.RecipientID,
-		RecipientName: recipientInfo.Name,
-		RecipientType: req.RecipientType,
-		Subject:       req.Subject,
-		Content:       req.Content,
-		Type:          req.Type,
-		Priority:      req.Priority,
-		Status:        "sent",
-		Attachments:   attachments,
-		CreatedAt:     createdAt,
-		UpdatedAt:     updatedAt,
+		SenderID:       senderID,
+		SenderName:     senderInfo.Name,
+		SenderAvatar:   senderInfo.Avatar,
+		RecipientID:    req.RecipientID,
+		RecipientName:  recipientInfo.Name,
+		RecipientType:  req.RecipientType,
+		Subject:        req.Subject,
+		Content:        req.Content,
+		Type:           req.Type,
+		Priority:       req.Priority,
+		Status:         "sent",
+		Attachments:    attachments,
+		CreatedAt:      createdAt,
+		UpdatedAt:      updatedAt,
 	}, nil
 }
 
@@ -198,6 +199,13 @@ func (r *Repository) GetConversations(ctx context.Context, tenantID, userID stri
 		FROM conversations c
 		WHERE c.tenant_id = $1 AND $2 = ANY(c.participant_ids)
 	`
+	if database.IsMySQL(r.db.Driver()) {
+		countQuery = `
+			SELECT COUNT(DISTINCT c.id)
+			FROM conversations c
+			WHERE c.tenant_id = $1 AND JSON_CONTAINS(c.participant_ids, JSON_QUOTE($2))
+		`
+	}
 	var total int
 	r.db.QueryRowContext(ctx, countQuery, tenantID, userID).Scan(&total)
 
@@ -212,6 +220,19 @@ func (r *Repository) GetConversations(ctx context.Context, tenantID, userID stri
 		ORDER BY c.updated_at DESC
 		LIMIT $3 OFFSET $4
 	`
+	if database.IsMySQL(r.db.Driver()) {
+		query = `
+			SELECT c.id, c.participant_ids, c.subject, c.is_archived, c.created_at, c.updated_at,
+				   COUNT(m.id) as message_count,
+				   COUNT(CASE WHEN m.status = 'sent' AND m.recipient_id = $2 AND m.read_at IS NULL THEN 1 END) as unread_count
+			FROM conversations c
+			LEFT JOIN messages m ON m.conversation_id = c.id
+			WHERE c.tenant_id = $1 AND JSON_CONTAINS(c.participant_ids, JSON_QUOTE($2))
+			GROUP BY c.id, c.participant_ids, c.subject, c.is_archived, c.created_at, c.updated_at
+			ORDER BY c.updated_at DESC
+			LIMIT $3 OFFSET $4
+		`
+	}
 
 	offset := (page - 1) * perPage
 	rows, err := r.db.QueryContext(ctx, query, tenantID, userID, perPage, offset)
@@ -223,17 +244,27 @@ func (r *Repository) GetConversations(ctx context.Context, tenantID, userID stri
 	var conversations []ConversationResponse
 	for rows.Next() {
 		var conv ConversationResponse
-		var participantIDs pq.StringArray
-
-		err := rows.Scan(
-			&conv.ID, &participantIDs, &conv.Subject, &conv.IsArchived,
-			&conv.CreatedAt, &conv.UpdatedAt, &conv.MessageCount, &conv.UnreadCount,
-		)
-		if err != nil {
-			return nil, 0, err
+		if database.IsMySQL(r.db.Driver()) {
+			var participantIDs []string
+			err := rows.Scan(
+				&conv.ID, &participantIDs, &conv.Subject, &conv.IsArchived,
+				&conv.CreatedAt, &conv.UpdatedAt, &conv.MessageCount, &conv.UnreadCount,
+			)
+			if err != nil {
+				return nil, 0, err
+			}
+			conv.ParticipantIDs = participantIDs
+		} else {
+			var participantIDs pq.StringArray
+			err := rows.Scan(
+				&conv.ID, &participantIDs, &conv.Subject, &conv.IsArchived,
+				&conv.CreatedAt, &conv.UpdatedAt, &conv.MessageCount, &conv.UnreadCount,
+			)
+			if err != nil {
+				return nil, 0, err
+			}
+			conv.ParticipantIDs = []string(participantIDs)
 		}
-
-		conv.ParticipantIDs = []string(participantIDs)
 
 		// Get participant info
 		conv.Participants, _ = r.getParticipantInfo(ctx, tenantID, conv.ParticipantIDs)
@@ -567,6 +598,13 @@ func (r *Repository) GetCommunicationStats(ctx context.Context, tenantID, userID
 		FROM conversations
 		WHERE tenant_id = $1 AND $2 = ANY(participant_ids) AND is_archived = false
 	`
+	if database.IsMySQL(r.db.Driver()) {
+		conversationQuery = `
+			SELECT COUNT(DISTINCT id)
+			FROM conversations
+			WHERE tenant_id = $1 AND JSON_CONTAINS(participant_ids, JSON_QUOTE($2)) AND is_archived = false
+		`
+	}
 	r.db.QueryRowContext(ctx, conversationQuery, tenantID, userID).Scan(&stats.ActiveConversations)
 
 	return stats, nil
@@ -574,6 +612,28 @@ func (r *Repository) GetCommunicationStats(ctx context.Context, tenantID, userID
 
 // Helper methods
 func (r *Repository) getOrCreateConversation(ctx context.Context, tenantID, user1, user2 string) (string, error) {
+	if database.IsMySQL(r.db.Driver()) {
+		checkQuery := `
+			SELECT id FROM conversations
+			WHERE tenant_id = $1
+			  AND JSON_CONTAINS(participant_ids, JSON_QUOTE($2))
+			  AND JSON_CONTAINS(participant_ids, JSON_QUOTE($3))
+			LIMIT 1
+		`
+		var conversationID string
+		err := r.db.QueryRowContext(ctx, checkQuery, tenantID, user1, user2).Scan(&conversationID)
+		if err == sql.ErrNoRows {
+			participantsJSON, _ := json.Marshal([]string{user1, user2})
+			createQuery := `
+				INSERT INTO conversations (tenant_id, participant_ids, subject, is_archived)
+				VALUES ($1, $2, $3, false)
+				RETURNING id
+			`
+			err = r.db.QueryRowContext(ctx, createQuery, tenantID, string(participantsJSON), "Direct Message").Scan(&conversationID)
+		}
+		return conversationID, err
+	}
+
 	// Check if conversation exists
 	checkQuery := `
 		SELECT id FROM conversations
@@ -673,13 +733,19 @@ func (r *Repository) getParticipantInfo(ctx context.Context, tenantID string, pa
 		return nil, nil
 	}
 
+	args := []interface{}{tenantID}
+	placeholders := make([]string, 0, len(participantIDs))
+	for i, id := range participantIDs {
+		args = append(args, id)
+		placeholders = append(placeholders, fmt.Sprintf("$%d", i+2))
+	}
 	query := `
 		SELECT id, first_name || ' ' || last_name, email, role, avatar_url
 		FROM users
-		WHERE tenant_id = $1 AND id = ANY($2)
+		WHERE tenant_id = $1 AND id IN (` + strings.Join(placeholders, ",") + `)
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, tenantID, pq.Array(participantIDs))
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -762,7 +828,7 @@ func (r *Repository) resolveRecipients(ctx context.Context, tenantID string, tar
 			rows.Close()
 		case "role":
 			// Get all users with the specified role
-			query := `SELECT id FROM users WHERE tenant_id = $1 AND role = $2 AND status = 'active'`
+			query := `SELECT id FROM users WHERE tenant_id = $1 AND role = $2 AND is_active = true`
 			rows, err := r.db.QueryContext(ctx, query, tenantID, target.ID)
 			if err != nil {
 				continue
@@ -818,7 +884,7 @@ func (r *Repository) buildRecipientInfo(ctx context.Context, tenantID string, ta
 			r.db.QueryRowContext(ctx, query, tenantID, target.ID).Scan(&info.Name, &info.Count)
 		case "role":
 			// Get role name and count
-			query := `SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = $2 AND status = 'active'`
+			query := `SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = $2 AND is_active = true`
 			r.db.QueryRowContext(ctx, query, tenantID, target.ID).Scan(&info.Count)
 			info.Name = target.ID // Use role name directly
 		}

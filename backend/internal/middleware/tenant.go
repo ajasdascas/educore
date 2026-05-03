@@ -4,11 +4,11 @@ import (
 	"context"
 	"strings"
 
+	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TenantResolver(db *pgxpool.Pool) fiber.Handler {
+func TenantResolver(db *database.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		tenantID := ""
 
@@ -35,7 +35,7 @@ func TenantResolver(db *pgxpool.Pool) fiber.Handler {
 }
 
 // SetDBTenant context execution logic for RLS
-func SetDBTenant(ctx context.Context, db *pgxpool.Pool, tenantID string) (context.Context, error) {
+func SetDBTenant(ctx context.Context, db *database.DB, tenantID string) (context.Context, error) {
 	if tenantID == "" {
 		return ctx, nil
 	}

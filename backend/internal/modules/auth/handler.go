@@ -9,20 +9,20 @@ import (
 	"strconv"
 	"time"
 
+	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
-	db            *pgxpool.Pool
+	db            *database.DB
 	jwtSecret     string
 	jwtExpiry     time.Duration
 	refreshExpiry time.Duration
 	redis         *redis.Client
 }
 
-func NewHandler(db *pgxpool.Pool, secret string, expiry, refreshExpiry time.Duration, redisClient *redis.Client) *Handler {
+func NewHandler(db *database.DB, secret string, expiry, refreshExpiry time.Duration, redisClient *redis.Client) *Handler {
 	return &Handler{
 		db:            db,
 		jwtSecret:     secret,

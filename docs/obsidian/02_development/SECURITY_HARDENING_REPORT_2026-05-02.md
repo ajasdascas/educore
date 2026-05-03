@@ -18,7 +18,7 @@ Revision focalizada para la fase Hostinger MySQL + Cloudflare + SuperAdmin propi
 - `NEXT_PUBLIC_DEMO_MODE=false npm run build` OK.
 - Schema MySQL importado en MariaDB local.
 - Seed propietarios validado en MariaDB local.
-- Bundle `frontend/out` sin `mock-token`, password real, `MYSQL_DSN` ni `STRIPE_SECRET_KEY`.
+- Bundle `frontend/out` sin tokens demo legacy, password real, DSN MySQL ni secretos Stripe.
 
 ## Pendientes
 - Portar repositorios con `pgxpool` y SQL PostgreSQL-specific a SQL portable antes de activar MySQL runtime.

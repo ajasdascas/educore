@@ -3,21 +3,31 @@ package reports
 import (
 	"context"
 	"database/sql"
+	"educore/internal/pkg/database"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *database.DB
 }
 
-func NewRepository(db *sql.DB) *Repository {
+func NewRepository(db *database.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func appendInCondition(conditions []string, args []interface{}, column string, values []string) ([]string, []interface{}) {
+	if len(values) == 0 {
+		return conditions, args
+	}
+	placeholders := make([]string, 0, len(values))
+	for _, value := range values {
+		args = append(args, value)
+		placeholders = append(placeholders, fmt.Sprintf("$%d", len(args)))
+	}
+	return append(conditions, fmt.Sprintf("%s IN (%s)", column, strings.Join(placeholders, ","))), args
 }
 
 // Report management
@@ -121,18 +131,13 @@ func (r *Repository) GetAttendanceReport(ctx context.Context, tenantID, startDat
 	// Build WHERE clause based on filters
 	whereConditions := []string{"ar.tenant_id = $1", "ar.date BETWEEN $2 AND $3"}
 	args := []interface{}{tenantID, startDate, endDate}
-	argCount := 3
 
 	if len(filters.GroupIDs) > 0 {
-		argCount++
-		whereConditions = append(whereConditions, fmt.Sprintf("s.group_id = ANY($%d)", argCount))
-		args = append(args, pq.Array(filters.GroupIDs))
+		whereConditions, args = appendInCondition(whereConditions, args, "s.group_id", filters.GroupIDs)
 	}
 
 	if len(filters.StudentIDs) > 0 {
-		argCount++
-		whereConditions = append(whereConditions, fmt.Sprintf("ar.student_id = ANY($%d)", argCount))
-		args = append(args, pq.Array(filters.StudentIDs))
+		whereConditions, args = appendInCondition(whereConditions, args, "ar.student_id", filters.StudentIDs)
 	}
 
 	whereClause := strings.Join(whereConditions, " AND ")
@@ -216,24 +221,17 @@ func (r *Repository) GetAttendanceReport(ctx context.Context, tenantID, startDat
 func (r *Repository) GetGradesReport(ctx context.Context, tenantID, startDate, endDate string, filters ReportFilters) (*GradesReportResponse, error) {
 	whereConditions := []string{"g.tenant_id = $1", "g.evaluation_date BETWEEN $2 AND $3"}
 	args := []interface{}{tenantID, startDate, endDate}
-	argCount := 3
 
 	if len(filters.GroupIDs) > 0 {
-		argCount++
-		whereConditions = append(whereConditions, fmt.Sprintf("s.group_id = ANY($%d)", argCount))
-		args = append(args, pq.Array(filters.GroupIDs))
+		whereConditions, args = appendInCondition(whereConditions, args, "s.group_id", filters.GroupIDs)
 	}
 
 	if len(filters.StudentIDs) > 0 {
-		argCount++
-		whereConditions = append(whereConditions, fmt.Sprintf("g.student_id = ANY($%d)", argCount))
-		args = append(args, pq.Array(filters.StudentIDs))
+		whereConditions, args = appendInCondition(whereConditions, args, "g.student_id", filters.StudentIDs)
 	}
 
 	if len(filters.SubjectIDs) > 0 {
-		argCount++
-		whereConditions = append(whereConditions, fmt.Sprintf("g.subject_id = ANY($%d)", argCount))
-		args = append(args, pq.Array(filters.SubjectIDs))
+		whereConditions, args = appendInCondition(whereConditions, args, "g.subject_id", filters.SubjectIDs)
 	}
 
 	whereClause := strings.Join(whereConditions, " AND ")
@@ -314,7 +312,7 @@ func (r *Repository) GetAcademicSummary(ctx context.Context, tenantID string, fi
 	overviewQuery := `
 		SELECT
 			(SELECT COUNT(*) FROM students WHERE tenant_id = $1 AND status = 'active') as total_students,
-			(SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'TEACHER' AND status = 'active') as total_teachers,
+			(SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'TEACHER' AND is_active = true) as total_teachers,
 			(SELECT COUNT(*) FROM groups WHERE tenant_id = $1 AND status = 'active') as total_groups,
 			(SELECT COUNT(*) FROM subjects WHERE tenant_id = $1 AND status = 'active') as total_subjects,
 			(SELECT COUNT(*) FROM students WHERE tenant_id = $1 AND status = 'active') as active_students,
@@ -374,8 +372,8 @@ func (r *Repository) GetAcademicSummary(ctx context.Context, tenantID string, fi
 	}
 
 	return &AcademicSummaryResponse{
-		Overview:   overview,
-		Groups:     groups,
+		Overview: overview,
+		Groups:   groups,
 	}, nil
 }
 

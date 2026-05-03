@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
 )
 
 var safeSQLIdent = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
@@ -66,7 +66,7 @@ func (h *Handler) RegisterDatabaseAdminRoutes(router fiber.Router) {
 }
 
 func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
-	rows, err := h.db.Query(c.UserContext(), `
+	query := `
 		SELECT
 			t.table_name,
 			COALESCE(obj_description((quote_ident(t.table_schema) || '.' || quote_ident(t.table_name))::regclass), '') AS description,
@@ -77,7 +77,21 @@ func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
 		LEFT JOIN pg_stat_user_tables s ON s.relname = t.table_name
 		LEFT JOIN database_admin_table_states st ON st.table_name = t.table_name
 		WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
-		ORDER BY t.table_name`)
+		ORDER BY t.table_name`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `
+			SELECT
+				t.table_name,
+				'' AS description,
+				COALESCE(t.table_rows, 0) AS estimated_rows,
+				COALESCE(st.is_hidden, false) AS is_hidden,
+				COALESCE(CAST(st.deleted_at AS CHAR), '') AS deleted_at
+			FROM information_schema.tables t
+			LEFT JOIN database_admin_table_states st ON st.table_name = t.table_name
+			WHERE t.table_schema = DATABASE() AND t.table_type = 'BASE TABLE'
+			ORDER BY t.table_name`
+	}
+	rows, err := h.db.Query(c.UserContext(), query)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "No se pudieron listar las tablas")
 	}
@@ -467,7 +481,7 @@ func (h *Handler) exportTables(c *fiber.Ctx, tables []string) error {
 }
 
 func (h *Handler) databaseColumns(c *fiber.Ctx, table string) ([]fiber.Map, error) {
-	rows, err := h.db.Query(c.UserContext(), `
+	query := `
 		SELECT
 			c.column_name,
 			c.data_type,
@@ -484,7 +498,26 @@ func (h *Handler) databaseColumns(c *fiber.Ctx, table string) ([]fiber.Map, erro
 			WHERE tc.table_schema = 'public' AND tc.table_name = $1 AND tc.constraint_type = 'PRIMARY KEY'
 		) pk ON pk.column_name = c.column_name
 		WHERE c.table_schema = 'public' AND c.table_name = $1
-		ORDER BY c.ordinal_position`, table)
+		ORDER BY c.ordinal_position`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `
+			SELECT
+				c.column_name,
+				c.data_type,
+				'' AS udt_name,
+				c.is_nullable,
+				COALESCE(c.column_default, '') AS column_default,
+				CASE WHEN kcu.column_name IS NULL THEN false ELSE true END AS is_primary
+			FROM information_schema.columns c
+			LEFT JOIN information_schema.key_column_usage kcu
+				ON kcu.table_schema = c.table_schema
+				AND kcu.table_name = c.table_name
+				AND kcu.column_name = c.column_name
+				AND kcu.constraint_name = 'PRIMARY'
+			WHERE c.table_schema = DATABASE() AND c.table_name = $1
+			ORDER BY c.ordinal_position`
+	}
+	rows, err := h.db.Query(c.UserContext(), query, table)
 	if err != nil {
 		return nil, err
 	}
@@ -510,11 +543,19 @@ func (h *Handler) databaseColumns(c *fiber.Ctx, table string) ([]fiber.Map, erro
 }
 
 func (h *Handler) databaseConstraints(c *fiber.Ctx, table string) ([]fiber.Map, error) {
-	rows, err := h.db.Query(c.UserContext(), `
+	query := `
 		SELECT constraint_name, constraint_type
 		FROM information_schema.table_constraints
 		WHERE table_schema = 'public' AND table_name = $1
-		ORDER BY constraint_type, constraint_name`, table)
+		ORDER BY constraint_type, constraint_name`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `
+			SELECT constraint_name, constraint_type
+			FROM information_schema.table_constraints
+			WHERE table_schema = DATABASE() AND table_name = $1
+			ORDER BY constraint_type, constraint_name`
+	}
+	rows, err := h.db.Query(c.UserContext(), query, table)
 	if err != nil {
 		return nil, err
 	}
@@ -531,7 +572,7 @@ func (h *Handler) databaseConstraints(c *fiber.Ctx, table string) ([]fiber.Map, 
 }
 
 func (h *Handler) databaseRelationships(c *fiber.Ctx, table string) ([]fiber.Map, error) {
-	rows, err := h.db.Query(c.UserContext(), `
+	query := `
 		SELECT
 			kcu.column_name,
 			ccu.table_name AS foreign_table,
@@ -544,7 +585,20 @@ func (h *Handler) databaseRelationships(c *fiber.Ctx, table string) ([]fiber.Map
 		WHERE tc.constraint_type = 'FOREIGN KEY'
 			AND tc.table_schema = 'public'
 			AND tc.table_name = $1
-		ORDER BY kcu.column_name`, table)
+		ORDER BY kcu.column_name`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `
+			SELECT
+				kcu.column_name,
+				kcu.referenced_table_name AS foreign_table,
+				kcu.referenced_column_name AS foreign_column
+			FROM information_schema.key_column_usage kcu
+			WHERE kcu.table_schema = DATABASE()
+				AND kcu.table_name = $1
+				AND kcu.referenced_table_name IS NOT NULL
+			ORDER BY kcu.column_name`
+	}
+	rows, err := h.db.Query(c.UserContext(), query, table)
 	if err != nil {
 		return nil, err
 	}
@@ -562,23 +616,42 @@ func (h *Handler) databaseRelationships(c *fiber.Ctx, table string) ([]fiber.Map
 
 func (h *Handler) tableExists(c *fiber.Ctx, table string) (bool, error) {
 	var exists bool
-	err := h.db.QueryRow(c.UserContext(), `
+	query := `
 		SELECT EXISTS (
 			SELECT 1 FROM information_schema.tables
 			WHERE table_schema = 'public' AND table_name = $1 AND table_type = 'BASE TABLE'
-		)`, table).Scan(&exists)
+		)`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.tables
+				WHERE table_schema = DATABASE() AND table_name = $1 AND table_type = 'BASE TABLE'
+			)`
+	}
+	err := h.db.QueryRow(c.UserContext(), query, table).Scan(&exists)
 	return exists, err
 }
 
 func (h *Handler) exportableTables(c *fiber.Ctx) ([]string, error) {
-	rows, err := h.db.Query(c.UserContext(), `
+	query := `
 		SELECT t.table_name
 		FROM information_schema.tables t
 		LEFT JOIN database_admin_table_states st ON st.table_name = t.table_name
 		WHERE t.table_schema = 'public'
 			AND t.table_type = 'BASE TABLE'
 			AND COALESCE(st.is_hidden, false) = false
-		ORDER BY t.table_name`)
+		ORDER BY t.table_name`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `
+			SELECT t.table_name
+			FROM information_schema.tables t
+			LEFT JOIN database_admin_table_states st ON st.table_name = t.table_name
+			WHERE t.table_schema = DATABASE()
+				AND t.table_type = 'BASE TABLE'
+				AND COALESCE(st.is_hidden, false) = false
+			ORDER BY t.table_name`
+	}
+	rows, err := h.db.Query(c.UserContext(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -603,7 +676,7 @@ func (h *Handler) blockProtectedDatabaseWrite(c *fiber.Ctx, table string) bool {
 	return false
 }
 
-func rowsToMaps(rows pgx.Rows) ([]fiber.Map, error) {
+func rowsToMaps(rows *database.Rows) ([]fiber.Map, error) {
 	fields := rows.FieldDescriptions()
 	result := make([]fiber.Map, 0)
 	for rows.Next() {

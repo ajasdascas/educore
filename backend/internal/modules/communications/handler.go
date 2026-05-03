@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
 	"educore/internal/pkg/response"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Handler struct {
@@ -20,8 +20,9 @@ func NewHandler(service *Service) *Handler {
 
 // RegisterRoutes sets up all communication routes
 func (h *Handler) RegisterRoutes(app fiber.Router) {
-	// Communications routes - require authenticated user
-	api := app.Group("/api/v1/communications")
+	// Communications routes - require authenticated user. The caller owns the
+	// /api/v1/communications prefix.
+	api := app
 
 	// Messages
 	messages := api.Group("/messages")
@@ -450,7 +451,7 @@ func (h *Handler) GetUnreadCounts(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, map[string]interface{}{
-		"unread_messages":     stats.UnreadMessages,
+		"unread_messages":      stats.UnreadMessages,
 		"unread_notifications": stats.UnreadNotifications,
 		"active_conversations": stats.ActiveConversations,
 	}, "Communication stats retrieved successfully")

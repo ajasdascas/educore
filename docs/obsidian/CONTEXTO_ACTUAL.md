@@ -104,7 +104,7 @@ EduCore/
 | Campo | Valor |
 |---|---|
 | Super Admin email | `admin@educore.mx` |
-| Super Admin pass | `admin123` |
+| Super Admin pass | configurado solo por secreto de entorno |
 
 ---
 

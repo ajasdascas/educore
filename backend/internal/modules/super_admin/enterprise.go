@@ -2,6 +2,7 @@ package superadmin
 
 import (
 	"crypto/rand"
+	"educore/internal/pkg/database"
 	"educore/internal/pkg/response"
 	"encoding/hex"
 	"encoding/json"
@@ -876,15 +877,25 @@ func (h *Handler) churnRiskRows(c *fiber.Ctx, limit int) []fiber.Map {
 }
 
 func (h *Handler) ModuleUsage(c *fiber.Ctx) error {
-	rows, err := h.db.Query(c.UserContext(),
-		`SELECT mc.key, mc.name,
+	query := `SELECT mc.key, mc.name,
 		        COUNT(tm.tenant_id) FILTER (WHERE tm.is_active = true) as active_tenants,
 		        COALESCE(SUM(mus.event_count), 0) as events,
 		        COALESCE(SUM(mus.error_count), 0) as errors
 		 FROM modules_catalog mc
 		 LEFT JOIN tenant_modules tm ON tm.module_key = mc.key
 		 LEFT JOIN module_usage_snapshots mus ON mus.module_key = mc.key AND mus.captured_at > NOW() - INTERVAL '30 days'
-		 GROUP BY mc.key, mc.name ORDER BY active_tenants DESC, events DESC`)
+		 GROUP BY mc.key, mc.name ORDER BY active_tenants DESC, events DESC`
+	if database.IsMySQL(h.db.Driver()) {
+		query = `SELECT mc.key, mc.name,
+		        COUNT(CASE WHEN tm.is_active = true THEN tm.tenant_id END) as active_tenants,
+		        COALESCE(SUM(mus.event_count), 0) as events,
+		        COALESCE(SUM(mus.error_count), 0) as errors
+		 FROM modules_catalog mc
+		 LEFT JOIN tenant_modules tm ON tm.module_key = mc.key
+		 LEFT JOIN module_usage_snapshots mus ON mus.module_key = mc.key AND mus.captured_at > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)
+		 GROUP BY mc.key, mc.name ORDER BY active_tenants DESC, events DESC`
+	}
+	rows, err := h.db.Query(c.UserContext(), query)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not fetch module usage")
 	}

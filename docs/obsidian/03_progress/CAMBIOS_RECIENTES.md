@@ -241,7 +241,7 @@
 - Verificacion: `npm run build` y `git diff --check` OK.
 # 29-04-2026 - Virtual Sub-Database Environment por escuela
 
-- Provisionamiento de escuelas reforzado: SuperAdmin ahora crea el tenant con admin demo `admin@educore.mx / admin123`, roles base, ciclo escolar actual, grados, materias base y grupo inicial.
+- Provisionamiento de escuelas reforzado: SuperAdmin ahora crea el tenant con admin inicial desde secretos de entorno, roles base, ciclo escolar actual, grados, materias base y grupo inicial.
 - Login backend actualizado para resolver `admin@educore.mx` por rol/tenant y evitar colision entre SuperAdmin global y School Admin de tenant.
 - Agregado backend `/api/v1/school-admin/database/*` con explorador tenant-scoped: tablas permitidas, schema, relaciones, filas paginadas, DML auditado, export e import validation.
 - Agregada migracion `013_tenant_virtual_database_environment.sql` con roles tenant, campos virtuales, tablas virtuales, filas custom y audit logs del explorador.

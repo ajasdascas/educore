@@ -8,16 +8,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"educore/internal/pkg/database"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db *database.DB
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db *database.DB) *Repository {
 	return &Repository{db: db}
 }
 
@@ -68,47 +67,42 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		       s.status,
 		       COALESCE(s.photo_url, ''),
 		       s.updated_at,
-		       COALESCE(att_stats.attendance_rate, 0),
-		       COALESCE(grade_stats.current_gpa, 0),
-		       COALESCE(last_att.last_attendance, ''),
-		       COALESCE(recent_grade.recent_grade, ''),
-		       COALESCE(next_class.next_class, '')
+		       COALESCE((
+		        SELECT ROUND(AVG(CASE WHEN ar.status IN ('present', 'late') THEN 100.0 ELSE 0.0 END), 2)
+		        FROM attendance_records ar
+		        WHERE ar.student_id = s.id AND ar.tenant_id = $1 AND ar.date >= CURRENT_DATE - INTERVAL '30 days'
+		       ), 0),
+		       COALESCE((
+		        SELECT ROUND(AVG(gr.score), 2)
+		        FROM grade_records gr
+		        WHERE gr.student_id = s.id AND gr.tenant_id = $1 AND gr.created_at >= date_trunc('month', CURRENT_DATE)
+		       ), 0),
+		       COALESCE((
+		        SELECT TO_CHAR(ar.date, 'YYYY-MM-DD')
+		        FROM attendance_records ar
+		        WHERE ar.student_id = s.id AND ar.tenant_id = $1
+		        ORDER BY ar.date DESC LIMIT 1
+		       ), ''),
+		       COALESCE((
+		        SELECT CONCAT(gr.score, ' - ', sub.name)
+		        FROM grade_records gr
+		        INNER JOIN subjects sub ON gr.subject_id = sub.id
+		        WHERE gr.student_id = s.id AND gr.tenant_id = $1
+		        ORDER BY gr.created_at DESC LIMIT 1
+		       ), ''),
+		       COALESCE((
+		        SELECT CONCAT(sub.name, ' ', TO_CHAR(csb.start_time, 'HH24:MI'))
+		        FROM class_schedule_blocks csb
+		        LEFT JOIN subjects sub ON csb.subject_id = sub.id
+		        WHERE csb.group_id = gs.group_id AND csb.tenant_id = $1 AND csb.status = 'active'
+		        ORDER BY csb.day, csb.start_time LIMIT 1
+		       ), '')
 		FROM students s
 		INNER JOIN parent_student ps ON s.id = ps.student_id
 		INNER JOIN users u ON ps.parent_id = u.id AND u.id = $2
 		LEFT JOIN group_students gs ON s.id = gs.student_id
 		LEFT JOIN groups g ON gs.group_id = g.id
 		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
-		LEFT JOIN LATERAL (
-			SELECT ROUND(AVG(CASE WHEN status IN ('present', 'late') THEN 100.0 ELSE 0.0 END), 2)::float8 AS attendance_rate
-			FROM attendance_records
-			WHERE student_id = s.id AND tenant_id = $1 AND date >= CURRENT_DATE - INTERVAL '30 days'
-		) att_stats ON true
-		LEFT JOIN LATERAL (
-			SELECT ROUND(AVG(score), 2)::float8 AS current_gpa
-			FROM grade_records
-			WHERE student_id = s.id AND tenant_id = $1 AND created_at >= date_trunc('month', CURRENT_DATE)
-		) grade_stats ON true
-		LEFT JOIN LATERAL (
-			SELECT TO_CHAR(date, 'YYYY-MM-DD') AS last_attendance
-			FROM attendance_records
-			WHERE student_id = s.id AND tenant_id = $1
-			ORDER BY date DESC LIMIT 1
-		) last_att ON true
-		LEFT JOIN LATERAL (
-			SELECT CONCAT(score, ' - ', sub.name) AS recent_grade
-			FROM grade_records gr
-			INNER JOIN subjects sub ON gr.subject_id = sub.id
-			WHERE gr.student_id = s.id AND gr.tenant_id = $1
-			ORDER BY gr.created_at DESC LIMIT 1
-		) recent_grade ON true
-		LEFT JOIN LATERAL (
-			SELECT CONCAT(sub.name, ' ', TO_CHAR(csb.start_time, 'HH24:MI')) AS next_class
-			FROM class_schedule_blocks csb
-			LEFT JOIN subjects sub ON csb.subject_id = sub.id
-			WHERE csb.group_id = gs.group_id AND csb.tenant_id = $1 AND csb.status = 'active'
-			ORDER BY csb.day, csb.start_time LIMIT 1
-		) next_class ON true
 		WHERE s.tenant_id = $1
 		  AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
 		ORDER BY s.first_name, s.last_name
@@ -605,7 +599,7 @@ func (r *Repository) GetNotificationsPaginated(ctx context.Context, tenantID, us
 	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT n.id,
 		       n.title,
-		       COALESCE(n.message, n.body),
+		       COALESCE(n.message, n.body, n.content, ''),
 		       n.type,
 		       n.priority,
 		       n.is_read,
@@ -823,7 +817,7 @@ func (r *Repository) getRecentActivity(ctx context.Context, tenantID, userID str
 		),
 		notification_activity AS (
 			SELECT n.id::text id, 'notification'::text type, n.title,
-			       COALESCE(n.message, n.body) description, ''::text child_name, n.created_at timestamp,
+			       COALESCE(n.message, n.body, n.content, '') description, ''::text child_name, n.created_at timestamp,
 			       COALESCE(n.action_url, '/parent/notifications') action_url
 			FROM notifications n
 			WHERE n.tenant_id = $1 AND n.user_id = $2
@@ -854,13 +848,14 @@ func (r *Repository) getRecentActivity(ctx context.Context, tenantID, userID str
 }
 
 func (r *Repository) getUpcomingEvents(ctx context.Context, tenantID, userID string, days int) ([]EventSummary, error) {
+	endDate := time.Now().AddDate(0, 0, days).Format("2006-01-02")
 	rows, err := r.db.Query(ctx, `
 		SELECT se.id, se.title, TO_CHAR(se.start_date, 'YYYY-MM-DD'), COALESCE(TO_CHAR(se.start_time, 'HH24:MI'), ''),
 		       se.type, COALESCE(s.first_name || ' ' || s.last_name, '')
 		FROM school_events se
 		LEFT JOIN students s ON se.student_id = s.id
 		WHERE se.tenant_id = $1
-		  AND se.start_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($2::text || ' days')::interval
+		  AND se.start_date BETWEEN CURRENT_DATE AND $2::date
 		  AND (
 			  se.student_id IS NULL
 			  OR se.student_id IN (
@@ -868,10 +863,10 @@ func (r *Repository) getUpcomingEvents(ctx context.Context, tenantID, userID str
 				  INNER JOIN students st ON st.id = ps.student_id
 				  WHERE ps.parent_id = $3 AND st.tenant_id = $1 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
 			  )
-		  )
+		)
 		ORDER BY se.start_date, se.start_time
 		LIMIT 10
-	`, tenantID, days, userID)
+	`, tenantID, endDate, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -1306,7 +1301,7 @@ func (r *Repository) getChildName(ctx context.Context, tenantID, childID string)
 		SELECT first_name || ' ' || last_name FROM students WHERE tenant_id = $1 AND id = $2
 	`, tenantID, childID).Scan(&name)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("child not found")
 		}
 		return "", err

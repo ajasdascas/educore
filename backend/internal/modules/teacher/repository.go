@@ -6,14 +6,14 @@ import (
 	"math"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"educore/internal/pkg/database"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db *database.DB
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db *database.DB) *Repository {
 	return &Repository{db: db}
 }
 
@@ -74,7 +74,7 @@ func (r *Repository) GetClasses(ctx context.Context, tenantID, teacherID string)
 		       COALESCE(TO_CHAR(csb.start_time, 'HH24:MI'), ''),
 		       COALESCE(TO_CHAR(csb.end_time, 'HH24:MI'), ''),
 		       COALESCE(csb.room, ''),
-		       COALESCE(student_counts.total, 0),
+		       COALESCE((SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id), 0),
 		       COALESCE(csb.status, 'active'),
 		       COALESCE(csb.updated_at, NOW())
 		FROM group_teachers gt
@@ -86,9 +86,6 @@ func (r *Repository) GetClasses(ctx context.Context, tenantID, teacherID string)
 		      AND csb.tenant_id = $1
 		      AND (csb.teacher_id = gt.teacher_id OR csb.teacher_id IS NULL)
 		      AND (csb.subject_id = gt.subject_id OR gt.subject_id IS NULL)
-		LEFT JOIN LATERAL (
-			SELECT COUNT(*)::int AS total FROM group_students gs WHERE gs.group_id = g.id
-		) student_counts ON true
 		WHERE gt.teacher_id = $2
 		ORDER BY g.name, csb.day, csb.start_time
 	`, tenantID, teacherID)
@@ -131,35 +128,42 @@ func (r *Repository) GetClassStudents(ctx context.Context, tenantID, teacherID, 
 		       COALESCE(s.enrollment_number, ''),
 		       g.id::text,
 		       g.name,
-		       COALESCE(att.rate, 0)::float8,
-		       COALESCE(gr.avg_score, 0)::float8,
-		       COALESCE(last_att.last_date, ''),
+		       COALESCE((
+		        SELECT ROUND(AVG(CASE WHEN ar.status IN ('present','late') THEN 100 ELSE 0 END), 2)
+		        FROM attendance_records ar
+		        WHERE ar.tenant_id = $1 AND ar.student_id = s.id
+		       ), 0)::float8,
+		       COALESCE((
+		        SELECT ROUND(AVG(gr.score), 2)
+		        FROM grade_records gr
+		        WHERE gr.tenant_id = $1 AND gr.student_id = s.id
+		       ), 0)::float8,
+		       COALESCE((
+		        SELECT TO_CHAR(ar.date, 'YYYY-MM-DD')
+		        FROM attendance_records ar
+		        WHERE ar.tenant_id = $1 AND ar.student_id = s.id
+		        ORDER BY ar.date DESC LIMIT 1
+		       ), ''),
 		       s.status,
-		       COALESCE(parent_info.parent_id, ''),
-		       COALESCE(parent_info.parent_name, '')
+		       COALESCE((
+		        SELECT u.id::text
+		        FROM parent_student ps
+		        INNER JOIN users u ON u.id = ps.parent_id
+		        WHERE ps.student_id = s.id AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		        ORDER BY ps.is_primary DESC
+		        LIMIT 1
+		       ), ''),
+		       COALESCE((
+		        SELECT u.first_name || ' ' || u.last_name
+		        FROM parent_student ps
+		        INNER JOIN users u ON u.id = ps.parent_id
+		        WHERE ps.student_id = s.id AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		        ORDER BY ps.is_primary DESC
+		        LIMIT 1
+		       ), '')
 		FROM group_students gs
 		INNER JOIN students s ON s.id = gs.student_id AND s.tenant_id = $1
 		INNER JOIN groups g ON g.id = gs.group_id AND g.tenant_id = $1
-		LEFT JOIN LATERAL (
-			SELECT ROUND(AVG(CASE WHEN status IN ('present','late') THEN 100 ELSE 0 END), 2) AS rate
-			FROM attendance_records WHERE tenant_id = $1 AND student_id = s.id
-		) att ON true
-		LEFT JOIN LATERAL (
-			SELECT ROUND(AVG(score), 2) AS avg_score
-			FROM grade_records WHERE tenant_id = $1 AND student_id = s.id
-		) gr ON true
-		LEFT JOIN LATERAL (
-			SELECT TO_CHAR(date, 'YYYY-MM-DD') AS last_date
-			FROM attendance_records WHERE tenant_id = $1 AND student_id = s.id ORDER BY date DESC LIMIT 1
-		) last_att ON true
-		LEFT JOIN LATERAL (
-			SELECT u.id::text AS parent_id, CONCAT(u.first_name, ' ', u.last_name) AS parent_name
-			FROM parent_student ps
-			INNER JOIN users u ON u.id = ps.parent_id
-			WHERE ps.student_id = s.id AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
-			ORDER BY ps.is_primary DESC
-			LIMIT 1
-		) parent_info ON true
 		WHERE gs.group_id = $2
 		ORDER BY s.first_name, s.last_name
 	`, tenantID, groupID)

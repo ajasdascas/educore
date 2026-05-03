@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"educore/internal/config"
@@ -35,39 +37,16 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if database.IsMySQL(cfg.DBDriver) {
-		sqlDB, err := database.NewSQLDBForDriver(ctx, cfg.DBDriver, cfg.DatabaseURL, cfg.MySQLDSN)
-		if err != nil {
-			log.Fatalf("Failed to connect to Hostinger MySQL: %v", err)
-		}
-		_ = sqlDB.Close()
-		pendingModules := []string{
-			"auth",
-			"tenants",
-			"super_admin",
-			"school_admin",
-			"teacher",
-			"parent",
-			"reports",
-			"communications",
-		}
-		if err := database.MySQLRuntimeReady(true, pendingModules); err != nil {
-			log.Fatal(err)
-		}
+	normalizedDriver := database.NormalizeDriver(cfg.DBDriver)
+	if cfg.AppEnv == "production" && normalizedDriver == "mysql" && !strings.EqualFold(os.Getenv("EDUCORE_ALLOW_MYSQL_RUNTIME"), "true") {
+		log.Fatal("DB_DRIVER=mysql is blocked in production until EDUCORE_ALLOW_MYSQL_RUNTIME=true is set after full validation")
 	}
 
-	db, err := database.New(ctx, cfg.DatabaseURL)
+	db, err := database.NewPortable(ctx, cfg.DBDriver, cfg.DatabaseURL, cfg.MySQLDSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
-
-	// Create SQL DB adapter for modules that use database/sql
-	sqlDB, err := database.NewSQLDBForDriver(ctx, cfg.DBDriver, cfg.DatabaseURL, cfg.MySQLDSN)
-	if err != nil {
-		log.Fatalf("Failed to create SQL DB adapter: %v", err)
-	}
-	defer sqlDB.Close()
 
 	// 3. Init Redis (optional in dev)
 	redisClient, err := redis.New(ctx, cfg.RedisURL)
@@ -110,13 +89,12 @@ func main() {
 	// Health check
 	api.Get("/health", func(c *fiber.Ctx) error {
 		tenantID := c.Locals("tenant_id")
-		dbDriver := database.NormalizeDriver(cfg.DBDriver)
 		return response.Success(c, fiber.Map{
 			"status":         "ok",
 			"env":            cfg.AppEnv,
 			"tenant":         tenantID,
-			"db_driver":      dbDriver,
-			"db_mysql_ready": dbDriver == "mysql",
+			"db_driver":      normalizedDriver,
+			"db_mysql_ready": normalizedDriver == "mysql" && (cfg.AppEnv != "production" || strings.EqualFold(os.Getenv("EDUCORE_ALLOW_MYSQL_RUNTIME"), "true")),
 			"redis":          redisClient.IsAvailable(),
 		}, "API is healthy")
 	})
@@ -159,14 +137,14 @@ func main() {
 	teacherHandler.RegisterRoutes(teacherGroup)
 
 	// Reports module (SCHOOL_ADMIN, TEACHER)
-	reportsRepo := reports.NewRepository(sqlDB)
+	reportsRepo := reports.NewRepository(db)
 	reportsService := reports.NewService(reportsRepo, eventBus)
 	reportsHandler := reports.NewHandler(reportsService)
 	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
 	reportsHandler.RegisterRoutes(reportsGroup)
 
 	// Communications module (All authenticated users)
-	communicationsRepo := communications.NewRepository(sqlDB)
+	communicationsRepo := communications.NewRepository(db)
 	communicationsService := communications.NewService(communicationsRepo, eventBus)
 	communicationsHandler := communications.NewHandler(communicationsService)
 	communicationsGroup := api.Group("/communications", middleware.Protected(cfg.JWTSecret))

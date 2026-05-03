@@ -93,7 +93,7 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 ## SESION 28-04-2026 (America/Mexico_City) - Correccion real de produccion Super Admin
 
 ### Estado verificado
-- Se reprodujo el error `Application error: a client-side exception has occurred` en produccion con sesion demo `mock-token-admin`.
+- Se reprodujo el error `Application error: a client-side exception has occurred` en produccion con una sesion demo legacy.
 - Causa raiz frontend: `authFetch` devolvia siempre payload de dashboard para tokens `mock-*`; la pagina de escuelas esperaba `response.data.schools`, recibia `undefined` y fallaba al ejecutar `.filter`.
 - Causa raiz deploy: GitHub Actions estaba desplegando a `/domains/educore/`, pero la URL real `https://onlineu.mx/educore/` se sirve desde `/domains/onlineu.mx/public_html/educore/`.
 
@@ -437,7 +437,7 @@ Siguiente: Implementar módulo School Admin con la misma calidad y estándares.
 #memory #super_admin #database #responsive #frontend
 # 29-04-2026 - Virtual Sub-Database Environment
 
-Se implemento la experiencia de "base de datos virtual" por escuela sin bases fisicas separadas. El alta de escuelas provisiona admin demo `admin@educore.mx / admin123`, roles base y estructura academica inicial. Se agrego backend `/api/v1/school-admin/database/*`, migracion `013`, UI `/school-admin/database`, mocks estaticos y login tenant-aware por rol para evitar colision entre SuperAdmin global y School Admin.
+Se implemento la experiencia de "base de datos virtual" por escuela sin bases fisicas separadas. El alta de escuelas provisiona admin inicial desde secretos de entorno, roles base y estructura academica inicial. Se agrego backend `/api/v1/school-admin/database/*`, migracion `013`, UI `/school-admin/database`, mocks estaticos y login tenant-aware por rol para evitar colision entre SuperAdmin global y School Admin.
 
 Verificacion realizada: `go test ./...` en backend OK y `npm run build` en frontend OK.
 
@@ -536,7 +536,7 @@ Se agrego la migracion Postgres `018_owner_super_admins_hardening.sql` para `pas
 
 Se endurecio seguridad: `TenantResolver` ya no confia en `X-Tenant-ID`, CORS elimino `http://onlineu.mx`, cookies refresh usan `Secure` cuando llega HTTPS, y scripts antiguos dejaron de incluir DSN local con password hardcoded. Cloudflare tiene zona `onlineu.mx` pendiente con nameservers `aleena.ns.cloudflare.com` y `rene.ns.cloudflare.com`; registros no-web quedaron DNS-only.
 
-Verificacion: `go test ./...` OK, `npx tsc --noEmit` OK, `NEXT_PUBLIC_DEMO_MODE=false npm run build` OK, schema MySQL importo en MariaDB local, seed de propietarios funciono en MariaDB local, y busqueda en `frontend/out` no encontro `mock-token`, contrasena real, `MYSQL_DSN` ni secretos Stripe.
+Verificacion: `go test ./...` OK, `npx tsc --noEmit` OK, `NEXT_PUBLIC_DEMO_MODE=false npm run build` OK, schema MySQL importo en MariaDB local, seed de propietarios funciono en MariaDB local, y busqueda en `frontend/out` no encontro tokens demo legacy, contrasena real, DSN MySQL ni secretos Stripe.
 
 #memory #security #super_admin #hostinger #cloudflare #mysql #deployment
 
@@ -553,3 +553,17 @@ Hallazgo de seguridad: `.env` y `backend/.env` estaban versionados con secretos 
 Verificacion: schema reset/import OK en MariaDB 10.4 local, triggers creados, seed de propietarios probado con password temporal, `go test ./...`, `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, scan de bundle sin secretos.
 
 #memory #hostinger #vps #mysql #security #deployment #backend
+
+---
+
+# 02-05-2026 - Port backend portable MySQL completado localmente
+
+Se completo el port local del backend a `database/sql` portable para `postgres|mysql` sin activar produccion. La nueva capa `backend/internal/pkg/database/portable_db.go` traduce placeholders, casts, upserts, `RETURNING`, funciones de fecha, JSON basico y patrones PostgreSQL comunes hacia MySQL/MariaDB, manteniendo soporte Postgres.
+
+Se corrigieron diferencias de schema MySQL descubiertas en smoke: `platform_settings.key` en `ORDER BY`, analitica con `to_char(date_trunc(...), 'YYYY-MM')`, y tablas/columnas enterprise faltantes como `tenants.storage_limit_mb` y `storage_usage_snapshots`.
+
+Validacion local realizada: import limpio de `backend/migrations_mysql/001_hostinger_core.sql`, seed de owners con password temporal local, backend con `DB_DRIVER=mysql`, smoke API completo en Super Admin, School Admin, Parent, Teacher, pagos, reportes, comunicaciones y RBAC negativo. Tambien pasaron `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...` y `git diff --check` con warnings CRLF solamente.
+
+Decision: el codigo ya esta listo para pruebas controladas con MySQL, pero no se debe activar en Railway/produccion hasta resolver IP/allowlist de Hostinger, configurar `MYSQL_DSN` como secreto, rotar la contrasena MySQL expuesta en pruebas manuales y ejecutar smoke real contra Hostinger.
+
+#memory #backend #mysql #database #security #tenant_isolation

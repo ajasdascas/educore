@@ -12,7 +12,7 @@ Para que el deploy automático funcione, necesitas configurar la contraseña FTP
 ### Paso 2: Crear el Secret
 1. Clic en **New repository secret**
 2. **Name**: `FTP_PASSWORD`
-3. **Secret**: `Peju751015`
+3. **Secret**: pega la contraseña real desde tu gestor de secretos. No la escribas en el repo.
 4. Clic en **Add secret**
 
 ## ⚡ Cómo funciona el deploy automático

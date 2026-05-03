@@ -11,8 +11,8 @@ import (
 
 	"educore/internal/pkg/response"
 
+	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
 )
 
 var tenantDBSafeIdent = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
@@ -461,7 +461,11 @@ func (h *Handler) tenantDatabaseRows(c *fiber.Ctx, tenantID string, cfg tenantDB
 		where := "t.tenant_id = $1"
 		args := []interface{}{tenantID}
 		if search != "" {
-			where += " AND row_to_json(t)::text ILIKE $2"
+			if database.IsMySQL(h.service.repo.db.Driver()) {
+				where += " AND CAST(CONCAT_WS(' ', t.id, t.tenant_id, t.created_at, t.updated_at) AS CHAR) LIKE $2"
+			} else {
+				where += " AND row_to_json(t)::text ILIKE $2"
+			}
 			args = append(args, "%"+search+"%")
 		}
 		var total int
@@ -500,7 +504,11 @@ func (h *Handler) bridgeRows(c *fiber.Ctx, tenantID, table string, perPage, offs
 	args := []interface{}{tenantID}
 	searchClause := ""
 	if search != "" {
-		searchClause = " AND row_to_json(src)::text ILIKE $2"
+		if database.IsMySQL(h.service.repo.db.Driver()) {
+			searchClause = " AND CAST(CONCAT_WS(' ', src.id) AS CHAR) LIKE $2"
+		} else {
+			searchClause = " AND row_to_json(src)::text ILIKE $2"
+		}
 		args = append(args, "%"+search+"%")
 	}
 	switch table {
@@ -560,7 +568,11 @@ func (h *Handler) customTableRows(c *fiber.Ctx, tenantID string, perPage, offset
 	where := "r.tenant_id = $1 AND r.deleted_at IS NULL"
 	args := []interface{}{tenantID}
 	if search != "" {
-		where += " AND r.data::text ILIKE $2"
+		if database.IsMySQL(h.service.repo.db.Driver()) {
+			where += " AND CAST(r.data AS CHAR) LIKE $2"
+		} else {
+			where += " AND r.data::text ILIKE $2"
+		}
 		args = append(args, "%"+search+"%")
 	}
 	var total int
@@ -623,7 +635,7 @@ func (h *Handler) updateTenantCustomRow(c *fiber.Ctx, tenantID, userID, id strin
 }
 
 func (h *Handler) tenantDatabaseColumns(c *fiber.Ctx, table string) ([]fiber.Map, error) {
-	rows, err := h.service.repo.db.Query(c.UserContext(), `
+	query := `
 		SELECT c.column_name, c.data_type, COALESCE(c.udt_name, ''), c.is_nullable,
 		       COALESCE(c.column_default, ''),
 		       COALESCE(pk.is_primary, false)
@@ -636,7 +648,22 @@ func (h *Handler) tenantDatabaseColumns(c *fiber.Ctx, table string) ([]fiber.Map
 			WHERE tc.table_schema = 'public' AND tc.table_name = $1 AND tc.constraint_type = 'PRIMARY KEY'
 		) pk ON pk.column_name = c.column_name
 		WHERE c.table_schema = 'public' AND c.table_name = $1
-		ORDER BY c.ordinal_position`, table)
+		ORDER BY c.ordinal_position`
+	if database.IsMySQL(h.service.repo.db.Driver()) {
+		query = `
+			SELECT c.column_name, c.data_type, '' AS udt_name, c.is_nullable,
+			       COALESCE(c.column_default, ''),
+			       CASE WHEN kcu.column_name IS NULL THEN false ELSE true END AS is_primary
+			FROM information_schema.columns c
+			LEFT JOIN information_schema.key_column_usage kcu
+			  ON kcu.table_schema = c.table_schema
+			 AND kcu.table_name = c.table_name
+			 AND kcu.column_name = c.column_name
+			 AND kcu.constraint_name = 'PRIMARY'
+			WHERE c.table_schema = DATABASE() AND c.table_name = $1
+			ORDER BY c.ordinal_position`
+	}
+	rows, err := h.service.repo.db.Query(c.UserContext(), query, table)
 	if err != nil {
 		return nil, err
 	}
@@ -686,7 +713,7 @@ func (h *Handler) tenantCustomFields(c *fiber.Ctx, tenantID, table string) ([]fi
 }
 
 func (h *Handler) tenantDatabaseRelationships(c *fiber.Ctx, table string) ([]fiber.Map, error) {
-	rows, err := h.service.repo.db.Query(c.UserContext(), `
+	query := `
 		SELECT kcu.column_name, ccu.table_name AS foreign_table, ccu.column_name AS foreign_column
 		FROM information_schema.table_constraints tc
 		JOIN information_schema.key_column_usage kcu
@@ -694,7 +721,17 @@ func (h *Handler) tenantDatabaseRelationships(c *fiber.Ctx, table string) ([]fib
 		JOIN information_schema.constraint_column_usage ccu
 		  ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema
 		WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' AND tc.table_name = $1
-		ORDER BY kcu.column_name`, table)
+		ORDER BY kcu.column_name`
+	if database.IsMySQL(h.service.repo.db.Driver()) {
+		query = `
+			SELECT kcu.column_name, kcu.referenced_table_name AS foreign_table, kcu.referenced_column_name AS foreign_column
+			FROM information_schema.key_column_usage kcu
+			WHERE kcu.table_schema = DATABASE()
+			  AND kcu.table_name = $1
+			  AND kcu.referenced_table_name IS NOT NULL
+			ORDER BY kcu.column_name`
+	}
+	rows, err := h.service.repo.db.Query(c.UserContext(), query, table)
 	if err != nil {
 		return nil, err
 	}
@@ -764,7 +801,7 @@ func tenantUpdateValues(table string, values map[string]interface{}) ([]interfac
 	return out, sets
 }
 
-func tenantRowsToMaps(rows pgx.Rows) ([]fiber.Map, error) {
+func tenantRowsToMaps(rows *database.Rows) ([]fiber.Map, error) {
 	fields := rows.FieldDescriptions()
 	result := []fiber.Map{}
 	for rows.Next() {

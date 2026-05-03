@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"educore/internal/pkg/database"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	db *database.DB
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
+func NewRepository(db *database.DB) *Repository {
 	return &Repository{
 		db: db,
 	}
@@ -2956,14 +2956,13 @@ func (r *Repository) GetPayment(ctx context.Context, tenantID, paymentID string)
 
 func (r *Repository) CreateStudentCharge(ctx context.Context, tenantID, userID string, req CreateStudentChargeRequest) (*StudentPaymentResponse, error) {
 	metadata, _ := json.Marshal(map[string]interface{}{"notes": req.Notes})
-	var id string
-	err := r.db.QueryRow(ctx, `
-		INSERT INTO student_payments (tenant_id, student_id, concept, description, amount, currency, due_date, status, created_by, metadata)
-		SELECT $1, s.id, $3, $4, $5, $6, NULLIF($7, '')::date, 'pending', NULLIF($8, '')::uuid, $9::jsonb
+	id := database.NewID()
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO student_payments (id, tenant_id, student_id, concept, description, amount, currency, due_date, status, created_by, metadata)
+		SELECT $1, $2, s.id, $4, $5, $6, $7, NULLIF($8, '')::date, 'pending', NULLIF($9, '')::uuid, $10::jsonb
 		FROM students s
-		WHERE s.tenant_id = $1 AND s.id = $2
-		RETURNING id::text
-	`, tenantID, req.StudentID, req.Concept, req.Description, req.Amount, req.Currency, req.DueDate, userID, string(metadata)).Scan(&id)
+		WHERE s.tenant_id = $2 AND s.id = $3
+	`, id, tenantID, req.StudentID, req.Concept, req.Description, req.Amount, req.Currency, req.DueDate, userID, string(metadata))
 	if err != nil {
 		return nil, err
 	}
@@ -3003,7 +3002,7 @@ func (r *Repository) RecordStudentPayment(ctx context.Context, tenantID, userID,
 		    payment_method = $2,
 		    receipt_number = $3,
 		    receipt_url = COALESCE(NULLIF(receipt_url, ''), '#'),
-		    metadata = metadata || $4::jsonb,
+		    metadata = $4::jsonb,
 		    updated_at = NOW()
 		WHERE tenant_id = $5 AND id = $6 AND deleted_at IS NULL
 	`, status, req.Method, receiptNumber, string(metadata), tenantID, paymentID)

@@ -17,8 +17,8 @@ func NewHandler(service *Service) *Handler {
 
 // RegisterRoutes sets up all parent portal routes
 func (h *Handler) RegisterRoutes(app fiber.Router) {
-	// Parent portal routes - require PARENT role
-	api := app.Group("/api/v1/parent")
+	// Parent portal routes - the parent router is already mounted at /api/v1/parent.
+	api := app
 
 	// Dashboard
 	api.Get("/dashboard", h.GetDashboard)

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"educore/internal/pkg/response"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Handler struct {
@@ -20,14 +20,13 @@ func NewHandler(service *Service) *Handler {
 
 // RegisterRoutes sets up all report routes
 func (h *Handler) RegisterRoutes(app fiber.Router) {
-	// Reports routes - require SCHOOL_ADMIN or TEACHER role
-	api := app.Group("/api/v1/reports")
+	// Reports routes - require SCHOOL_ADMIN or TEACHER role. The caller owns the
+	// /api/v1/reports prefix.
+	api := app
 
 	// Report management
 	api.Post("/generate", h.GenerateReport)
 	api.Get("/", h.GetReports)
-	api.Get("/:id", h.GetReport)
-	api.Delete("/:id", h.DeleteReport)
 
 	// Specific report types
 	api.Get("/attendance", h.GetAttendanceReport)
@@ -42,6 +41,9 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	// Analytics and metrics
 	api.Get("/analytics", h.GetAnalytics)
 	api.Get("/dashboard/metrics", h.GetDashboardMetrics)
+
+	api.Get("/:id", h.GetReport)
+	api.Delete("/:id", h.DeleteReport)
 
 	// Export and scheduling
 	api.Post("/:id/export", h.ExportReport)
@@ -267,7 +269,7 @@ func (h *Handler) ExportReport(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, map[string]interface{}{
-		"job_id": jobID,
+		"job_id":  jobID,
 		"message": "Export job started successfully",
 	}, "Export job started successfully")
 }
