@@ -29,7 +29,7 @@ func defaultStagingPortalPasswordHash() string {
 	if !strings.EqualFold(os.Getenv("APP_ENV"), "staging") && !strings.EqualFold(os.Getenv("EDUCORE_ENABLE_STAGING_PORTAL_PASSWORDS"), "true") {
 		return ""
 	}
-	password := strings.TrimSpace(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
+	password := cleanStagingSecret(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
 	if len(password) < 12 {
 		return ""
 	}
@@ -38,6 +38,18 @@ func defaultStagingPortalPasswordHash() string {
 		return ""
 	}
 	return string(hash)
+}
+
+func cleanStagingSecret(value string) string {
+	cleaned := strings.TrimSpace(value)
+	if len(cleaned) >= 2 {
+		first := cleaned[0]
+		last := cleaned[len(cleaned)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			cleaned = strings.TrimSpace(cleaned[1 : len(cleaned)-1])
+		}
+	}
+	return cleaned
 }
 
 func (r *Repository) IsModuleEnabled(ctx context.Context, tenantID, moduleKey string) bool {

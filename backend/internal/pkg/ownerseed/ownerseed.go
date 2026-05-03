@@ -21,7 +21,7 @@ func SeedFromEnv(ctx context.Context, db *database.DB, appEnv string) error {
 	}
 
 	emails := parseEmails(env("EDUCORE_OWNER_ADMIN_EMAILS", defaultOwnerEmails))
-	password := os.Getenv("EDUCORE_OWNER_ADMIN_PASSWORD")
+	password := cleanSecret(os.Getenv("EDUCORE_OWNER_ADMIN_PASSWORD"))
 	if strings.TrimSpace(password) == "" {
 		log.Println("Owner SuperAdmin seed skipped: EDUCORE_OWNER_ADMIN_PASSWORD is not configured")
 		return nil
@@ -155,4 +155,16 @@ func env(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func cleanSecret(value string) string {
+	cleaned := strings.TrimSpace(value)
+	if len(cleaned) >= 2 {
+		first := cleaned[0]
+		last := cleaned[len(cleaned)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			cleaned = strings.TrimSpace(cleaned[1 : len(cleaned)-1])
+		}
+	}
+	return cleaned
 }

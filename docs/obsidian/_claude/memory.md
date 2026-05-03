@@ -611,3 +611,13 @@ Tambien se habilito solo para staging que los usuarios `TEACHER` y `PARENT` crea
 Verificacion local: sintaxis PowerShell OK, `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, `git diff --check` OK. No se detectaron secretos en el diff.
 
 #memory #railway #mysql #qa #security #teacher #parent
+
+---
+
+# 02-05-2026 - Login owner 401 en staging y sanitizado de secretos
+
+El primer smoke autenticado contra Railway staging paso `health` pero fallo el login owner con `401`. Causa probable: el seed no corrio por variable faltante o el Raw Editor de Railway pudo guardar el password con comillas literales. Se endurecio el seed para limpiar espacios y comillas envolventes de `EDUCORE_OWNER_ADMIN_PASSWORD` antes de generar bcrypt. Tambien se aplico la misma sanitizacion a `EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD` para Teacher/Parent staging.
+
+No se pidio ni se guardo la contrasena. Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server` y `git diff --check` OK.
+
+#memory #railway #mysql #auth #security #qa
