@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"educore/internal/pkg/database"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Repository struct {
@@ -21,6 +23,21 @@ func NewRepository(db *database.DB) *Repository {
 	return &Repository{
 		db: db,
 	}
+}
+
+func defaultStagingPortalPasswordHash() string {
+	if !strings.EqualFold(os.Getenv("APP_ENV"), "staging") && !strings.EqualFold(os.Getenv("EDUCORE_ENABLE_STAGING_PORTAL_PASSWORDS"), "true") {
+		return ""
+	}
+	password := strings.TrimSpace(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
+	if len(password) < 12 {
+		return ""
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return ""
+	}
+	return string(hash)
 }
 
 func (r *Repository) IsModuleEnabled(ctx context.Context, tenantID, moduleKey string) bool {
@@ -655,13 +672,15 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 			relationship = "guardian"
 		}
 		var parentID string
+		parentPasswordHash := defaultStagingPortalPasswordHash()
 		err = tx.QueryRow(ctx, `
 			INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
-			VALUES ($1, $2, '', $3, $4, 'PARENT', true)
+			VALUES ($1, $2, $3, $4, $5, 'PARENT', true)
 			ON CONFLICT (tenant_id, email)
-			DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
+			DO UPDATE SET password_hash = CASE WHEN EXCLUDED.password_hash <> '' THEN EXCLUDED.password_hash ELSE users.password_hash END,
+			              first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
 			RETURNING id
-		`, tenantID, parent.Email, parent.FirstName, parentLastName).Scan(&parentID)
+		`, tenantID, parent.Email, parentPasswordHash, parent.FirstName, parentLastName).Scan(&parentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create parent user: %w", err)
 		}
@@ -1107,12 +1126,13 @@ func (r *Repository) CreateTeacher(ctx context.Context, tenantID string, req Cre
 	// Create user
 	var userID string
 	isActive := req.Status != "inactive"
+	teacherPasswordHash := defaultStagingPortalPasswordHash()
 	err = tx.QueryRow(ctx, `
 		INSERT INTO users (tenant_id, first_name, last_name, email,
 						  password_hash, role, is_active)
-		VALUES ($1, $2, $3, $4, '', 'TEACHER', $5)
+		VALUES ($1, $2, $3, $4, $5, 'TEACHER', $6)
 		RETURNING id
-	`, tenantID, req.FirstName, req.LastName, req.Email, isActive).Scan(&userID)
+	`, tenantID, req.FirstName, req.LastName, req.Email, teacherPasswordHash, isActive).Scan(&userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}

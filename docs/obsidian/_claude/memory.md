@@ -599,3 +599,15 @@ Tras confirmar que Railway staging responde `/api/v1/health` con `env=staging`, 
 Esto permite que Railway staging cree/actualice `gioescudero2007@gmail.com` y `jagustin_ramosp@hotmail.com` como `SUPER_ADMIN` durante redeploy sin pasar secretos por chat ni por git. Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server` y `git diff --check` OK.
 
 #memory #railway #mysql #super_admin #security #deployment
+
+---
+
+# 02-05-2026 - Smoke autenticado staging preparado
+
+Staging Railway sigue respondiendo `health` con `env=staging`, `db_driver=mysql`, `db_mysql_ready=true`. Las rutas privadas sin token devuelven `401`, correcto. Para poder completar el smoke sin exponer contrasenas, se agrego `scripts/staging-smoke-authenticated.ps1`: pide password owner y password temporal School Admin/Teacher/Parent en una ventana local, mantiene tokens solo en memoria y escribe un reporte sanitizado en `scripts/staging-smoke-report.json`.
+
+Tambien se habilito solo para staging que los usuarios `TEACHER` y `PARENT` creados durante la prueba reciban un bcrypt derivado de `EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD`. Fuera de `APP_ENV=staging` el comportamiento anterior se conserva y no se crean passwords automaticos.
+
+Verificacion local: sintaxis PowerShell OK, `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, `git diff --check` OK. No se detectaron secretos en el diff.
+
+#memory #railway #mysql #qa #security #teacher #parent
