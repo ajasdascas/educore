@@ -19,6 +19,7 @@ import (
 	"educore/internal/modules/teacher"
 	"educore/internal/modules/tenants"
 	"educore/internal/pkg/database"
+	"educore/internal/pkg/ownerseed"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
 
@@ -47,6 +48,12 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	seedCtx, seedCancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer seedCancel()
+	if err := ownerseed.SeedFromEnv(seedCtx, db, cfg.AppEnv); err != nil {
+		log.Fatalf("Failed to seed owner admins: %v", err)
+	}
 
 	// 3. Init Redis (optional in dev)
 	redisClient, err := redis.New(ctx, cfg.RedisURL)

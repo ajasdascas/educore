@@ -567,3 +567,35 @@ Validacion local realizada: import limpio de `backend/migrations_mysql/001_hosti
 Decision: el codigo ya esta listo para pruebas controladas con MySQL, pero no se debe activar en Railway/produccion hasta resolver IP/allowlist de Hostinger, configurar `MYSQL_DSN` como secreto, rotar la contrasena MySQL expuesta en pruebas manuales y ejecutar smoke real contra Hostinger.
 
 #memory #backend #mysql #database #security #tenant_isolation
+
+---
+
+# 02-05-2026 - Staging Railway Hostinger MySQL bloqueado por Browser Use
+
+Tras el reinicio de la computadora se intento continuar la configuracion guiada en navegador para Railway `patient-charm` y Hostinger Remote MySQL. La rama sigue en `codex/mysql-hostinger-staging`, commit `d90d5ee`, con `master` y production intactos. `git diff --check` sigue sin errores.
+
+Bloqueo operativo: Browser Use no pudo iniciar el runtime de navegador dentro de Codex porque el app-server interno reporto una ruta faltante antes de abrir Railway. No se entro a Railway, no se creo el environment `educore-mysql-staging`, no se configuraron variables, no se activo Static Outbound IP y no se toco Hostinger ni Cloudflare.
+
+Siguiente paso seguro: reintentar Browser Use cuando la extension/runtime este disponible o hacer sesion guiada manual en Railway/Hostinger. Mantener production con PostgreSQL y no activar `DB_DRIVER=mysql` hasta que staging conecte con Hostinger MySQL, pase smoke real y se confirme la IP allowlist.
+
+#memory #railway #hostinger #mysql #deployment #security
+
+---
+
+# 02-05-2026 - Reintento Browser Use con Railway autenticado
+
+Giovanni abrio manualmente Railway en la app de Codex en la URL de variables del servicio `educore` (`project/4d633524...`, `service/8d93ce32...`, `environmentId=ca5c705f...`). Browser Use logro leer URL y titulo de la pestana (`educore`), pero cualquier intento de inspeccionar DOM, screenshot, locator o interaccion sigue fallando con el app-server interno de Codex antes de poder verificar el environment o editar variables.
+
+No se modifico Railway, Hostinger, Cloudflare, production ni master. La prueba staging queda bloqueada por herramienta de navegador, no por codigo. Para continuar sin riesgo hace falta que Browser Use permita DOM/clicks o que Giovanni autorice una sesion manual guiada en pantalla/CLI con secretos pegados por el usuario directamente en Railway.
+
+#memory #railway #browser_use #hostinger #mysql #staging
+
+---
+
+# 02-05-2026 - Auto-seed seguro para owners en staging MySQL
+
+Tras confirmar que Railway staging responde `/api/v1/health` con `env=staging`, `db_driver=mysql` y `db_mysql_ready=true`, se agrego un auto-seed seguro de propietarios SuperAdmin. El seed solo corre automaticamente en `APP_ENV=staging` o si `EDUCORE_AUTO_SEED_OWNERS=true`, lee `EDUCORE_OWNER_ADMIN_EMAILS` y `EDUCORE_OWNER_ADMIN_PASSWORD` desde variables de entorno, genera bcrypt en runtime y no imprime ni guarda contrasenas.
+
+Esto permite que Railway staging cree/actualice `gioescudero2007@gmail.com` y `jagustin_ramosp@hotmail.com` como `SUPER_ADMIN` durante redeploy sin pasar secretos por chat ni por git. Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server` y `git diff --check` OK.
+
+#memory #railway #mysql #super_admin #security #deployment
