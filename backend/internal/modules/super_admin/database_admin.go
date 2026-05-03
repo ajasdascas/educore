@@ -93,7 +93,7 @@ func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
 	}
 	rows, err := h.db.Query(c.UserContext(), query)
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "No se pudieron listar las tablas")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("No se pudieron listar las tablas", err))
 	}
 	defer rows.Close()
 
@@ -103,7 +103,7 @@ func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
 		var estimatedRows int64
 		var isHiddenValue interface{}
 		if err := rows.Scan(&name, &description, &estimatedRows, &isHiddenValue, &deletedAt); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "No se pudo leer una tabla")
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("No se pudo leer una tabla", err))
 		}
 		isHidden := databaseAdminBool(isHiddenValue)
 		tables = append(tables, fiber.Map{

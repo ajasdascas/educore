@@ -103,6 +103,7 @@ func main() {
 			"db_driver":      normalizedDriver,
 			"db_mysql_ready": normalizedDriver == "mysql" && (cfg.AppEnv != "production" || strings.EqualFold(os.Getenv("EDUCORE_ALLOW_MYSQL_RUNTIME"), "true")),
 			"redis":          redisClient.IsAvailable(),
+			"git_commit":     os.Getenv("RAILWAY_GIT_COMMIT_SHA"),
 		}, "API is healthy")
 	})
 

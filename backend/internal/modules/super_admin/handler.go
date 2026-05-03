@@ -284,6 +284,13 @@ func minimumProvisioningPasswordLength() int {
 	return 12
 }
 
+func superAdminInternalErrorMessage(message string, err error) string {
+	if err != nil && strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "staging") {
+		return message + ": " + err.Error()
+	}
+	return message
+}
+
 func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	var req CreateSchoolRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -300,14 +307,18 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 
 	// 1. Validate plan exists
 	var planExists bool
-	h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists)
+	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error validating subscription plan", err))
+	}
 	if !planExists {
 		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 	}
 
 	// 2. Check if slug exists
 	var slugExists bool
-	h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)", req.Slug).Scan(&slugExists)
+	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)", req.Slug).Scan(&slugExists); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error validating school slug", err))
+	}
 	if slugExists {
 		return response.Error(c, fiber.StatusConflict, "El subdominio ya está en uso")
 	}
@@ -348,7 +359,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		req.Name, req.Slug, req.LogoURL, req.Plan, settingsData).Scan(&tenantID)
 
 	if err != nil {
-		return response.Error(c, fiber.StatusConflict, "Slug already exists or database error")
+		return response.Error(c, fiber.StatusConflict, superAdminInternalErrorMessage("Slug already exists or database error", err))
 	}
 
 	// 3. Create default tenant admin user for the virtual environment.
@@ -395,7 +406,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
 
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error creating admin user")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error creating admin user", err))
 	}
 
 	_, err = tx.Exec(c.UserContext(), `
@@ -407,7 +418,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			($1, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]'::jsonb, true)
 		ON CONFLICT (tenant_id, key) DO NOTHING`, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error seeding tenant roles")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding tenant roles", err))
 	}
 
 	// 4. Activate core modules and selected premium modules
@@ -419,7 +430,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		tenantID)
 
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error activating core modules")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error activating core modules", err))
 	}
 
 	for _, level := range req.Levels {
@@ -432,7 +443,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 				 DO UPDATE SET is_active = true, enabled = true, level = COALESCE(tenant_modules.level, EXCLUDED.level),
 				               is_required = true, source = EXCLUDED.source, updated_at = NOW()`,
 				tenantID, mod, normalizedLevel); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, "Error activating level module: "+mod)
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error activating level module: "+mod, err))
 			}
 		}
 	}
@@ -444,7 +455,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			 ON CONFLICT (tenant_id, module_key)
 			 DO UPDATE SET is_active = true, enabled = true, source = EXCLUDED.source, updated_at = NOW()`,
 			tenantID, mod); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error activating premium module: "+mod)
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error activating premium module: "+mod, err))
 		}
 	}
 
@@ -461,7 +472,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		        make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int + 1, 7, 31),
 		        'active', true, 'Ciclo creado automaticamente al provisionar tenant')
 		RETURNING id`, tenantID, schoolYearName).Scan(&schoolYearID); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error seeding school year")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school year", err))
 	}
 
 	if _, err := tx.Exec(c.UserContext(), `
@@ -469,7 +480,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		VALUES ($1, $2, '[]'::jsonb, '{"min":0,"max":100,"passing":60}'::jsonb, '#4f46e5', NOW())
 		ON CONFLICT (tenant_id)
 		DO UPDATE SET school_year = EXCLUDED.school_year, updated_at = NOW()`, tenantID, schoolYearName); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error seeding school settings")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school settings", err))
 	}
 
 	seedLevels := req.Levels
@@ -489,7 +500,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			 VALUES ($1, $2, $3, $4)
 			 RETURNING id`,
 			tenantID, gradeName, normalizedLevel, i).Scan(&gradeID); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error seeding grade level: "+level)
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding grade level: "+level, err))
 		}
 		if firstGradeID == "" {
 			firstGradeID = gradeID
@@ -510,7 +521,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			INSERT INTO subjects (tenant_id, grade_id, name, code, description, credits, status)
 			VALUES ($1, NULLIF($2, '')::uuid, $3, $4, 'Materia base creada automaticamente', 1, 'active')
 			ON CONFLICT DO NOTHING`, tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error seeding subject: "+subject.Name)
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding subject: "+subject.Name, err))
 		}
 	}
 
@@ -519,12 +530,12 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			INSERT INTO groups (tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
 			VALUES ($1, $2, 'A', $3, $4, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')
 			ON CONFLICT DO NOTHING`, tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error seeding default group")
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding default group", err))
 		}
 	}
 
 	if err := tx.Commit(c.UserContext()); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not commit transaction")
+		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Could not commit transaction", err))
 	}
 
 	return response.Success(c, fiber.Map{

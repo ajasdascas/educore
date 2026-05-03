@@ -6,5 +6,6 @@ out/
 *.exe
 *.dump
 *.bak
+scripts/staging-smoke-report.json
 full_migration.sql
 .DS_Store

@@ -144,7 +144,7 @@ $paymentID = ""
 try {
   $health = Invoke-Json -Method "GET" -Path "/api/v1/health"
   if ($health.ok -and $health.body.data.db_driver -eq "mysql" -and $health.body.data.env -eq "staging") {
-    Add-Result "health mysql staging" "PASS" "db_driver=mysql env=staging"
+    Add-Result "health mysql staging" "PASS" "db_driver=mysql env=staging commit=$($health.body.data.git_commit)"
   } else {
     Add-Result "health mysql staging" "FAIL" $health.raw
     throw "Health failed"
@@ -163,7 +163,7 @@ try {
   Add-Result "super admin stats" ($(if ($stats.ok) { "PASS" } else { "FAIL" })) "HTTP $($stats.status)"
 
   $tables = Invoke-Json -Method "GET" -Path "/api/v1/super-admin/database/tables" -Token $ownerToken
-  Add-Result "database tables" ($(if ($tables.ok) { "PASS" } else { "FAIL" })) "HTTP $($tables.status)"
+  Add-Result "database tables" ($(if ($tables.ok) { "PASS" } else { "FAIL" })) "$(if ($tables.ok) { "HTTP $($tables.status)" } else { "HTTP $($tables.status): $($tables.raw)" })"
 
   $schoolBody = @{
     name = "Escuela Staging MySQL $stamp"
@@ -190,7 +190,7 @@ try {
     $tenantID = $createdSchool.body.data.tenant_id
     Add-Result "crear escuela staging" "PASS" $tenantID
   } else {
-    Add-Result "crear escuela staging" "FAIL" $createdSchool.raw
+    Add-Result "crear escuela staging" "FAIL" "HTTP $($createdSchool.status): $($createdSchool.raw)"
     throw "Create school failed"
   }
 

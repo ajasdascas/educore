@@ -641,3 +641,13 @@ Giovanni configuro las variables secretas y el smoke autentico paso `health`, `l
 Se corrigio `ListDatabaseTables` para normalizar booleanos de MySQL/MariaDB de forma tolerante y se alineo `CreateSchool` con el minimo staging de 10 caracteres, manteniendo 12 en produccion. El smoke script ahora guarda `scripts/staging-smoke-report.json` tambien cuando falla para conservar diagnostico sin tokens ni passwords.
 
 #memory #railway #mysql #super_admin #qa #security
+
+---
+
+# 03-05-2026 - Diagnostico seguro para staging MySQL
+
+El smoke siguio fallando con `database tables` HTTP 500 y `crear escuela staging` despues de actualizar el script local; no quedo confirmado si Railway ya habia redeployado el commit de backend con el fix. Para evitar depender de logs manuales, `health` ahora incluye `RAILWAY_GIT_COMMIT_SHA` como `git_commit` sin exponer secretos y los errores 500 de SuperAdmin devuelven detalle SQL seguro solo en `APP_ENV=staging`.
+
+Tambien se agrego `scripts/staging-smoke-report.json` a `.gitignore` para evitar subir reportes de QA generados localmente.
+
+#memory #railway #mysql #debugging #qa #security
