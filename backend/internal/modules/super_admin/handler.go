@@ -3,6 +3,7 @@ package superadmin
 import (
 	"educore/internal/pkg/response"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -270,6 +271,19 @@ func isSupportedEducationLevel(level string) bool {
 	}
 }
 
+func cleanProvisioningSecret(value string) string {
+	cleaned := strings.TrimSpace(value)
+	cleaned = strings.Trim(cleaned, "\"'")
+	return strings.TrimSpace(cleaned)
+}
+
+func minimumProvisioningPasswordLength() int {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "staging") {
+		return 10
+	}
+	return 12
+}
+
 func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	var req CreateSchoolRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -355,12 +369,13 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		adminFirstName = nameParts[0]
 		adminLastName = strings.Join(nameParts[1:], " ")
 	}
-	defaultPassword := os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD")
+	defaultPassword := cleanProvisioningSecret(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
 	if defaultPassword == "" {
 		return response.Error(c, fiber.StatusInternalServerError, "EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD is required for school provisioning")
 	}
-	if len(defaultPassword) < 12 {
-		return response.Error(c, fiber.StatusInternalServerError, "EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD must be at least 12 characters")
+	minPasswordLength := minimumProvisioningPasswordLength()
+	if len(defaultPassword) < minPasswordLength {
+		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD must be at least %d characters", minPasswordLength))
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
 	if err != nil {

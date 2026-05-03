@@ -88,6 +88,27 @@ function Login {
   return $result.body.data
 }
 
+function Write-SmokeReport {
+  $summary = [pscustomobject]@{
+    api = $ApiBase
+    generated_at = (Get-Date).ToString("o")
+    tenant_id = $tenantID
+    school_slug = $schoolSlug
+    school_admin_email = $schoolAdminEmail
+    teacher_email = $teacherEmail
+    parent_email = $parentEmail
+    student_id = $studentID
+    group_id = $groupID
+    payment_id = $paymentID
+    results = $script:Results
+  }
+
+  $reportPath = Join-Path (Get-Location) "scripts\\staging-smoke-report.json"
+  $summary | ConvertTo-Json -Depth 20 | Set-Content -Path $reportPath -Encoding UTF8
+  Write-Host ""
+  Write-Host "Reporte guardado sin tokens ni passwords: $reportPath"
+}
+
 $script:Results = @()
 $stamp = Get-Date -Format "yyyyMMddHHmmss"
 do {
@@ -325,23 +346,5 @@ try {
 } finally {
   $ownerPassword = $null
   $schoolAdminPassword = $null
+  Write-SmokeReport
 }
-
-$summary = [pscustomobject]@{
-  api = $ApiBase
-  generated_at = (Get-Date).ToString("o")
-  tenant_id = $tenantID
-  school_slug = $schoolSlug
-  school_admin_email = $schoolAdminEmail
-  teacher_email = $teacherEmail
-  parent_email = $parentEmail
-  student_id = $studentID
-  group_id = $groupID
-  payment_id = $paymentID
-  results = $script:Results
-}
-
-$reportPath = Join-Path (Get-Location) "scripts\\staging-smoke-report.json"
-$summary | ConvertTo-Json -Depth 20 | Set-Content -Path $reportPath -Encoding UTF8
-Write-Host ""
-Write-Host "Reporte guardado sin tokens ni passwords: $reportPath"

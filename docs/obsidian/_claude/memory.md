@@ -631,3 +631,13 @@ Giovanni confirmo que `EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD` no estaba configur
 Root cause del `401`: `health` confirmaba API/MySQL vivos, asi que el fallo venia de credenciales/seed. Para validar staging, Railway debe tener ambas variables secretas configuradas y redeployar hasta ver logs `Owner SuperAdmin ready: ...`.
 
 #memory #railway #mysql #staging #auth #security
+
+---
+
+# 03-05-2026 - Smoke staging avanza a bugs MySQL reales
+
+Giovanni configuro las variables secretas y el smoke autentico paso `health`, `login owner super admin` y `super admin stats`. El siguiente fallo fue `database tables` con HTTP 500 y `crear escuela staging` fallando. Se identificaron dos causas probables en runtime MySQL: conversion booleana de MariaDB en Database Admin y el handler de creacion de escuela aun exigia 12 caracteres para `EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD` sin limpiar comillas/espacios.
+
+Se corrigio `ListDatabaseTables` para normalizar booleanos de MySQL/MariaDB de forma tolerante y se alineo `CreateSchool` con el minimo staging de 10 caracteres, manteniendo 12 en produccion. El smoke script ahora guarda `scripts/staging-smoke-report.json` tambien cuando falla para conservar diagnostico sin tokens ni passwords.
+
+#memory #railway #mysql #super_admin #qa #security

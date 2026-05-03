@@ -101,10 +101,11 @@ func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
 	for rows.Next() {
 		var name, description, deletedAt string
 		var estimatedRows int64
-		var isHidden bool
-		if err := rows.Scan(&name, &description, &estimatedRows, &isHidden, &deletedAt); err != nil {
+		var isHiddenValue interface{}
+		if err := rows.Scan(&name, &description, &estimatedRows, &isHiddenValue, &deletedAt); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "No se pudo leer una tabla")
 		}
+		isHidden := databaseAdminBool(isHiddenValue)
 		tables = append(tables, fiber.Map{
 			"name":           name,
 			"description":    description,
@@ -116,6 +117,26 @@ func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.Map{"tables": tables}, "Tablas disponibles")
+}
+
+func databaseAdminBool(value interface{}) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case int:
+		return typed != 0
+	case int64:
+		return typed != 0
+	case uint64:
+		return typed != 0
+	case []byte:
+		return databaseAdminBool(string(typed))
+	case string:
+		normalized := strings.TrimSpace(strings.ToLower(typed))
+		return normalized == "1" || normalized == "true" || normalized == "t" || normalized == "yes"
+	default:
+		return false
+	}
 }
 
 func (h *Handler) GetDatabaseTableSchema(c *fiber.Ctx) error {
