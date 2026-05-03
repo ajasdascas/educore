@@ -84,10 +84,9 @@ func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {
 				t.table_name,
 				'' AS description,
 				COALESCE(t.table_rows, 0) AS estimated_rows,
-				COALESCE(st.is_hidden, false) AS is_hidden,
-				COALESCE(CAST(st.deleted_at AS CHAR), '') AS deleted_at
+				false AS is_hidden,
+				'' AS deleted_at
 			FROM information_schema.tables t
-			LEFT JOIN database_admin_table_states st ON st.table_name = t.table_name
 			WHERE t.table_schema = DATABASE() AND t.table_type = 'BASE TABLE'
 			ORDER BY t.table_name`
 	}
