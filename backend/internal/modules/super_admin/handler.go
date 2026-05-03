@@ -354,9 +354,16 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error serializing settings")
 	}
 
-	err = tx.QueryRow(c.UserContext(),
-		"INSERT INTO tenants (name, slug, logo_url, plan, status, settings) VALUES ($1, $2, $3, $4, 'active', $5) RETURNING id",
-		req.Name, req.Slug, req.LogoURL, req.Plan, settingsData).Scan(&tenantID)
+	if database.IsMySQL(h.db.Driver()) {
+		tenantID = database.NewID()
+		_, err = tx.Exec(c.UserContext(),
+			"INSERT INTO tenants (id, name, slug, logo_url, plan, status, settings) VALUES (?, ?, ?, ?, ?, 'active', ?)",
+			tenantID, req.Name, req.Slug, req.LogoURL, req.Plan, settingsData)
+	} else {
+		err = tx.QueryRow(c.UserContext(),
+			"INSERT INTO tenants (name, slug, logo_url, plan, status, settings) VALUES ($1, $2, $3, $4, 'active', $5) RETURNING id",
+			req.Name, req.Slug, req.LogoURL, req.Plan, settingsData).Scan(&tenantID)
+	}
 
 	if err != nil {
 		return response.Error(c, fiber.StatusConflict, superAdminInternalErrorMessage("Slug already exists or database error", err))
@@ -393,30 +400,55 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error preparing admin password")
 	}
 
-	_, err = tx.Exec(c.UserContext(),
-		`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
-		 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true)
-		 ON CONFLICT (tenant_id, email)
-		 DO UPDATE SET password_hash = EXCLUDED.password_hash,
-		               first_name = EXCLUDED.first_name,
-		               last_name = EXCLUDED.last_name,
-		               role = 'SCHOOL_ADMIN',
-		               is_active = true,
-		               updated_at = NOW()`,
-		tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
+	if database.IsMySQL(h.db.Driver()) {
+		_, err = tx.Exec(c.UserContext(),
+			`INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active)
+			 VALUES (?, ?, ?, ?, ?, ?, 'SCHOOL_ADMIN', true)
+			 ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash),
+			                         first_name = VALUES(first_name),
+			                         last_name = VALUES(last_name),
+			                         role = 'SCHOOL_ADMIN',
+			                         is_active = true,
+			                         updated_at = CURRENT_TIMESTAMP`,
+			database.NewID(), tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
+	} else {
+		_, err = tx.Exec(c.UserContext(),
+			`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
+			 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true)
+			 ON CONFLICT (tenant_id, email)
+			 DO UPDATE SET password_hash = EXCLUDED.password_hash,
+			               first_name = EXCLUDED.first_name,
+			               last_name = EXCLUDED.last_name,
+			               role = 'SCHOOL_ADMIN',
+			               is_active = true,
+			               updated_at = NOW()`,
+			tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
+	}
 
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error creating admin user", err))
 	}
 
-	_, err = tx.Exec(c.UserContext(), `
-		INSERT INTO tenant_roles (tenant_id, key, name, description, permissions, is_system)
-		VALUES
-			($1, 'admin', 'Administrador', 'Control operativo de la escuela', '["users:*","academic:*","database:tenant"]'::jsonb, true),
-			($1, 'teacher', 'Profesor', 'Gestion docente y captura academica', '["groups:read","attendance:write","grades:write"]'::jsonb, true),
-			($1, 'parent', 'Padre/Tutor', 'Consulta de hijos y comunicacion escolar', '["children:read","messages:write"]'::jsonb, true),
-			($1, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]'::jsonb, true)
-		ON CONFLICT (tenant_id, key) DO NOTHING`, tenantID)
+	if database.IsMySQL(h.db.Driver()) {
+		_, err = tx.Exec(c.UserContext(), `
+			INSERT INTO tenant_roles (id, tenant_id, `+"`key`"+`, name, description, permissions, is_system)
+			VALUES
+				(?, ?, 'admin', 'Administrador', 'Control operativo de la escuela', '["users:*","academic:*","database:tenant"]', true),
+				(?, ?, 'teacher', 'Profesor', 'Gestion docente y captura academica', '["groups:read","attendance:write","grades:write"]', true),
+				(?, ?, 'parent', 'Padre/Tutor', 'Consulta de hijos y comunicacion escolar', '["children:read","messages:write"]', true),
+				(?, ?, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]', true)
+			ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), permissions = VALUES(permissions), is_system = true`,
+			database.NewID(), tenantID, database.NewID(), tenantID, database.NewID(), tenantID, database.NewID(), tenantID)
+	} else {
+		_, err = tx.Exec(c.UserContext(), `
+			INSERT INTO tenant_roles (tenant_id, key, name, description, permissions, is_system)
+			VALUES
+				($1, 'admin', 'Administrador', 'Control operativo de la escuela', '["users:*","academic:*","database:tenant"]'::jsonb, true),
+				($1, 'teacher', 'Profesor', 'Gestion docente y captura academica', '["groups:read","attendance:write","grades:write"]'::jsonb, true),
+				($1, 'parent', 'Padre/Tutor', 'Consulta de hijos y comunicacion escolar', '["children:read","messages:write"]'::jsonb, true),
+				($1, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]'::jsonb, true)
+			ON CONFLICT (tenant_id, key) DO NOTHING`, tenantID)
+	}
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding tenant roles", err))
 	}
@@ -466,21 +498,44 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		schoolYearName = strconv.Itoa(now.Year()) + "-" + strconv.Itoa(now.Year()+1)
 	}
 	var schoolYearID string
-	if err := tx.QueryRow(c.UserContext(), `
-		INSERT INTO school_years (tenant_id, name, start_date, end_date, status, is_current, notes)
-		VALUES ($1, $2, make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, 8, 1),
-		        make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int + 1, 7, 31),
-		        'active', true, 'Ciclo creado automaticamente al provisionar tenant')
-		RETURNING id`, tenantID, schoolYearName).Scan(&schoolYearID); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school year", err))
+	if database.IsMySQL(h.db.Driver()) {
+		schoolYearID = database.NewID()
+		now := time.Now()
+		startDate := time.Date(now.Year(), 8, 1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		endDate := time.Date(now.Year()+1, 7, 31, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		if _, err := tx.Exec(c.UserContext(), `
+			INSERT INTO school_years (id, tenant_id, name, start_date, end_date, status, is_current, notes)
+			VALUES (?, ?, ?, ?, ?, 'active', true, 'Ciclo creado automaticamente al provisionar tenant')`,
+			schoolYearID, tenantID, schoolYearName, startDate, endDate); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school year", err))
+		}
+	} else {
+		if err := tx.QueryRow(c.UserContext(), `
+			INSERT INTO school_years (tenant_id, name, start_date, end_date, status, is_current, notes)
+			VALUES ($1, $2, make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, 8, 1),
+			        make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int + 1, 7, 31),
+			        'active', true, 'Ciclo creado automaticamente al provisionar tenant')
+			RETURNING id`, tenantID, schoolYearName).Scan(&schoolYearID); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school year", err))
+		}
 	}
 
-	if _, err := tx.Exec(c.UserContext(), `
-		INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
-		VALUES ($1, $2, '[]'::jsonb, '{"min":0,"max":100,"passing":60}'::jsonb, '#4f46e5', NOW())
-		ON CONFLICT (tenant_id)
-		DO UPDATE SET school_year = EXCLUDED.school_year, updated_at = NOW()`, tenantID, schoolYearName); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school settings", err))
+	if database.IsMySQL(h.db.Driver()) {
+		if _, err := tx.Exec(c.UserContext(), `
+			INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
+			VALUES (?, ?, '[]', '{"min":0,"max":100,"passing":60}', '#4f46e5', CURRENT_TIMESTAMP)
+			ON DUPLICATE KEY UPDATE school_year = VALUES(school_year), updated_at = CURRENT_TIMESTAMP`,
+			tenantID, schoolYearName); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school settings", err))
+		}
+	} else {
+		if _, err := tx.Exec(c.UserContext(), `
+			INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
+			VALUES ($1, $2, '[]'::jsonb, '{"min":0,"max":100,"passing":60}'::jsonb, '#4f46e5', NOW())
+			ON CONFLICT (tenant_id)
+			DO UPDATE SET school_year = EXCLUDED.school_year, updated_at = NOW()`, tenantID, schoolYearName); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school settings", err))
+		}
 	}
 
 	seedLevels := req.Levels
@@ -495,12 +550,22 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			gradeName = "Grado inicial"
 		}
 		var gradeID string
-		if err := tx.QueryRow(c.UserContext(),
-			`INSERT INTO grade_levels (tenant_id, name, level, sort_order)
-			 VALUES ($1, $2, $3, $4)
-			 RETURNING id`,
-			tenantID, gradeName, normalizedLevel, i).Scan(&gradeID); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding grade level: "+level, err))
+		if database.IsMySQL(h.db.Driver()) {
+			gradeID = database.NewID()
+			if _, err := tx.Exec(c.UserContext(),
+				`INSERT INTO grade_levels (id, tenant_id, name, level, sort_order)
+				 VALUES (?, ?, ?, ?, ?)`,
+				gradeID, tenantID, gradeName, normalizedLevel, i); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding grade level: "+level, err))
+			}
+		} else {
+			if err := tx.QueryRow(c.UserContext(),
+				`INSERT INTO grade_levels (tenant_id, name, level, sort_order)
+				 VALUES ($1, $2, $3, $4)
+				 RETURNING id`,
+				tenantID, gradeName, normalizedLevel, i).Scan(&gradeID); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding grade level: "+level, err))
+			}
 		}
 		if firstGradeID == "" {
 			firstGradeID = gradeID
@@ -517,20 +582,38 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		{"Historia", "HIS"},
 	}
 	for _, subject := range defaultSubjects {
-		if _, err := tx.Exec(c.UserContext(), `
-			INSERT INTO subjects (tenant_id, grade_id, name, code, description, credits, status)
-			VALUES ($1, NULLIF($2, '')::uuid, $3, $4, 'Materia base creada automaticamente', 1, 'active')
-			ON CONFLICT DO NOTHING`, tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding subject: "+subject.Name, err))
+		if database.IsMySQL(h.db.Driver()) {
+			if _, err := tx.Exec(c.UserContext(), `
+				INSERT IGNORE INTO subjects (id, tenant_id, grade_id, name, code, description, credits, status)
+				VALUES (?, ?, NULLIF(?, ''), ?, ?, 'Materia base creada automaticamente', 1, 'active')`,
+				database.NewID(), tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding subject: "+subject.Name, err))
+			}
+		} else {
+			if _, err := tx.Exec(c.UserContext(), `
+				INSERT INTO subjects (tenant_id, grade_id, name, code, description, credits, status)
+				VALUES ($1, NULLIF($2, '')::uuid, $3, $4, 'Materia base creada automaticamente', 1, 'active')
+				ON CONFLICT DO NOTHING`, tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding subject: "+subject.Name, err))
+			}
 		}
 	}
 
 	if firstGradeID != "" {
-		if _, err := tx.Exec(c.UserContext(), `
-			INSERT INTO groups (tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
-			VALUES ($1, $2, 'A', $3, $4, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')
-			ON CONFLICT DO NOTHING`, tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding default group", err))
+		if database.IsMySQL(h.db.Driver()) {
+			if _, err := tx.Exec(c.UserContext(), `
+				INSERT IGNORE INTO groups (id, tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
+				VALUES (?, ?, ?, 'A', ?, ?, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')`,
+				database.NewID(), tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding default group", err))
+			}
+		} else {
+			if _, err := tx.Exec(c.UserContext(), `
+				INSERT INTO groups (tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
+				VALUES ($1, $2, 'A', $3, $4, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')
+				ON CONFLICT DO NOTHING`, tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding default group", err))
+			}
 		}
 	}
 

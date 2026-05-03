@@ -651,3 +651,13 @@ El smoke siguio fallando con `database tables` HTTP 500 y `crear escuela staging
 Tambien se agrego `scripts/staging-smoke-report.json` a `.gitignore` para evitar subir reportes de QA generados localmente.
 
 #memory #railway #mysql #debugging #qa #security
+
+---
+
+# 03-05-2026 - CreateSchool MySQL explicito
+
+Con Railway corriendo `eff5e29`, el smoke paso `database tables` pero siguio fallando `crear escuela staging` con HTTP 500. Se redujo la superficie fragil del traductor SQL para el alta de escuela: en MySQL/MariaDB `CreateSchool` ahora genera UUIDs desde Go y usa SQL explicito compatible para `tenants`, `users`, `tenant_roles`, `school_years`, `school_settings`, `grade_levels`, `subjects` y `groups`, manteniendo el path PostgreSQL intacto.
+
+Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, sintaxis PowerShell y `git diff --check` OK.
+
+#memory #railway #mysql #super_admin #school_provisioning #security
