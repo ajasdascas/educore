@@ -63,12 +63,12 @@ func (h *Handler) ListGlobalUsers(c *fiber.Ctx) error {
 	baseQuery := `
 		SELECT id, email, first_name, last_name, role, is_active, created_at, updated_at
 		FROM users
-		WHERE tenant_id IS NULL AND role = 'SUPER_ADMIN'
+		WHERE tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL
 	`
 	countQuery := `
 		SELECT COUNT(*)
 		FROM users
-		WHERE tenant_id IS NULL AND role = 'SUPER_ADMIN'
+		WHERE tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL
 	`
 
 	var args []interface{}
@@ -267,7 +267,7 @@ func (h *Handler) UpdateGlobalUser(c *fiber.Ctx) error {
 	// Add WHERE clause
 	args = append(args, id)
 
-	query := fmt.Sprintf("UPDATE users SET %s WHERE id = $%d AND tenant_id IS NULL AND role = 'SUPER_ADMIN'",
+	query := fmt.Sprintf("UPDATE users SET %s WHERE id = $%d AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
 		strings.Join(setParts, ", "), argIndex)
 
 	_, err = h.db.Exec(c.UserContext(), query, args...)
@@ -291,7 +291,7 @@ func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
 	// Get current status
 	var currentStatus bool
 	err := h.db.QueryRow(c.UserContext(),
-		"SELECT is_active FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN'",
+		"SELECT is_active FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
 		id).Scan(&currentStatus)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
@@ -300,7 +300,7 @@ func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
 	// Toggle status
 	newStatus := !currentStatus
 	_, err = h.db.Exec(c.UserContext(),
-		"UPDATE users SET is_active = $1, updated_at = $2 WHERE id = $3 AND tenant_id IS NULL AND role = 'SUPER_ADMIN'",
+		"UPDATE users SET is_active = $1, updated_at = $2 WHERE id = $3 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
 		newStatus, time.Now(), id)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error updating user status")
@@ -312,33 +312,38 @@ func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
 	}, "User status updated successfully")
 }
 
-// DeleteGlobalUser deactivates a user (soft delete)
+// DeleteGlobalUser soft-deletes a global Super Admin user.
 func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	// Cannot delete yourself
-	currentUser := c.Locals("user")
-	if currentUser != nil {
-		if userMap, ok := currentUser.(map[string]interface{}); ok {
-			if currentUserID, ok := userMap["id"].(string); ok && currentUserID == id {
-				return response.Error(c, fiber.StatusForbidden, "Cannot delete your own account")
-			}
-		}
+	if currentUserID, ok := c.Locals("user_id").(string); ok && currentUserID == id {
+		return response.Error(c, fiber.StatusForbidden, "No puedes eliminar tu propia cuenta")
 	}
 
-	// Soft delete (deactivate)
+	var targetEmail string
+	if err := h.db.QueryRow(c.UserContext(), `
+		SELECT email
+		FROM users
+		WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL
+	`, id).Scan(&targetEmail); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Usuario no encontrado")
+	}
+
 	result, err := h.db.Exec(c.UserContext(),
-		"UPDATE users SET is_active = false, updated_at = $1 WHERE id = $2 AND tenant_id IS NULL AND role = 'SUPER_ADMIN'",
-		time.Now(), id)
+		"UPDATE users SET is_active = false, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
+		id)
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error deactivating user")
+		return response.Error(c, fiber.StatusInternalServerError, "Error eliminando usuario")
 	}
 
 	if result.RowsAffected() == 0 {
-		return response.Error(c, fiber.StatusNotFound, "User not found")
+		return response.Error(c, fiber.StatusNotFound, "Usuario no encontrado")
 	}
 
-	return response.Success(c, fiber.Map{"id": id}, "User deactivated successfully")
+	h.auditSuperAdmin(c, "user.soft_delete", "users", id, "critical", fiber.Map{"email": targetEmail}, "")
+
+	return response.Success(c, fiber.Map{"id": id}, "Usuario eliminado correctamente")
 }
 
 // GetGlobalUserActivity gets recent activity log for a user
@@ -381,7 +386,7 @@ func (h *Handler) fetchGlobalUser(ctx context.Context, id string) (GlobalUser, e
 	err := h.db.QueryRow(ctx, `
 		SELECT id, email, first_name, last_name, role, is_active, created_at, updated_at
 		FROM users
-		WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN'
+		WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL
 	`, id).Scan(
 		&user.ID, &user.Email, &user.FirstName, &user.LastName,
 		&user.Role, &user.IsActive, &user.CreatedAt, &user.UpdatedAt,
@@ -392,7 +397,7 @@ func (h *Handler) fetchGlobalUser(ctx context.Context, id string) (GlobalUser, e
 func (h *Handler) globalUserExists(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	err := h.db.QueryRow(ctx,
-		"SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN')",
+		"SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL)",
 		id).Scan(&exists)
 	return exists, err
 }

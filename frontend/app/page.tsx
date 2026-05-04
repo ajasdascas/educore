@@ -231,8 +231,8 @@ export default function LandingPage() {
         initial={rm ? false : { y: -64, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5, ease: [0, 0, 0.2, 1] }}
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-          scrolled ? "bg-slate-950/95 backdrop-blur-md shadow-lg shadow-black/20 border-b border-slate-800/60" : "bg-transparent"
+        className={`landing-nav fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+          scrolled ? "landing-nav--scrolled bg-slate-950/95 backdrop-blur-md shadow-lg shadow-black/20 border-b border-slate-800/60" : "landing-nav--top bg-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -244,7 +244,7 @@ export default function LandingPage() {
             >
               <BookOpen className="w-4 h-4 text-white" />
             </motion.div>
-            <span className="text-lg font-bold text-white tracking-tight">EduCore</span>
+            <span className="landing-brand-text text-lg font-bold text-white tracking-tight">EduCore</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6" aria-label="Navegación principal">
@@ -255,7 +255,7 @@ export default function LandingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.07, duration: 0.3 }}
                 onClick={() => scrollTo(l.href)}
-                className="text-sm text-slate-400 hover:text-white transition-colors focus:outline-none focus-visible:underline"
+                className="landing-nav-link text-sm text-slate-400 hover:text-white transition-colors focus:outline-none focus-visible:underline"
               >
                 {l.label}
               </motion.button>
@@ -269,7 +269,7 @@ export default function LandingPage() {
             className="hidden md:flex items-center gap-3"
           >
             <ThemeToggle />
-            <Link href="/login" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800">
+            <Link href="/login" className="landing-nav-link text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800">
               Iniciar sesión
             </Link>
             <motion.button
@@ -311,7 +311,7 @@ export default function LandingPage() {
               animate={{ opacity: 1, height: "auto" }}
               exit={rm ? { opacity: 0 } : { opacity: 0, height: 0 }}
               transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
-              className="md:hidden bg-slate-900/98 backdrop-blur-xl border-t border-slate-800 overflow-hidden"
+              className="landing-mobile-menu md:hidden bg-slate-900/98 backdrop-blur-xl border-t border-slate-800 overflow-hidden"
             >
               <div className="px-4 py-4 space-y-1">
                 {NAV_LINKS.map((l) => (

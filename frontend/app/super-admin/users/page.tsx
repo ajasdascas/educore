@@ -149,34 +149,43 @@ export default function UsersPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("¿Estás seguro de desactivar este usuario?")) return;
+  const handleDeleteUser = async (user: GlobalUser) => {
+    const displayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
+    const confirmed = confirm(
+      `¿Eliminar el usuario global "${displayName}"?\n\nEsta acción lo quitará del Manager Maestro y bloqueará su acceso.`
+    );
 
-    setActionLoading(userId);
+    if (!confirmed) return;
+
+    setActionLoading(user.id);
     try {
-      const response = await authFetch(`/api/v1/super-admin/users/${userId}`, {
+      const response = await authFetch(`/api/v1/super-admin/users/${user.id}`, {
         method: "DELETE",
       });
 
       if (response.success) {
-        setUsers(prev => prev.map(user =>
-          user.id === userId
-            ? { ...user, is_active: false }
-            : user
-        ));
+        setUsers(prev => prev.filter(current => current.id !== user.id));
+        setMeta(prev => {
+          const total = Math.max(0, prev.total - 1);
+          return {
+            ...prev,
+            total,
+            pages: Math.max(1, Math.ceil(total / prev.per_page)),
+          };
+        });
         toast({
           title: "Éxito",
-          description: "Usuario desactivado correctamente",
+          description: "Usuario eliminado correctamente",
         });
       } else {
-        throw new Error(response.message);
+        throw new Error(response.message || "No se pudo eliminar el usuario");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo desactivar el usuario",
+        description: error?.message || "No se pudo eliminar el usuario",
       });
     } finally {
       setActionLoading(null);
@@ -470,15 +479,13 @@ export default function UsersPage() {
                                 <UserCheck className="h-4 w-4 mr-2" />
                                 Impersonar
                               </DropdownMenuItem>
-                              {user.is_active && (
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteUser(user.id)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Desactivar
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteUser(user)}
+                                className="text-red-600 focus:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Eliminar usuario
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
