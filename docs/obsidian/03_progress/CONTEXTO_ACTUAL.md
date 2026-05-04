@@ -83,3 +83,19 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Catalogo modular SaaS:** se alinearon 4 Core reales (`auth`, `users`, `academic_core`, `grading`) y extensiones vendibles por plan/add-on con migracion `016_modular_saas_catalog_and_plans.sql`.
 
 #module #school_admin #academic_core #grading #frontend #backend #security
+
+## Avance 04-05-2026 (sesión tarde)
+- **Landing page pública `/`:** página de marketing completa con Framer Motion — navbar sticky con mobile menu AnimatePresence, hero con blobs animados + AnimatedCounter en stats, grid de 9 soluciones con stagger 80ms, diferenciadores con scroll-trigger, testimonios con estrellas spring, video block con ripple rings, FAQ accordion AnimatePresence, formulario de contacto con spinner y success state animado. `prefers-reduced-motion` respetado en todos los elementos.
+- **Login `/login`:** movido a ruta propia. Eye-toggle con contraste corregido (`text-slate-400 hover:text-slate-200`). Transición CSS slide entre selección de rol y formulario. `type="button"` en toggle para no interferir con submit.
+- **AuthProvider:** `PUBLIC_ROUTES` incluye `/login`. Redirect de logout a `/login`. Redirect de autenticado en `/` o `/login` al dashboard por rol.
+- **Backend School Admin > Communications:** CRUD completo (`GET/POST/PATCH/DELETE /api/v1/school-admin/communications`) con stats, soft delete y canales derivados.
+- **Backend School Admin > Reports:** generación con datos reales de BD (attendance rate, avg grade), insights por tipo, export demo. (`GET/POST /api/v1/school-admin/reports`).
+- **Migración 019:** tablas `school_communications` y `school_reports` con índices por `tenant_id`. **PENDIENTE correr en Railway DB**.
+- **Build:** `next build` OK — 68 páginas estáticas, 0 errores TypeScript/ESLint.
+- **Commit:** `ea6f804` — pushed a `claude/priceless-mahavira-a754eb`.
+
+### 🔴 Pendiente inmediato
+- Correr migración 019 en Railway PostgreSQL (ver instrucciones abajo).
+- Merge del branch `claude/priceless-mahavira-a754eb` a `master` para trigger deploy en Railway.
+
+#landing #login #frontend #backend #school_admin #communications #reports #framer-motion
