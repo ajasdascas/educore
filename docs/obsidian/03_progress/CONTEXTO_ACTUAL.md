@@ -18,12 +18,10 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
     - Funcionalidades: crear, editar, listar, filtrar, paginar, toggle status, soft delete.
 
 ### 🛑 Pendientes Críticos (Lo que falta por hacer)
-1. **Backend: Middleware de Cuotas:**
-    - Hacer cumplir los límites de alumnos/profesores según el plan (diseño pendiente).
-2. **Módulo de Escuelas (School Admin):**
-    - Iniciar con el dashboard del director de escuela.
-3. **Verificación final Super Admin:**
+1. ~~**Backend: Middleware de Cuotas**~~ ✅ **COMPLETADO 04-05-2026**
+2. **Verificación final Super Admin:**
     - Confirmar que todas las secciones del dashboard usan datos reales (no mock).
+3. **Deploy a producción:** push del commit de cuotas y verificar en staging.
 
 ## 🛠️ Stack y Configuración
 - **Backend:** Go (Fiber) + PostgreSQL + Redis (Railway).
@@ -63,6 +61,13 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Siguiente foco recomendado:** smoke productivo de Teacher/Parent y despues endurecer cuotas por plan y reportes/analytics, sin abrir modulos tenant-facing nuevos fuera de los 4 Core.
 
 #module #architecture #super_admin #school_admin
+
+## Avance 04-05-2026
+- **Smoke test Teacher Portal (9/9 páginas):** Todas las rutas y mocks correctos. Sin bugs.
+- **Smoke test Parent Portal (12/12 páginas):** Dashboard, hijos, calificaciones, asistencia, mensajes, documentos, pagos y consentimientos OK. `summary.rate` confirmado correcto.
+- **Middleware de Cuotas:** `QuotaExceededError` type + métodos `GetTenantQuota`/`CountActiveStudents`/`CountActiveTeachers` en repository. Checks en `validateCreateStudent`, `validateCreateTeacher` y `CommitStudentImport`. HTTP 402 para cuota excedida. Fail-open si BD no responde. Commit: `9c5efd2`.
+
+#module #school_admin #parent_portal #teacher_portal #backend #quota
 
 ## Avance 30-04-2026
 - **School Admin > Layout responsive:** corregido encimado de textos con nombres largos de escuela. El sidebar trunca de forma segura y el header separa "Panel Escuela" del nombre institucional sin generar scroll horizontal global.
