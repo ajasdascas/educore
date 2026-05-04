@@ -336,8 +336,21 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 	// 1. Validate plan exists
 	step = "validate_plan"
 	var planExists bool
-	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+	if database.IsMySQL(h.db.Driver()) {
+		step = "validate_plan_mysql_subscription_plans"
+		err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+		if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
+			step = "validate_plan_mysql_plans_fallback"
+			err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+		}
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+		}
+	} else {
+		step = "validate_plan_postgres"
+		if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+		}
 	}
 	if !planExists {
 		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")

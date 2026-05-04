@@ -685,3 +685,13 @@ Esto reduce la dependencia de comportamiento especifico de MySQL/MariaDB en `ON 
 Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, sintaxis PowerShell, `git diff --check` y scan de diff sin secretos OK.
 
 #memory #railway #mysql #super_admin #school_provisioning #qa #security
+
+---
+
+# 03-05-2026 - Fallback para subscription_plans faltante en Hostinger
+
+El smoke staging con `0dea7da` ya devolvio el error real: `Table 'u550473909_educore_prod.subscription_plans' doesn't exist` durante `validate_plan`. La base Hostinger real parece venir de una importacion parcial/previa que contiene `plans` pero no `subscription_plans`.
+
+Se ajusto `CreateSchool` solo para MySQL/MariaDB: primero valida contra `subscription_plans`; si la tabla no existe, hace fallback seguro a `plans`. PostgreSQL conserva el path original. Tambien se agrego `backend/migrations_mysql/002_subscription_plans_bridge.sql` para crear/backfillear `subscription_plans` desde `plans` sin resetear la base.
+
+#memory #railway #mysql #hostinger #schema #super_admin
