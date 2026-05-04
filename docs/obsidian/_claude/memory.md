@@ -725,3 +725,50 @@ El smoke con `d1da20a` avanzo: `tenant_modules` ya tenia columnas reparadas, per
 Se agrego backfill idempotente de `modules_catalog` en `mysqlrepair` para todos los modulos que `CreateSchool` puede activar durante staging (`auth`, `users`, `academic_core`, `grading`, `students`, `groups`, `schedules`, `attendance`, `documents`, `payments`, `reports`, `communications`, portales y aliases). Mantiene FK activo y no toca production.
 
 #memory #railway #mysql #hostinger #schema #catalog #staging #qa
+
+---
+
+# 03-05-2026 - Smoke avanza a School Admin academico
+
+El smoke con `cb06ff0` paso health, owner login, Super Admin stats, database tables, crear escuela, editar escuela, persistencia, login School Admin, school years, grupo base y crear Teacher. El siguiente fallo fue `crear alumno` por `students.enrollment_number` faltante en una tabla existente antigua, y Teacher dashboard quedo en HTTP 500 sin body detallado.
+
+La siguiente reparacion debe cubrir el tramo academico completo en staging MySQL: columnas faltantes de `students`, tablas/columnas de `group_students`, `parent_student`, `attendance_records`, `student_payments`, `payment_receipts`, `class_schedule_blocks`, `grade_records`, `notifications`, `parent_conversations` y `parent_messages`. Tambien se requiere diagnostico seguro en Teacher handler y smoke report con body del 500.
+
+#memory #railway #mysql #hostinger #school_admin #teacher #schema #staging
+
+---
+
+# 03-05-2026 — Smoke test MySQL staging COMPLETO ✅
+
+## Resultado: 26/26 PASS
+
+Staging: https://educore-educore-mysql-staging.up.railway.app
+Branch: codex/mysql-hostinger-staging (commit e9085f4)
+Base: Hostinger MySQL u550473909_educore_prod (reset limpio + 001 + 002 reimportados)
+
+### Tests pasados
+- health: db_driver=mysql, env=staging ✅
+- login owner super admin (gioescudero2007@gmail.com) ✅
+- super admin stats, database tables ✅
+- crear/editar escuela + persistencia ✅
+- login school admin ✅
+- school admin dashboard, school years, grupo base ✅
+- crear teacher, crear alumno ✅
+- asistencia bulk, cargo, pago cash, recibo ✅
+- login parent, parent dashboard, parent payments ✅
+- RBAC: parent→school-admin 403, parent→super-admin 403 ✅
+- login teacher, teacher dashboard ✅
+- RBAC: teacher→super-admin 403, school-admin→super-admin 403 ✅
+
+### Migraciones aplicadas a Hostinger
+- 001_hostinger_core.sql (reimport limpio)
+- 002_subscription_plans_bridge.sql
+- (003-005 descartadas tras reset)
+
+### Pendiente para producción
+- Merging codex/mysql-hostinger-staging → master
+- Cambiar variables Railway production a DB_DRIVER=mysql
+- Quitar Any Host (%) en Hostinger Remote MySQL → IP fija o VPS
+- Re-seed owners en producción
+
+#memory #mysql #staging #smoke_test #production_ready
