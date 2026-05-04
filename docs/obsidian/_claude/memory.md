@@ -715,3 +715,13 @@ El smoke staging con MySQL avanzo hasta `activate_core_modules_mysql` y fallo co
 Se amplio `internal/pkg/mysqlrepair` para que en `APP_ENV=staging` + MySQL haga reparacion aditiva por columna usando `INFORMATION_SCHEMA.COLUMNS` y `ALTER TABLE ... ADD COLUMN` solo cuando falte. Tambien verifica columnas minimas antes de permitir que el backend arranque, para evitar otro smoke con errores silenciosos de schema. Produccion y PostgreSQL no ejecutan esta reparacion.
 
 #memory #railway #mysql #hostinger #schema #staging #qa #debugging
+
+---
+
+# 03-05-2026 - Backfill de modules_catalog para FK tenant_modules
+
+El smoke con `d1da20a` avanzo: `tenant_modules` ya tenia columnas reparadas, pero fallo al activar `students` porque la FK `tenant_modules.module_key -> modules_catalog.key` rechazo un modulo que no existia en el catalogo. Esto confirma que el problema restante era data seed/catalog incompleta, no estructura ni credenciales.
+
+Se agrego backfill idempotente de `modules_catalog` en `mysqlrepair` para todos los modulos que `CreateSchool` puede activar durante staging (`auth`, `users`, `academic_core`, `grading`, `students`, `groups`, `schedules`, `attendance`, `documents`, `payments`, `reports`, `communications`, portales y aliases). Mantiene FK activo y no toca production.
+
+#memory #railway #mysql #hostinger #schema #catalog #staging #qa

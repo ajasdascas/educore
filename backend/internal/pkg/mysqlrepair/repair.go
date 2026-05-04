@@ -547,6 +547,46 @@ var stagingSchemaStatements = []string{
 }
 
 var stagingBackfillStatements = []string{
+	`INSERT INTO modules_catalog (
+		id, ` + "`key`" + `, name, description, category, is_core,
+		price_monthly_mxn, status, version, required_level, feature_flags,
+		global_enabled, visible, supported_now, educational_level,
+		plan_required, dependencies, metadata
+	)
+	VALUES
+		(UUID(), 'auth', 'Auth + RBAC', 'Autenticacion, sesiones y roles base.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'basic', JSON_ARRAY(), JSON_OBJECT()),
+		(UUID(), 'users', 'Usuarios', 'Usuarios, perfiles y permisos.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'basic', JSON_ARRAY('auth'), JSON_OBJECT()),
+		(UUID(), 'academic_core', 'Nucleo academico', 'Estructura escolar base.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'basic', JSON_ARRAY('auth'), JSON_OBJECT()),
+		(UUID(), 'grading', 'Calificaciones', 'Evaluacion y calificaciones base.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('academic_core'), JSON_OBJECT()),
+		(UUID(), 'students', 'Alumnos', 'Gestion de alumnos.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'basic', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'groups', 'Grupos', 'Gestion de grupos escolares.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'basic', JSON_ARRAY('academic_core'), JSON_OBJECT()),
+		(UUID(), 'grades', 'Calificaciones operativas', 'Captura operativa de calificaciones.', 'core', true, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('grading'), JSON_OBJECT()),
+		(UUID(), 'schedules', 'Horarios', 'Horarios por grupo y profesor.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('academic_core'), JSON_OBJECT()),
+		(UUID(), 'attendance', 'Asistencia', 'Registro y consulta de asistencia.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('academic_core'), JSON_OBJECT()),
+		(UUID(), 'documents', 'Documentos digitales', 'Expediente documental.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'payments', 'Pagos y cobranza', 'Cargos, pagos y recibos.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'enterprise', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'payments_basic', 'Pagos basicos', 'Pagos manuales basicos.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'report_cards', 'Boletas', 'Boletas y report cards.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('grading'), JSON_OBJECT()),
+		(UUID(), 'reports', 'Reportes', 'Reportes academicos y administrativos.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('academic_core'), JSON_OBJECT()),
+		(UUID(), 'communications', 'Comunicaciones', 'Comunicaciones y notificaciones.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'communication', 'Comunicacion basica', 'Alias de compatibilidad para comunicaciones.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'parent_portal', 'Portal de padres', 'Acceso para padres.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'teacher_portal', 'Portal de maestros', 'Acceso para profesores.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, true, NULL, 'pro', JSON_ARRAY('users'), JSON_OBJECT()),
+		(UUID(), 'qr_access', 'Acceso QR', 'Accesos por QR.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, false, NULL, 'enterprise', JSON_ARRAY('attendance'), JSON_OBJECT()),
+		(UUID(), 'credentials', 'Credenciales', 'Credenciales escolares.', 'extension', false, 0, 'active', '1.0.0', NULL, JSON_OBJECT(), true, true, false, NULL, 'enterprise', JSON_ARRAY('documents','qr_access'), JSON_OBJECT())
+	ON DUPLICATE KEY UPDATE
+		name = VALUES(name),
+		description = VALUES(description),
+		category = VALUES(category),
+		is_core = VALUES(is_core),
+		status = VALUES(status),
+		global_enabled = VALUES(global_enabled),
+		visible = VALUES(visible),
+		supported_now = VALUES(supported_now),
+		plan_required = VALUES(plan_required),
+		dependencies = VALUES(dependencies),
+		metadata = VALUES(metadata),
+		updated_at = CURRENT_TIMESTAMP`,
 	`INSERT INTO subscription_plans (
 		id, name, description, price_monthly, price_annual, currency,
 		max_students, max_teachers, modules, features, is_active, is_featured
