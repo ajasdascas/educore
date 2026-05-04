@@ -2,6 +2,7 @@ package mysqlrepair
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -27,7 +28,241 @@ func EnsureStagingSchema(ctx context.Context, db *database.DB, appEnv string) er
 			return fmt.Errorf("mysql staging schema repair statement %d failed: %w", i+1, err)
 		}
 	}
+	if err := ensureStagingColumns(ctx, sqlDB); err != nil {
+		return err
+	}
+	for i, stmt := range stagingBackfillStatements {
+		if strings.TrimSpace(stmt) == "" {
+			continue
+		}
+		if _, err := sqlDB.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("mysql staging schema backfill statement %d failed: %w", i+1, err)
+		}
+	}
+	if err := verifyStagingSchema(ctx, sqlDB); err != nil {
+		return err
+	}
 	return nil
+}
+
+type columnRepair struct {
+	table  string
+	column string
+	ddl    string
+}
+
+type requiredColumn struct {
+	table  string
+	column string
+}
+
+func ensureStagingColumns(ctx context.Context, db *sql.DB) error {
+	for _, repair := range stagingColumnRepairs {
+		exists, err := columnExists(ctx, db, repair.table, repair.column)
+		if err != nil {
+			return fmt.Errorf("mysql staging schema column check failed for %s.%s: %w", repair.table, repair.column, err)
+		}
+		if exists {
+			continue
+		}
+		stmt := fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN %s", repair.table, repair.ddl)
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("mysql staging schema column repair failed for %s.%s: %w", repair.table, repair.column, err)
+		}
+	}
+	return nil
+}
+
+func verifyStagingSchema(ctx context.Context, db *sql.DB) error {
+	var missing []string
+	for _, required := range stagingRequiredColumns {
+		exists, err := columnExists(ctx, db, required.table, required.column)
+		if err != nil {
+			return fmt.Errorf("mysql staging schema verification failed for %s.%s: %w", required.table, required.column, err)
+		}
+		if !exists {
+			missing = append(missing, required.table+"."+required.column)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("mysql staging schema still missing required columns: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+func columnExists(ctx context.Context, db *sql.DB, table, column string) (bool, error) {
+	var exists bool
+	err := db.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM INFORMATION_SCHEMA.COLUMNS
+			WHERE TABLE_SCHEMA = DATABASE()
+			  AND TABLE_NAME = ?
+			  AND COLUMN_NAME = ?
+		)`, table, column).Scan(&exists)
+	return exists, err
+}
+
+var stagingColumnRepairs = []columnRepair{
+	// Core provisioning tables. Hostinger imports may contain older versions of
+	// these tables, so CREATE TABLE IF NOT EXISTS is not enough.
+	{"tenants", "logo_url", "logo_url TEXT NULL"},
+	{"tenants", "status", "status ENUM('active','trial','suspended','cancelled') NOT NULL DEFAULT 'trial'"},
+	{"tenants", "plan", "plan VARCHAR(50) NOT NULL DEFAULT 'basic'"},
+	{"tenants", "storage_limit_mb", "storage_limit_mb INT NOT NULL DEFAULT 5120"},
+	{"tenants", "settings", "settings JSON NULL"},
+	{"tenants", "trial_ends_at", "trial_ends_at DATETIME NULL"},
+	{"tenants", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"modules_catalog", "category", "category VARCHAR(80) NOT NULL DEFAULT 'core'"},
+	{"modules_catalog", "is_core", "is_core BOOLEAN NOT NULL DEFAULT FALSE"},
+	{"modules_catalog", "price_monthly_mxn", "price_monthly_mxn DECIMAL(12,2) NOT NULL DEFAULT 0"},
+	{"modules_catalog", "status", "status VARCHAR(40) NOT NULL DEFAULT 'active'"},
+	{"modules_catalog", "version", "version VARCHAR(40) NOT NULL DEFAULT '1.0.0'"},
+	{"modules_catalog", "required_level", "required_level VARCHAR(80) NULL"},
+	{"modules_catalog", "feature_flags", "feature_flags JSON NULL"},
+	{"modules_catalog", "global_enabled", "global_enabled BOOLEAN NOT NULL DEFAULT TRUE"},
+	{"modules_catalog", "visible", "visible BOOLEAN NOT NULL DEFAULT TRUE"},
+	{"modules_catalog", "supported_now", "supported_now BOOLEAN NOT NULL DEFAULT TRUE"},
+	{"modules_catalog", "educational_level", "educational_level VARCHAR(80) NULL"},
+	{"modules_catalog", "plan_required", "plan_required VARCHAR(80) NULL"},
+	{"modules_catalog", "dependencies", "dependencies JSON NULL"},
+	{"modules_catalog", "metadata", "metadata JSON NULL"},
+
+	{"tenant_modules", "enabled", "enabled BOOLEAN NOT NULL DEFAULT TRUE"},
+	{"tenant_modules", "is_active", "is_active BOOLEAN NOT NULL DEFAULT TRUE"},
+	{"tenant_modules", "is_required", "is_required BOOLEAN NOT NULL DEFAULT FALSE"},
+	{"tenant_modules", "source", "source VARCHAR(40) NOT NULL DEFAULT 'manual'"},
+	{"tenant_modules", "level", "level VARCHAR(80) NULL"},
+	{"tenant_modules", "activated_at", "activated_at DATETIME NULL"},
+	{"tenant_modules", "expires_at", "expires_at DATETIME NULL"},
+	{"tenant_modules", "updated_at", "updated_at DATETIME NULL"},
+
+	{"users", "phone", "phone VARCHAR(30) NULL"},
+	{"users", "address", "address TEXT NULL"},
+	{"users", "emergency_contact", "emergency_contact VARCHAR(255) NULL"},
+	{"users", "emergency_phone", "emergency_phone VARCHAR(30) NULL"},
+	{"users", "notification_preferences", "notification_preferences JSON NULL"},
+	{"users", "password_must_change", "password_must_change BOOLEAN NOT NULL DEFAULT FALSE"},
+	{"users", "email_verified_at", "email_verified_at DATETIME NULL"},
+	{"users", "invitation_token", "invitation_token TEXT NULL"},
+	{"users", "invitation_expires_at", "invitation_expires_at DATETIME NULL"},
+	{"users", "last_login_at", "last_login_at DATETIME NULL"},
+	{"users", "global_tenant_key", "global_tenant_key VARCHAR(80) NOT NULL DEFAULT '__global__'"},
+	{"users", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"subscription_plans", "description", "description TEXT NULL"},
+	{"subscription_plans", "price_monthly", "price_monthly DECIMAL(12,2) NOT NULL DEFAULT 0"},
+	{"subscription_plans", "price_annual", "price_annual DECIMAL(12,2) NOT NULL DEFAULT 0"},
+	{"subscription_plans", "currency", "currency CHAR(3) NOT NULL DEFAULT 'MXN'"},
+	{"subscription_plans", "max_students", "max_students INT NOT NULL DEFAULT 0"},
+	{"subscription_plans", "max_teachers", "max_teachers INT NOT NULL DEFAULT 0"},
+	{"subscription_plans", "modules", "modules JSON NULL"},
+	{"subscription_plans", "features", "features JSON NULL"},
+	{"subscription_plans", "is_active", "is_active BOOLEAN NOT NULL DEFAULT TRUE"},
+	{"subscription_plans", "is_featured", "is_featured BOOLEAN NOT NULL DEFAULT FALSE"},
+	{"subscription_plans", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"tenant_roles", "tenant_id", "tenant_id CHAR(36) NULL"},
+	{"tenant_roles", "key", "`key` VARCHAR(80) NOT NULL DEFAULT ''"},
+	{"tenant_roles", "name", "name VARCHAR(120) NOT NULL DEFAULT ''"},
+	{"tenant_roles", "description", "description TEXT NULL"},
+	{"tenant_roles", "permissions", "permissions JSON NULL"},
+	{"tenant_roles", "is_system", "is_system BOOLEAN NOT NULL DEFAULT FALSE"},
+	{"tenant_roles", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"school_years", "status", "status ENUM('active','closed','archived') NOT NULL DEFAULT 'active'"},
+	{"school_years", "is_current", "is_current BOOLEAN NOT NULL DEFAULT FALSE"},
+	{"school_years", "notes", "notes TEXT NULL"},
+	{"school_years", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"school_settings", "school_year", "school_year VARCHAR(40) NULL"},
+	{"school_settings", "periods", "periods JSON NULL"},
+	{"school_settings", "grading_scale", "grading_scale JSON NULL"},
+	{"school_settings", "primary_color", "primary_color VARCHAR(20) NOT NULL DEFAULT '#4f46e5'"},
+	{"school_settings", "notification_settings", "notification_settings JSON NULL"},
+	{"school_settings", "security_settings", "security_settings JSON NULL"},
+
+	{"grade_levels", "level", "level VARCHAR(80) NOT NULL DEFAULT 'primaria'"},
+	{"grade_levels", "sort_order", "sort_order INT NOT NULL DEFAULT 0"},
+	{"grade_levels", "custom_fields", "custom_fields JSON NULL"},
+	{"grade_levels", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"subjects", "grade_id", "grade_id CHAR(36) NULL"},
+	{"subjects", "grade_level_id", "grade_level_id CHAR(36) NULL"},
+	{"subjects", "code", "code VARCHAR(30) NULL"},
+	{"subjects", "description", "description TEXT NULL"},
+	{"subjects", "credits", "credits INT NOT NULL DEFAULT 1"},
+	{"subjects", "status", "status VARCHAR(40) NOT NULL DEFAULT 'active'"},
+	{"subjects", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"groups", "grade_id", "grade_id CHAR(36) NULL"},
+	{"groups", "grade_level_id", "grade_level_id CHAR(36) NULL"},
+	{"groups", "school_year_id", "school_year_id CHAR(36) NULL"},
+	{"groups", "school_year", "school_year VARCHAR(40) NULL"},
+	{"groups", "main_teacher_id", "main_teacher_id CHAR(36) NULL"},
+	{"groups", "capacity", "capacity INT NULL"},
+	{"groups", "max_students", "max_students INT NULL"},
+	{"groups", "room", "room VARCHAR(100) NULL"},
+	{"groups", "description", "description TEXT NULL"},
+	{"groups", "status", "status VARCHAR(40) NOT NULL DEFAULT 'active'"},
+	{"groups", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"students", "unique_student_code", "unique_student_code VARCHAR(60) NULL"},
+	{"students", "enrollment_id", "enrollment_id VARCHAR(80) NULL"},
+	{"students", "paternal_last_name", "paternal_last_name VARCHAR(100) NOT NULL DEFAULT ''"},
+	{"students", "maternal_last_name", "maternal_last_name VARCHAR(100) NULL"},
+	{"students", "last_name", "last_name VARCHAR(200) NOT NULL DEFAULT ''"},
+	{"students", "birth_day", "birth_day INT NULL"},
+	{"students", "birth_month", "birth_month INT NULL"},
+	{"students", "birth_year", "birth_year INT NULL"},
+	{"students", "group_id", "group_id CHAR(36) NULL"},
+	{"students", "metadata", "metadata JSON NULL"},
+	{"students", "deleted_at", "deleted_at DATETIME NULL"},
+
+	{"student_payments", "tutor_id", "tutor_id CHAR(36) NULL"},
+	{"student_payments", "paid_amount", "paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0"},
+	{"student_payments", "currency", "currency CHAR(3) NOT NULL DEFAULT 'MXN'"},
+	{"student_payments", "due_date", "due_date DATE NULL"},
+	{"student_payments", "paid_at", "paid_at DATETIME NULL"},
+	{"student_payments", "payment_method", "payment_method VARCHAR(40) NULL"},
+	{"student_payments", "status", "status VARCHAR(40) NOT NULL DEFAULT 'pending'"},
+	{"student_payments", "receipt_number", "receipt_number VARCHAR(80) NULL"},
+	{"student_payments", "receipt_url", "receipt_url TEXT NULL"},
+	{"student_payments", "registered_by", "registered_by CHAR(36) NULL"},
+	{"student_payments", "created_by", "created_by CHAR(36) NULL"},
+	{"student_payments", "metadata", "metadata JSON NULL"},
+	{"student_payments", "deleted_at", "deleted_at DATETIME NULL"},
+}
+
+var stagingRequiredColumns = []requiredColumn{
+	{"tenants", "id"},
+	{"tenants", "slug"},
+	{"tenants", "name"},
+	{"tenants", "plan"},
+	{"modules_catalog", "key"},
+	{"modules_catalog", "is_core"},
+	{"tenant_modules", "tenant_id"},
+	{"tenant_modules", "module_key"},
+	{"tenant_modules", "enabled"},
+	{"tenant_modules", "is_active"},
+	{"tenant_modules", "is_required"},
+	{"tenant_modules", "source"},
+	{"tenant_modules", "level"},
+	{"tenant_modules", "updated_at"},
+	{"tenant_roles", "tenant_id"},
+	{"tenant_roles", "key"},
+	{"users", "tenant_id"},
+	{"users", "email"},
+	{"school_years", "tenant_id"},
+	{"school_settings", "tenant_id"},
+	{"grade_levels", "tenant_id"},
+	{"subjects", "tenant_id"},
+	{"groups", "tenant_id"},
+	{"students", "tenant_id"},
+	{"attendance_records", "tenant_id"},
+	{"student_payments", "tenant_id"},
+	{"payment_receipts", "tenant_id"},
 }
 
 var stagingSchemaStatements = []string{
@@ -49,27 +284,6 @@ var stagingSchemaStatements = []string{
 		deleted_at DATETIME NULL,
 		UNIQUE KEY uq_subscription_plans_name (name)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-	`INSERT INTO subscription_plans (
-		id, name, description, price_monthly, price_annual, currency,
-		max_students, max_teachers, modules, features, is_active, is_featured
-	)
-	SELECT
-		id, name, description, price_monthly, price_annual, currency,
-		max_students, max_teachers, modules, features, is_active, is_featured
-	FROM plans
-	ON DUPLICATE KEY UPDATE
-		name = VALUES(name),
-		description = VALUES(description),
-		price_monthly = VALUES(price_monthly),
-		price_annual = VALUES(price_annual),
-		currency = VALUES(currency),
-		max_students = VALUES(max_students),
-		max_teachers = VALUES(max_teachers),
-		modules = VALUES(modules),
-		features = VALUES(features),
-		is_active = VALUES(is_active),
-		is_featured = VALUES(is_featured),
-		updated_at = CURRENT_TIMESTAMP`,
 	`CREATE TABLE IF NOT EXISTS tenant_roles (
 		id CHAR(36) NOT NULL PRIMARY KEY DEFAULT (UUID()),
 		tenant_id CHAR(36) NOT NULL,
@@ -330,4 +544,28 @@ var stagingSchemaStatements = []string{
 		CONSTRAINT fk_receipts_payment FOREIGN KEY (payment_id) REFERENCES student_payments(id) ON DELETE CASCADE,
 		CONSTRAINT fk_receipts_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+}
+
+var stagingBackfillStatements = []string{
+	`INSERT INTO subscription_plans (
+		id, name, description, price_monthly, price_annual, currency,
+		max_students, max_teachers, modules, features, is_active, is_featured
+	)
+	SELECT
+		id, name, description, price_monthly, price_annual, currency,
+		max_students, max_teachers, modules, features, is_active, is_featured
+	FROM plans
+	ON DUPLICATE KEY UPDATE
+		name = VALUES(name),
+		description = VALUES(description),
+		price_monthly = VALUES(price_monthly),
+		price_annual = VALUES(price_annual),
+		currency = VALUES(currency),
+		max_students = VALUES(max_students),
+		max_teachers = VALUES(max_teachers),
+		modules = VALUES(modules),
+		features = VALUES(features),
+		is_active = VALUES(is_active),
+		is_featured = VALUES(is_featured),
+		updated_at = CURRENT_TIMESTAMP`,
 }

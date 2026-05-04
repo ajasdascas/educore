@@ -705,3 +705,13 @@ El smoke con `5368564` avanzo al siguiente faltante de schema: `tenant_roles` no
 La reparacion no corre en production, no modifica PostgreSQL y no usa secretos. Cubre las tablas necesarias para provisionar escuela y continuar smoke de School Admin, alumnos, asistencia y pagos.
 
 #memory #railway #mysql #hostinger #schema #staging #qa
+
+---
+
+# 03-05-2026 - Schema drift por columnas faltantes en tenant_modules
+
+El smoke staging con MySQL avanzo hasta `activate_core_modules_mysql` y fallo con `Unknown column 'is_required' in 'INSERT INTO'`. La causa raiz ya no es conexion ni password: Hostinger tiene tablas existentes de una importacion anterior/parcial, y `CREATE TABLE IF NOT EXISTS` no modifica tablas viejas.
+
+Se amplio `internal/pkg/mysqlrepair` para que en `APP_ENV=staging` + MySQL haga reparacion aditiva por columna usando `INFORMATION_SCHEMA.COLUMNS` y `ALTER TABLE ... ADD COLUMN` solo cuando falte. Tambien verifica columnas minimas antes de permitir que el backend arranque, para evitar otro smoke con errores silenciosos de schema. Produccion y PostgreSQL no ejecutan esta reparacion.
+
+#memory #railway #mysql #hostinger #schema #staging #qa #debugging
