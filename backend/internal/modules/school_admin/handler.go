@@ -104,6 +104,24 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	payments.Post("/:id/record-payment", h.RecordStudentPayment)
 	payments.Post("/:id/card-checkout-session", h.CreatePaymentCheckoutSession)
 	payments.Get("/:id/receipt", h.GetPaymentReceipt)
+
+	// Communications
+	comms := api.Group("/communications")
+	comms.Get("", h.GetCommunications)
+	comms.Get("/stats", h.GetCommunicationStats)
+	comms.Post("", h.CreateCommunication)
+	comms.Post("/send", h.SendCommunication)
+	comms.Get("/:id", h.GetCommunication)
+	comms.Patch("/:id", h.UpdateCommunication)
+	comms.Delete("/:id", h.DeleteCommunication)
+
+	// Reports
+	rpts := api.Group("/reports")
+	rpts.Get("", h.GetReports)
+	rpts.Post("/generate", h.GenerateReport)
+	rpts.Get("/:id", h.GetReport)
+	rpts.Post("/:id/export", h.ExportReport)
+	rpts.Delete("/:id", h.DeleteReport)
 }
 
 func (h *Handler) RequireModule(moduleKey string) fiber.Handler {
