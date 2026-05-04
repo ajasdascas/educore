@@ -203,3 +203,253 @@
     }
   }
 }
+
+@layer components {
+  .claude-landing {
+    transition: background-color 220ms ease, color 220ms ease;
+  }
+
+  .claude-landing .landing-nav {
+    color: #e2e8f0;
+  }
+
+  .claude-landing .landing-nav--scrolled {
+    background-color: rgba(2, 6, 23, 0.95);
+    border-bottom-color: rgba(30, 41, 59, 0.6);
+  }
+
+  html.light .claude-landing {
+    color: #0f172a;
+    background-color: #f8fafc !important;
+  }
+
+  html.light .claude-landing .landing-nav {
+    color: #0f172a;
+  }
+
+  html.light .claude-landing .landing-nav--scrolled {
+    background-color: rgba(255, 255, 255, 0.94) !important;
+    border-bottom-color: #e2e8f0 !important;
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08) !important;
+  }
+
+  html.light .claude-landing .landing-nav--top {
+    background-color: transparent !important;
+  }
+
+  html.light .claude-landing .landing-brand-text,
+  html.light .claude-landing .landing-nav-link {
+    color: #0f172a !important;
+  }
+
+  html.light .claude-landing .landing-nav-link:hover {
+    color: #2563eb !important;
+    background-color: #dbeafe !important;
+  }
+
+  html.light .claude-landing .landing-mobile-menu {
+    background-color: rgba(255, 255, 255, 0.96) !important;
+    border-top-color: #e2e8f0 !important;
+  }
+
+  html.light .claude-landing header[class*="bg-slate-950"],
+  html.light .claude-landing [class*="bg-slate-950"] {
+    background-color: rgba(255, 255, 255, 0.94) !important;
+  }
+
+  html.light .claude-landing [class*="bg-slate-900"] {
+    background-color: #f1f5f9 !important;
+  }
+
+  html.light .claude-landing [class*="bg-slate-800"] {
+    background-color: rgba(255, 255, 255, 0.88) !important;
+  }
+
+  html.light .claude-landing [class*="from-slate-950"],
+  html.light .claude-landing [class*="from-slate-900"],
+  html.light .claude-landing [class*="from-slate-800"] {
+    --tw-gradient-from: #f8fafc var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgba(248, 250, 252, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  html.light .claude-landing [class*="via-slate-950"],
+  html.light .claude-landing [class*="via-slate-900"],
+  html.light .claude-landing [class*="via-slate-800"] {
+    --tw-gradient-to: rgba(241, 245, 249, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), #f1f5f9 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+  }
+
+  html.light .claude-landing [class*="to-slate-950"],
+  html.light .claude-landing [class*="to-slate-900"],
+  html.light .claude-landing [class*="to-slate-800"] {
+    --tw-gradient-to: #e0f2fe var(--tw-gradient-to-position) !important;
+  }
+
+  html.light .claude-landing .text-white,
+  html.light .claude-landing .text-white\/70,
+  html.light .claude-landing .text-slate-100,
+  html.light .claude-landing .text-slate-200,
+  html.light .claude-landing .text-slate-300 {
+    color: #0f172a !important;
+  }
+
+  html.light .claude-landing .text-slate-400,
+  html.light .claude-landing .text-slate-500,
+  html.light .claude-landing .text-slate-600,
+  html.light .claude-landing .text-slate-700 {
+    color: #475569 !important;
+  }
+
+  html.light .claude-landing .hover\:text-white:hover,
+  html.light .claude-landing .hover\:text-slate-300:hover,
+  html.light .claude-landing .hover\:text-slate-400:hover {
+    color: #1d4ed8 !important;
+  }
+
+  html.light .claude-landing [class*="border-slate-"] {
+    border-color: #cbd5e1 !important;
+  }
+
+  html.light .claude-landing .hover\:border-slate-600:hover {
+    border-color: #2563eb !important;
+  }
+
+  html.light .claude-landing .hover\:bg-slate-800:hover,
+  html.light .claude-landing .hover\:bg-slate-800\/50:hover,
+  html.light .claude-landing .hover\:bg-slate-800\/70:hover,
+  html.light .claude-landing .hover\:bg-slate-700:hover {
+    background-color: #dbeafe !important;
+  }
+
+  html.light .claude-landing input,
+  html.light .claude-landing textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+
+  html.light .claude-landing input::placeholder,
+  html.light .claude-landing textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  html.light .claude-landing .bg-blue-600.text-white,
+  html.light .claude-landing .bg-blue-600 .text-white,
+  html.light .claude-landing [class*="from-blue-"] .text-white,
+  html.light .claude-landing .bg-black\/50 .text-white,
+  html.light .claude-landing .fill-white {
+    color: #ffffff !important;
+  }
+
+  html.light .claude-landing .bg-blue-600.text-white svg,
+  html.light .claude-landing [class*="from-blue-"] svg.text-white {
+    color: #ffffff !important;
+  }
+
+  html.light .claude-landing .shadow-black\/20 {
+    --tw-shadow-color: rgba(15, 23, 42, 0.12) !important;
+    --tw-shadow: var(--tw-shadow-colored) !important;
+  }
+
+  html.dark .claude-landing {
+    color: #f8fafc;
+    background-color: #020203 !important;
+  }
+
+  html.dark .claude-landing .landing-nav {
+    color: #f8fafc;
+  }
+
+  html.dark .claude-landing .landing-nav--scrolled {
+    background-color: rgba(2, 2, 3, 0.96) !important;
+    border-bottom-color: #27272a !important;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45) !important;
+  }
+
+  html.dark .claude-landing .landing-brand-text,
+  html.dark .claude-landing .landing-nav-link {
+    color: #f8fafc !important;
+  }
+
+  html.dark .claude-landing .landing-nav-link:hover {
+    color: #93c5fd !important;
+    background-color: #18181b !important;
+  }
+
+  html.dark .claude-landing .landing-mobile-menu {
+    background-color: rgba(5, 7, 12, 0.98) !important;
+    border-top-color: #27272a !important;
+  }
+
+  html.dark .claude-landing header[class*="bg-slate-950"],
+  html.dark .claude-landing [class*="bg-slate-950"] {
+    background-color: rgba(2, 2, 3, 0.96) !important;
+  }
+
+  html.dark .claude-landing [class*="bg-slate-900"] {
+    background-color: #05070c !important;
+  }
+
+  html.dark .claude-landing [class*="bg-slate-800"] {
+    background-color: rgba(18, 18, 24, 0.84) !important;
+  }
+
+  html.dark .claude-landing [class*="from-slate-950"],
+  html.dark .claude-landing [class*="from-slate-900"],
+  html.dark .claude-landing [class*="from-slate-800"] {
+    --tw-gradient-from: #020203 var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgba(2, 2, 3, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+
+  html.dark .claude-landing [class*="via-slate-950"],
+  html.dark .claude-landing [class*="via-slate-900"],
+  html.dark .claude-landing [class*="via-slate-800"] {
+    --tw-gradient-to: rgba(5, 7, 12, 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), #05070c var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+  }
+
+  html.dark .claude-landing [class*="to-slate-950"],
+  html.dark .claude-landing [class*="to-slate-900"],
+  html.dark .claude-landing [class*="to-slate-800"] {
+    --tw-gradient-to: #070710 var(--tw-gradient-to-position) !important;
+  }
+
+  html.dark .claude-landing .text-white,
+  html.dark .claude-landing .text-slate-100,
+  html.dark .claude-landing .text-slate-200,
+  html.dark .claude-landing .text-slate-300 {
+    color: #f8fafc !important;
+  }
+
+  html.dark .claude-landing .text-slate-400,
+  html.dark .claude-landing .text-slate-500,
+  html.dark .claude-landing .text-slate-600,
+  html.dark .claude-landing .text-slate-700 {
+    color: #b6c2d2 !important;
+  }
+
+  html.dark .claude-landing [class*="border-slate-"] {
+    border-color: #27272a !important;
+  }
+
+  html.dark .claude-landing .hover\:bg-slate-800:hover,
+  html.dark .claude-landing .hover\:bg-slate-800\/50:hover,
+  html.dark .claude-landing .hover\:bg-slate-800\/70:hover,
+  html.dark .claude-landing .hover\:bg-slate-700:hover {
+    background-color: #18181b !important;
+  }
+
+  html.dark .claude-landing input,
+  html.dark .claude-landing textarea {
+    background-color: #05070c !important;
+    border-color: #27272a !important;
+    color: #f8fafc !important;
+  }
+
+  html.dark .claude-landing input::placeholder,
+  html.dark .claude-landing textarea::placeholder {
+    color: #71717a !important;
+  }
+}

@@ -1,0 +1,25 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#F8FAFC"/>
+  <circle cx="1030" cy="70" r="280" fill="#DBEAFE"/>
+  <circle cx="105" cy="560" r="220" fill="#E0F2FE"/>
+  <rect x="96" y="92" width="1008" height="446" rx="36" fill="white" stroke="#E2E8F0"/>
+  <rect x="148" y="150" width="82" height="82" rx="22" fill="url(#g)"/>
+  <path d="M180 174H204M180 191H204M180 208H204" stroke="white" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="180" cy="174" r="7" fill="white"/>
+  <circle cx="204" cy="174" r="7" fill="white"/>
+  <circle cx="180" cy="191" r="7" fill="white"/>
+  <circle cx="204" cy="191" r="7" fill="white"/>
+  <circle cx="180" cy="208" r="7" fill="white"/>
+  <circle cx="204" cy="208" r="7" fill="white"/>
+  <text x="252" y="203" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="800">Educore</text>
+  <text x="148" y="320" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="800">La gestión escolar, simplificada.</text>
+  <text x="148" y="380" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="500">SIS + LMS todo-en-uno para escuelas modernas.</text>
+  <rect x="148" y="430" width="244" height="54" rx="14" fill="#2563EB"/>
+  <text x="178" y="465" fill="white" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700">Solicitar demo</text>
+  <defs>
+    <linearGradient id="g" x1="148" y1="150" x2="230" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+</svg>

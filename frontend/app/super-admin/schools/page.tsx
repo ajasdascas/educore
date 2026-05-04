@@ -374,6 +374,11 @@ export default function SchoolsPage() {
                       <div className="grid gap-2">
                         <Label htmlFor="slug">Slug / Subdominio</Label>
                         <Input id="slug" value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} required />
+                        {formData.slug && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Subdominio: <span className="text-blue-400 font-mono font-medium">{formData.slug}.onlineu.mx</span>
+                          </p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="timezone">Zona Horaria</Label>
@@ -601,7 +606,9 @@ export default function SchoolsPage() {
                       )}
                       <div>
                         <CardTitle className="text-lg line-clamp-1">{school.name}</CardTitle>
-                        <div className="text-sm text-muted-foreground mt-1">Slug: {school.slug}</div>
+                        <div className="text-sm text-muted-foreground mt-0.5">
+                          <span className="font-mono text-blue-400 text-xs">{school.slug}.onlineu.mx</span>
+                        </div>
                       </div>
                     </div>
                     <DropdownMenu>

@@ -247,7 +247,7 @@ function SchoolDetailContent() {
             </SelectContent>
           </Select>
           <Button variant="outline" asChild>
-            <a href={`https://${school.slug}.educore.mx`} target="_blank" rel="noopener noreferrer">
+            <a href={`https://${school.slug}.onlineu.mx`} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-2 h-4 w-4" />
               Visitar
             </a>
@@ -305,6 +305,7 @@ function SchoolDetailContent() {
           <TabsTrigger value="overview">General</TabsTrigger>
           <TabsTrigger value="modules">Módulos</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="portals">Portales</TabsTrigger>
           <TabsTrigger value="settings">Configuración</TabsTrigger>
         </TabsList>
 
@@ -322,7 +323,7 @@ function SchoolDetailContent() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Subdominio</Label>
-                    <p className="font-medium">{school.slug}.educore.mx</p>
+                    <p className="font-medium">{school.slug}.onlineu.mx</p>
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Última Actualización</Label>
@@ -424,6 +425,60 @@ function SchoolDetailContent() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="portals">
+          <Card>
+            <CardHeader>
+              <CardTitle>Portales por Rol</CardTitle>
+              <CardDescription>
+                Accede a los módulos de esta escuela como administrador. Subdominio:{" "}
+                <span className="font-mono text-blue-400">{school.slug}.onlineu.mx</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { key: "school-admin", label: "Administración Escolar", desc: "Panel del director y coordinadores. Gestión de profesores, alumnos, grupos, horarios y reportes.", icon: "🏫", available: true,  href: `/school-portal/school-admin?slug=${school.slug}` },
+                  { key: "teachers",     label: "Portal de Profesores",   desc: "Registro de asistencias, captura de calificaciones y comunicación con padres de familia.",       icon: "👨‍🏫", available: true,  href: `/school-portal/teachers?slug=${school.slug}` },
+                  { key: "parents",      label: "Portal de Padres",       desc: "Seguimiento de hijos: calificaciones, asistencia, pagos, mensajes y consentimientos.",           icon: "👨‍👩‍👧", available: true,  href: `/school-portal/parents?slug=${school.slug}` },
+                  { key: "students",     label: "Portal de Alumnos",      desc: "Módulo en desarrollo. Las funcionalidades serán definidas en la siguiente fase del proyecto.",   icon: "🎒", available: false, href: `/school-portal/students?slug=${school.slug}` },
+                ].map((portal) => (
+                  <div
+                    key={portal.key}
+                    className={`flex flex-col gap-4 p-5 rounded-xl border transition-colors ${
+                      portal.available
+                        ? "border-slate-700/60 hover:border-primary/40 bg-card"
+                        : "border-slate-800/40 opacity-60 bg-muted/20"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">{portal.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm">{portal.label}</span>
+                          {!portal.available && (
+                            <Badge variant="secondary" className="text-[10px]">Próximamente</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{portal.desc}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={portal.available ? "default" : "secondary"}
+                      disabled={!portal.available}
+                      className="self-start"
+                      onClick={() => portal.available && (window.location.href = portal.href)}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                      {portal.available ? "Abrir portal" : "No disponible"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="settings">
           <Card>
             <CardHeader>
@@ -440,7 +495,7 @@ function SchoolDetailContent() {
                   <Label>Subdominio (Slug)</Label>
                   <div className="flex items-center gap-2">
                     <Input defaultValue={school.slug} readOnly className="bg-muted flex-1" />
-                    <span className="text-muted-foreground text-sm">.educore.mx</span>
+                    <span className="text-muted-foreground text-sm">.onlineu.mx</span>
                   </div>
                 </div>
               </div>

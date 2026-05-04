@@ -382,12 +382,16 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 	// 2. Create Tenant with Settings
 	var tenantID string
 
+	// Auto-generate normalized subdomain from slug
+	subdomain := req.Slug + ".onlineu.mx"
+
 	settingsJSON := fiber.Map{
 		"levels":        req.Levels,
 		"phone":         req.Phone,
 		"contact_email": req.ContactEmail,
 		"address":       req.Address,
 		"timezone":      req.Timezone,
+		"subdomain":     subdomain,
 		"fiscal_data": fiber.Map{
 			"rfc":           req.RFC,
 			"razon_social":  req.RazonSocial,
@@ -728,6 +732,25 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
+	// 6. Activate the 4 portal modules (school_admin, parents, teachers, students)
+	step = "activate_portal_modules"
+	portalMods := []string{"portal_school_admin", "portal_parents", "portal_teachers", "portal_students"}
+	for _, mod := range portalMods {
+		if database.IsMySQL(h.db.Driver()) {
+			_, _ = tx.Exec(c.UserContext(),
+				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+				 VALUES (?, ?, true, true, true, 'core')
+				 ON DUPLICATE KEY UPDATE is_active = true, enabled = true, updated_at = CURRENT_TIMESTAMP`,
+				tenantID, mod)
+		} else {
+			_, _ = tx.Exec(c.UserContext(),
+				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+				 VALUES ($1, $2, true, true, true, 'core')
+				 ON CONFLICT (tenant_id, module_key) DO NOTHING`,
+				tenantID, mod)
+		}
+	}
+
 	step = "commit"
 	if err := tx.Commit(c.UserContext()); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, internalError("Could not commit transaction", err))
@@ -738,7 +761,14 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		"id":          tenantID,
 		"tenant_id":   tenantID,
 		"admin_email": adminEmail,
+		"subdomain":   subdomain,
 		"admin_demo":  true,
+		"portals": fiber.Map{
+			"school_admin": "/school-portal/school-admin?slug=" + req.Slug,
+			"parents":      "/school-portal/parents?slug=" + req.Slug,
+			"teachers":     "/school-portal/teachers?slug=" + req.Slug,
+			"students":     "/school-portal/students?slug=" + req.Slug,
+		},
 	}, "School created successfully")
 }
 

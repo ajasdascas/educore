@@ -772,3 +772,39 @@ Base: Hostinger MySQL u550473909_educore_prod (reset limpio + 001 + 002 reimport
 - Re-seed owners en producción
 
 #memory #mysql #staging #smoke_test #production_ready
+
+---
+
+# 04-05-2026 - Landing Educore: tema Normal/Claro/Oscuro corregido
+
+Se reviso la landing publica en `frontend/app/page.tsx` y el bug del selector de tema. La causa era que la pagina mezclaba `next-themes` con muchas clases Tailwind hardcodeadas (`bg-white`, `text-[#0F172A]`, `bg-[#F8FAFC]`), por lo que solo algunas piezas cambiaban de modo.
+
+Se ajusto la landing para mapear `blue/light/dark` a variables propias de landing alineadas con el ThemeToggle de modulos, se evito que el `<main>` fuerce fondo blanco, se protegió el boton blanco del CTA y se ampliaron overrides scoped a `.landing-page` para secciones, navbar, cards, tabla, inputs y footer. Validacion: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, `git diff --check` y ciclo del ThemeToggle en navegador local `3007` OK.
+
+#memory #frontend #landing #theme #qa
+
+---
+
+# 04-05-2026 - Landing Educore desplegada en produccion
+
+Se corrigio contraste de la landing publica en temas Normal/Oscuro: logo usa `--landing-ink`, textos muted en fondos oscuros usan tokens mas claros, y footer/CTA dejan de depender de opacidades bajas. Se creo `DESIGN.md` basado en la especificacion de google-labs-code/design.md para fijar colores, tipografias, radios, spacing y reglas de tema de Educore.
+
+Validacion local: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, `git diff --check` y scan de secretos en frontend/out OK. Commit `16ca201` fue pusheado a `master`, GitHub Actions `Deploy EduCore to Production` termino success y `https://onlineu.mx/educore/` + `/educore/login/` respondieron HTTP 200 con assets bajo `/educore/_next/`.
+
+#memory #frontend #landing #production #design_system
+
+---
+
+# 04-05-2026 - Restaurar landing original de Claude con ThemeToggle
+
+Giovanni pidio revertir el cambio visual de la landing porque preferia el trabajo de Claude Code. Se restauro `frontend/app/page.tsx` desde `ac76561` (landing oscura animada con hero, blobs, counters, soluciones, testimonios, video modal, blog, FAQ y formulario) y se agrego solo `ThemeToggle` en navbar desktop/mobile. El modo `Normal` queda sin overrides para preservar exactamente el look original de Claude; `Claro` y `Oscuro` usan overrides scoped a `.claude-landing`.
+
+Validacion local: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, `git diff --check` y scan de secretos en frontend/out OK.
+
+#memory #frontend #landing #theme #restore
+
+## 04-05-2026 - Fix cache production landing Educore
+- Se diagnostico que la landing publica podia verse como HTML sin estilos cuando un navegador conservaba HTML viejo apuntando a assets `_next` que el FTP borraba con `mirror --delete`.
+- Se agrego `frontend/public/.htaccess` para no cachear HTML y cachear assets hasheados como immutable.
+- Se modifico `.github/workflows/deploy.yml` para dejar de borrar assets antiguos durante deploy FTP, evitando que HTML cacheado quede sin CSS/JS.
+- No se tocaron `.agents/`, `AGENTS.md`, `.env`, backend productivo, Hostinger MySQL ni Cloudflare.
