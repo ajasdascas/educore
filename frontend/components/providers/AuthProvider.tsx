@@ -33,7 +33,7 @@ export function useAuth() {
 }
 
 // Public routes that don't need auth
-const PUBLIC_ROUTES = ["/", "/reset-password", "/accept-invitation"];
+const PUBLIC_ROUTES = ["/", "/login", "/reset-password", "/accept-invitation"];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -59,12 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isPublic = PUBLIC_ROUTES.some((r) => pathname === r);
 
     if (!user && !isPublic) {
-      router.replace("/");
+      router.replace("/login");
       return;
     }
 
     // If authenticated and on login page, redirect to dashboard
-    if (user && pathname === "/") {
+    if (user && (pathname === "/" || pathname === "/login")) {
       router.replace(getDashboardPath(user.role));
     }
   }, [user, loading, pathname, router]);
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuth();
     setUser(null);
     setToken(null);
-    router.replace("/");
+    router.replace("/login");
     void authLogout();
   };
 
