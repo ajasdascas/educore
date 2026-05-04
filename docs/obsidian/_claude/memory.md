@@ -802,3 +802,9 @@ Giovanni pidio revertir el cambio visual de la landing porque preferia el trabaj
 Validacion local: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, `git diff --check` y scan de secretos en frontend/out OK.
 
 #memory #frontend #landing #theme #restore
+
+## 04-05-2026 - Fix cache production landing Educore
+- Se diagnostico que la landing publica podia verse como HTML sin estilos cuando un navegador conservaba HTML viejo apuntando a assets `_next` que el FTP borraba con `mirror --delete`.
+- Se agrego `frontend/public/.htaccess` para no cachear HTML y cachear assets hasheados como immutable.
+- Se modifico `.github/workflows/deploy.yml` para dejar de borrar assets antiguos durante deploy FTP, evitando que HTML cacheado quede sin CSS/JS.
+- No se tocaron `.agents/`, `AGENTS.md`, `.env`, backend productivo, Hostinger MySQL ni Cloudflare.
