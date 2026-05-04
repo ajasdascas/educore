@@ -19,6 +19,7 @@ import (
 	"educore/internal/modules/teacher"
 	"educore/internal/modules/tenants"
 	"educore/internal/pkg/database"
+	"educore/internal/pkg/mysqlrepair"
 	"educore/internal/pkg/ownerseed"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
@@ -48,6 +49,12 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	repairCtx, repairCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer repairCancel()
+	if err := mysqlrepair.EnsureStagingSchema(repairCtx, db, cfg.AppEnv); err != nil {
+		log.Fatalf("Failed to repair MySQL staging schema: %v", err)
+	}
 
 	seedCtx, seedCancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer seedCancel()

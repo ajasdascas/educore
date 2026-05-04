@@ -695,3 +695,13 @@ El smoke staging con `0dea7da` ya devolvio el error real: `Table 'u550473909_edu
 Se ajusto `CreateSchool` solo para MySQL/MariaDB: primero valida contra `subscription_plans`; si la tabla no existe, hace fallback seguro a `plans`. PostgreSQL conserva el path original. Tambien se agrego `backend/migrations_mysql/002_subscription_plans_bridge.sql` para crear/backfillear `subscription_plans` desde `plans` sin resetear la base.
 
 #memory #railway #mysql #hostinger #schema #super_admin
+
+---
+
+# 03-05-2026 - Reparacion aditiva de schema MySQL staging
+
+El smoke con `5368564` avanzo al siguiente faltante de schema: `tenant_roles` no existe. Esto confirma que la base Hostinger real es una importacion parcial/anterior. Para no resetear ni borrar datos, se agrego `internal/pkg/mysqlrepair`: en `APP_ENV=staging` + MySQL ejecuta solo `CREATE TABLE IF NOT EXISTS` y backfill de catalogos minimos antes del seed de owners.
+
+La reparacion no corre en production, no modifica PostgreSQL y no usa secretos. Cubre las tablas necesarias para provisionar escuela y continuar smoke de School Admin, alumnos, asistencia y pagos.
+
+#memory #railway #mysql #hostinger #schema #staging #qa
