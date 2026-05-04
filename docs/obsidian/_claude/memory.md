@@ -673,3 +673,15 @@ Tambien se endurecio la transaccion con `committed := false`, rollback condicion
 Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, sintaxis PowerShell, `git diff --check` y scan de diff sin secretos OK.
 
 #memory #railway #mysql #super_admin #school_provisioning #qa #security
+
+---
+
+# 03-05-2026 - Upsert tenant_modules sin VALUES en staging MySQL
+
+Con Railway corriendo `dd1a087`, el smoke siguio fallando en `crear escuela staging` con HTTP 500 y PowerShell no estaba capturando el body del error. Se ajusto el script de smoke para leer `ErrorDetails.Message` en errores HTTP y se hizo el upsert de `tenant_modules` mas compatible con MariaDB/Hostinger: `source` queda como constante (`core`, `level`, `plan`) y `level` usa parametro explicito en lugar de `VALUES(...)`.
+
+Esto reduce la dependencia de comportamiento especifico de MySQL/MariaDB en `ON DUPLICATE KEY UPDATE`, especialmente en el `INSERT ... SELECT` de modulos core. No se usaron ni guardaron contrasenas.
+
+Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, sintaxis PowerShell, `git diff --check` y scan de diff sin secretos OK.
+
+#memory #railway #mysql #super_admin #school_provisioning #qa #security

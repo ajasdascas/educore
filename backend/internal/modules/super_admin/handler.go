@@ -504,7 +504,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 			 ON DUPLICATE KEY UPDATE is_active = true,
 			                         enabled = true,
 			                         is_required = true,
-			                         source = VALUES(source),
+			                         source = 'core',
 			                         updated_at = CURRENT_TIMESTAMP`,
 			tenantID)
 	} else {
@@ -531,11 +531,11 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 					 VALUES (?, ?, true, true, ?, true, 'level')
 					 ON DUPLICATE KEY UPDATE is_active = true,
 					                         enabled = true,
-					                         level = VALUES(level),
+					                         level = ?,
 					                         is_required = true,
-					                         source = VALUES(source),
+					                         source = 'level',
 					                         updated_at = CURRENT_TIMESTAMP`,
-					tenantID, mod, normalizedLevel); err != nil {
+					tenantID, mod, normalizedLevel, normalizedLevel); err != nil {
 					return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating level module: "+mod, err))
 				}
 			} else {
@@ -561,7 +561,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 				 VALUES (?, ?, true, true, false, 'plan')
 				 ON DUPLICATE KEY UPDATE is_active = true,
 				                         enabled = true,
-				                         source = VALUES(source),
+				                         source = 'plan',
 				                         updated_at = CURRENT_TIMESTAMP`,
 				tenantID, mod); err != nil {
 				return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating premium module: "+mod, err))

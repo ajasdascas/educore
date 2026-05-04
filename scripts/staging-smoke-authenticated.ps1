@@ -57,11 +57,17 @@ function Invoke-Json {
   } catch {
     $status = 0
     $raw = $_.Exception.Message
+    if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+      $raw = $_.ErrorDetails.Message
+    }
     if ($_.Exception.Response) {
       $status = [int]$_.Exception.Response.StatusCode
       try {
         $reader = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())
-        $raw = $reader.ReadToEnd()
+        $streamBody = $reader.ReadToEnd()
+        if (-not [string]::IsNullOrWhiteSpace($streamBody)) {
+          $raw = $streamBody
+        }
       } catch {}
     }
     $parsed = $null
