@@ -255,9 +255,6 @@ export default function SchoolsPage() {
           description: `La escuela ${formData.name} se ha registrado exitosamente.`,
         });
         setIsModalOpen(false);
-        if (response.data?.id && typeof window !== "undefined") {
-          localStorage.setItem("mock_current_school_id", response.data.id);
-        }
         // Reset
         setFormData({
           name: "", slug: "", plan: "basic", admin_email: "", admin_name: "",
