@@ -38,6 +38,18 @@ func (s *Service) GetDashboard(ctx context.Context, tenantID string) (*Dashboard
 		return nil, fmt.Errorf("failed to get recent activity: %w", err)
 	}
 
+	// Attach plan quota info to dashboard (non-fatal if unavailable)
+	if quota, qErr := s.repo.GetTenantQuota(ctx, tenantID); qErr == nil {
+		currentStudents, _ := s.repo.CountActiveStudents(ctx, tenantID)
+		currentTeachers, _ := s.repo.CountActiveTeachers(ctx, tenantID)
+		stats.PlanLimits = PlanLimits{
+			MaxStudents:     quota.MaxStudents,
+			MaxTeachers:     quota.MaxTeachers,
+			CurrentStudents: currentStudents,
+			CurrentTeachers: currentTeachers,
+		}
+	}
+
 	return &DashboardResponse{
 		Stats:          stats,
 		RecentActivity: recentActivity,

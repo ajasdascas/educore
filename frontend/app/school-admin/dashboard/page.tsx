@@ -16,6 +16,13 @@ import {
   MessageCircle
 } from "lucide-react";
 
+interface PlanLimits {
+  max_students: number;
+  max_teachers: number;
+  current_students: number;
+  current_teachers: number;
+}
+
 export default function SchoolAdminDashboard() {
   const { toast } = useToast();
   const [stats, setStats] = useState({
@@ -24,6 +31,7 @@ export default function SchoolAdminDashboard() {
     totalGroups: 12,
     attendance: 92,
   });
+  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
 
   const [recentActivity, setRecentActivity] = useState([
     { id: 1, type: "student", message: "Nuevo estudiante matriculado: Juan Pérez", time: "hace 2h" },
@@ -47,6 +55,7 @@ export default function SchoolAdminDashboard() {
           totalGroups: data.stats.total_groups ?? 0,
           attendance: Math.round(data.stats.attendance_rate ?? 0),
         });
+        if (data.stats.plan_limits) setPlanLimits(data.stats.plan_limits);
 
         if (Array.isArray(data.recent_activity) && data.recent_activity.length > 0) {
           setRecentActivity(
@@ -140,6 +149,57 @@ export default function SchoolAdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Plan quota widget */}
+      {planLimits && (planLimits.max_students > 0 || planLimits.max_teachers > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Límites del Plan</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {planLimits.max_students > 0 && (
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Alumnos</span>
+                  <span className="font-medium">{planLimits.current_students} / {planLimits.max_students}</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      planLimits.current_students / planLimits.max_students >= 0.9
+                        ? "bg-red-500"
+                        : planLimits.current_students / planLimits.max_students >= 0.7
+                        ? "bg-yellow-500"
+                        : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((planLimits.current_students / planLimits.max_students) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {planLimits.max_teachers > 0 && (
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Profesores</span>
+                  <span className="font-medium">{planLimits.current_teachers} / {planLimits.max_teachers}</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      planLimits.current_teachers / planLimits.max_teachers >= 0.9
+                        ? "bg-red-500"
+                        : planLimits.current_teachers / planLimits.max_teachers >= 0.7
+                        ? "bg-yellow-500"
+                        : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(100, Math.round((planLimits.current_teachers / planLimits.max_teachers) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

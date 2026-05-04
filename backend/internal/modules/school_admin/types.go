@@ -318,15 +318,23 @@ type DashboardResponse struct {
 	LastUpdated    time.Time       `json:"last_updated"`
 }
 
+type PlanLimits struct {
+	MaxStudents     int `json:"max_students"`
+	MaxTeachers     int `json:"max_teachers"`
+	CurrentStudents int `json:"current_students"`
+	CurrentTeachers int `json:"current_teachers"`
+}
+
 type DashboardStats struct {
-	TotalStudents    int     `json:"total_students"`
-	TotalTeachers    int     `json:"total_teachers"`
-	TotalGroups      int     `json:"total_groups"`
-	ActiveStudents   int     `json:"active_students"`
-	AttendanceRate   float64 `json:"attendance_rate"`
-	AverageGrade     float64 `json:"average_grade"`
-	NewStudentsMonth int     `json:"new_students_month"`
-	GraduationsMonth int     `json:"graduations_month"`
+	TotalStudents    int        `json:"total_students"`
+	TotalTeachers    int        `json:"total_teachers"`
+	TotalGroups      int        `json:"total_groups"`
+	ActiveStudents   int        `json:"active_students"`
+	AttendanceRate   float64    `json:"attendance_rate"`
+	AverageGrade     float64    `json:"average_grade"`
+	NewStudentsMonth int        `json:"new_students_month"`
+	GraduationsMonth int        `json:"graduations_month"`
+	PlanLimits       PlanLimits `json:"plan_limits"`
 }
 
 type StatsResponse struct {
