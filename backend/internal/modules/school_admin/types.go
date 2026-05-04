@@ -1,6 +1,24 @@
 package school_admin
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+// QuotaExceededError is returned when a tenant has reached the limit imposed by its plan.
+type QuotaExceededError struct {
+	Resource string
+	Current  int
+	Max      int
+	Message  string
+}
+
+func (e *QuotaExceededError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("plan limit reached: maximum %d %s allowed by your current plan", e.Max, e.Resource)
+}
 
 // Request DTOs
 type GetStudentsParams struct {

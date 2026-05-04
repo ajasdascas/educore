@@ -211,6 +211,25 @@ func (s *Service) CommitStudentImport(ctx context.Context, tenantID, userID stri
 	if len(req.Rows) == 0 {
 		return nil, fmt.Errorf("no rows to import")
 	}
+
+	// Quota check for bulk import — fail open if quota cannot be determined
+	if quota, err := s.repo.GetTenantQuota(ctx, tenantID); err == nil && quota.MaxStudents > 0 {
+		if current, err := s.repo.CountActiveStudents(ctx, tenantID); err == nil {
+			available := quota.MaxStudents - current
+			if available <= 0 {
+				return nil, &QuotaExceededError{Resource: "students", Current: current, Max: quota.MaxStudents}
+			}
+			if len(req.Rows) > available {
+				return nil, &QuotaExceededError{
+					Resource: "students",
+					Current:  current,
+					Max:      quota.MaxStudents,
+					Message:  fmt.Sprintf("plan limit: this import would add %d students but only %d slots remain (plan max: %d). Please upgrade your plan or reduce the import size", len(req.Rows), available, quota.MaxStudents),
+				}
+			}
+		}
+	}
+
 	result, err := s.repo.CommitStudentImport(ctx, tenantID, userID, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit student import: %w", err)
@@ -830,6 +849,13 @@ func (s *Service) validateCreateStudent(ctx context.Context, tenantID string, re
 		}
 	}
 
+	// Plan quota check — fail open if quota cannot be determined
+	if quota, err := s.repo.GetTenantQuota(ctx, tenantID); err == nil && quota.MaxStudents > 0 {
+		if count, err := s.repo.CountActiveStudents(ctx, tenantID); err == nil && count >= quota.MaxStudents {
+			return &QuotaExceededError{Resource: "students", Current: count, Max: quota.MaxStudents}
+		}
+	}
+
 	return nil
 }
 
@@ -869,6 +895,13 @@ func (s *Service) validateCreateTeacher(ctx context.Context, tenantID string, re
 	}
 	if exists {
 		return fmt.Errorf("teacher with email %s already exists", req.Email)
+	}
+
+	// Plan quota check — fail open if quota cannot be determined
+	if quota, err := s.repo.GetTenantQuota(ctx, tenantID); err == nil && quota.MaxTeachers > 0 {
+		if count, err := s.repo.CountActiveTeachers(ctx, tenantID); err == nil && count >= quota.MaxTeachers {
+			return &QuotaExceededError{Resource: "teachers", Current: count, Max: quota.MaxTeachers}
+		}
 	}
 
 	return nil

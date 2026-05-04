@@ -1,9 +1,20 @@
 package school_admin
 
 import (
+	"errors"
+
 	"educore/internal/pkg/response"
 	"github.com/gofiber/fiber/v2"
 )
+
+// quotaStatus returns 402 Payment Required for quota errors, 400 for everything else.
+func quotaStatus(err error) int {
+	var qe *QuotaExceededError
+	if errors.As(err, &qe) {
+		return fiber.StatusPaymentRequired
+	}
+	return fiber.StatusBadRequest
+}
 
 type Handler struct {
 	service *Service
@@ -247,7 +258,7 @@ func (h *Handler) CreateStudent(c *fiber.Ctx) error {
 
 	student, err := h.service.CreateStudent(c.Context(), tenantID, userID, req)
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, quotaStatus(err), err)
 	}
 
 	return response.Success(c, student, "Success")
@@ -319,7 +330,7 @@ func (h *Handler) CommitStudentImport(c *fiber.Ctx) error {
 
 	result, err := h.service.CommitStudentImport(c.Context(), tenantID, userID, req)
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, quotaStatus(err), err)
 	}
 
 	return response.Success(c, result, "Success")
@@ -348,7 +359,7 @@ func (h *Handler) CreateTeacher(c *fiber.Ctx) error {
 
 	teacher, err := h.service.CreateTeacher(c.Context(), tenantID, userID, req)
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, quotaStatus(err), err)
 	}
 
 	return response.Success(c, teacher, "Success")

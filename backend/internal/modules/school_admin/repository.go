@@ -3053,3 +3053,51 @@ func (r *Repository) RecordStudentPayment(ctx context.Context, tenantID, userID,
 	}
 	return r.GetPayment(ctx, tenantID, paymentID)
 }
+
+// --- Quota helpers ---
+
+type TenantQuota struct {
+	MaxStudents int
+	MaxTeachers int
+}
+
+// GetTenantQuota returns the effective limits from the active subscription (or plan defaults).
+// A limit of 0 means unlimited.
+func (r *Repository) GetTenantQuota(ctx context.Context, tenantID string) (*TenantQuota, error) {
+	q := &TenantQuota{}
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COALESCE(sub.max_students, sp.max_students, 0) AS max_students,
+			COALESCE(sub.max_teachers, sp.max_teachers, 0) AS max_teachers
+		FROM tenants t
+		LEFT JOIN subscriptions sub
+			ON sub.tenant_id = t.id AND sub.status = 'active'
+		LEFT JOIN subscription_plans sp
+			ON sp.id = COALESCE(sub.plan_id, t.plan_id)
+		WHERE t.id = $1
+	`, tenantID).Scan(&q.MaxStudents, &q.MaxTeachers)
+	if err != nil {
+		return nil, fmt.Errorf("quota lookup: %w", err)
+	}
+	return q, nil
+}
+
+func (r *Repository) CountActiveStudents(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM students WHERE tenant_id = $1 AND status = 'active'`,
+		tenantID,
+	).Scan(&n)
+	return n, err
+}
+
+func (r *Repository) CountActiveTeachers(ctx context.Context, tenantID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM users u
+		INNER JOIN teacher_profiles tp ON tp.user_id = u.id
+		WHERE u.tenant_id = $1 AND u.is_active = true
+	`, tenantID).Scan(&n)
+	return n, err
+}
