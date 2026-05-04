@@ -661,3 +661,15 @@ Con Railway corriendo `eff5e29`, el smoke paso `database tables` pero siguio fal
 Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, sintaxis PowerShell y `git diff --check` OK.
 
 #memory #railway #mysql #super_admin #school_provisioning #security
+
+---
+
+# 03-05-2026 - Tenant modules MySQL explicito y diagnostico CreateSchool
+
+Con Railway corriendo `77a0231`, el smoke ya paso `database tables` pero `POST /api/v1/super-admin/schools` seguia en HTTP 500. Se completo el port explicito de `CreateSchool` para `tenant_modules`: core modules, modules por nivel y premium modules usan `?`, `ON DUPLICATE KEY UPDATE`, `CURRENT_TIMESTAMP` y `VALUES(...)` en MySQL/MariaDB, manteniendo la rama PostgreSQL con `ON CONFLICT`.
+
+Tambien se endurecio la transaccion con `committed := false`, rollback condicionado y diagnostico seguro en staging: si vuelve a fallar, el error incluye el paso interno (`activate_core_modules_mysql`, `seed_school_year_mysql`, etc.) sin DSN ni secretos.
+
+Verificacion local: `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, sintaxis PowerShell, `git diff --check` y scan de diff sin secretos OK.
+
+#memory #railway #mysql #super_admin #school_provisioning #qa #security

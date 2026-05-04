@@ -4,6 +4,7 @@ import (
 	"educore/internal/pkg/response"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -291,11 +292,38 @@ func superAdminInternalErrorMessage(message string, err error) string {
 	return message
 }
 
-func (h *Handler) CreateSchool(c *fiber.Ctx) error {
+func superAdminStagingPanicMessage(step string, recovered interface{}) string {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "staging") {
+		return fmt.Sprintf("CreateSchool panic at %s: %v", step, recovered)
+	}
+	return "Error provisioning school"
+}
+
+func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
+	step := "parse_request"
+	requestID := fmt.Sprint(c.Locals("requestid"))
+	staging := strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "staging")
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			log.Printf("CreateSchool panic request_id=%s step=%s err=%v", requestID, step, recovered)
+			err = response.Error(c, fiber.StatusInternalServerError, superAdminStagingPanicMessage(step, recovered))
+		}
+	}()
+	internalError := func(message string, cause error) string {
+		if cause != nil {
+			log.Printf("CreateSchool error request_id=%s step=%s err=%v", requestID, step, cause)
+		}
+		if cause != nil && staging {
+			return fmt.Sprintf("%s at %s: %s", message, step, cause)
+		}
+		return message
+	}
+
 	var req CreateSchoolRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
 	}
+	step = "validate_request"
 	if len(req.Levels) == 0 {
 		return response.Error(c, fiber.StatusBadRequest, "Selecciona un nivel escolar: preescolar, kinder o primaria")
 	}
@@ -306,29 +334,37 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 
 	// 1. Validate plan exists
+	step = "validate_plan"
 	var planExists bool
 	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error validating subscription plan", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
 	}
 	if !planExists {
 		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 	}
 
 	// 2. Check if slug exists
+	step = "validate_slug"
 	var slugExists bool
 	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)", req.Slug).Scan(&slugExists); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error validating school slug", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating school slug", err))
 	}
 	if slugExists {
 		return response.Error(c, fiber.StatusConflict, "El subdominio ya está en uso")
 	}
 
 	// 3. Start transaction
+	step = "begin_transaction"
 	tx, err := h.db.Begin(c.UserContext())
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not start transaction")
 	}
-	defer tx.Rollback(c.UserContext())
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(c.UserContext())
+		}
+	}()
 
 	// 2. Create Tenant with Settings
 	var tenantID string
@@ -355,18 +391,20 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 
 	if database.IsMySQL(h.db.Driver()) {
+		step = "insert_tenant_mysql"
 		tenantID = database.NewID()
 		_, err = tx.Exec(c.UserContext(),
 			"INSERT INTO tenants (id, name, slug, logo_url, plan, status, settings) VALUES (?, ?, ?, ?, ?, 'active', ?)",
 			tenantID, req.Name, req.Slug, req.LogoURL, req.Plan, settingsData)
 	} else {
+		step = "insert_tenant_postgres"
 		err = tx.QueryRow(c.UserContext(),
 			"INSERT INTO tenants (name, slug, logo_url, plan, status, settings) VALUES ($1, $2, $3, $4, 'active', $5) RETURNING id",
 			req.Name, req.Slug, req.LogoURL, req.Plan, settingsData).Scan(&tenantID)
 	}
 
 	if err != nil {
-		return response.Error(c, fiber.StatusConflict, superAdminInternalErrorMessage("Slug already exists or database error", err))
+		return response.Error(c, fiber.StatusConflict, internalError("Slug already exists or database error", err))
 	}
 
 	// 3. Create default tenant admin user for the virtual environment.
@@ -401,6 +439,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 
 	if database.IsMySQL(h.db.Driver()) {
+		step = "create_admin_user_mysql"
 		_, err = tx.Exec(c.UserContext(),
 			`INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active)
 			 VALUES (?, ?, ?, ?, ?, ?, 'SCHOOL_ADMIN', true)
@@ -412,6 +451,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			                         updated_at = CURRENT_TIMESTAMP`,
 			database.NewID(), tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
 	} else {
+		step = "create_admin_user_postgres"
 		_, err = tx.Exec(c.UserContext(),
 			`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
 			 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true)
@@ -426,10 +466,11 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error creating admin user", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error creating admin user", err))
 	}
 
 	if database.IsMySQL(h.db.Driver()) {
+		step = "seed_roles_mysql"
 		_, err = tx.Exec(c.UserContext(), `
 			INSERT INTO tenant_roles (id, tenant_id, `+"`key`"+`, name, description, permissions, is_system)
 			VALUES
@@ -440,6 +481,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), permissions = VALUES(permissions), is_system = true`,
 			database.NewID(), tenantID, database.NewID(), tenantID, database.NewID(), tenantID, database.NewID(), tenantID)
 	} else {
+		step = "seed_roles_postgres"
 		_, err = tx.Exec(c.UserContext(), `
 			INSERT INTO tenant_roles (tenant_id, key, name, description, permissions, is_system)
 			VALUES
@@ -450,44 +492,90 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			ON CONFLICT (tenant_id, key) DO NOTHING`, tenantID)
 	}
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding tenant roles", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding tenant roles", err))
 	}
 
 	// 4. Activate core modules and selected premium modules
-	_, err = tx.Exec(c.UserContext(),
-		`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-		 SELECT $1, `+h.moduleCatalogKey("")+`, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
-		 ON CONFLICT (tenant_id, module_key)
-		 DO UPDATE SET is_active = true, enabled = true, is_required = true, updated_at = NOW()`,
-		tenantID)
+	if database.IsMySQL(h.db.Driver()) {
+		step = "activate_core_modules_mysql"
+		_, err = tx.Exec(c.UserContext(),
+			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+			 SELECT ?, `+"`key`"+`, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
+			 ON DUPLICATE KEY UPDATE is_active = true,
+			                         enabled = true,
+			                         is_required = true,
+			                         source = VALUES(source),
+			                         updated_at = CURRENT_TIMESTAMP`,
+			tenantID)
+	} else {
+		step = "activate_core_modules_postgres"
+		_, err = tx.Exec(c.UserContext(),
+			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+			 SELECT $1, `+h.moduleCatalogKey("")+`, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
+			 ON CONFLICT (tenant_id, module_key)
+			 DO UPDATE SET is_active = true, enabled = true, is_required = true, updated_at = NOW()`,
+			tenantID)
+	}
 
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error activating core modules", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating core modules", err))
 	}
 
 	for _, level := range req.Levels {
 		normalizedLevel := normalizeEducationLevel(level)
 		for _, mod := range modulesByEducationLevel[normalizedLevel] {
-			if _, err := tx.Exec(c.UserContext(),
-				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, level, is_required, source)
-				 VALUES ($1, $2, true, true, $3, true, 'level')
-				 ON CONFLICT (tenant_id, module_key)
-				 DO UPDATE SET is_active = true, enabled = true, level = COALESCE(tenant_modules.level, EXCLUDED.level),
-				               is_required = true, source = EXCLUDED.source, updated_at = NOW()`,
-				tenantID, mod, normalizedLevel); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error activating level module: "+mod, err))
+			if database.IsMySQL(h.db.Driver()) {
+				step = "activate_level_module_mysql:" + mod
+				if _, err := tx.Exec(c.UserContext(),
+					`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, level, is_required, source)
+					 VALUES (?, ?, true, true, ?, true, 'level')
+					 ON DUPLICATE KEY UPDATE is_active = true,
+					                         enabled = true,
+					                         level = VALUES(level),
+					                         is_required = true,
+					                         source = VALUES(source),
+					                         updated_at = CURRENT_TIMESTAMP`,
+					tenantID, mod, normalizedLevel); err != nil {
+					return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating level module: "+mod, err))
+				}
+			} else {
+				step = "activate_level_module_postgres:" + mod
+				if _, err := tx.Exec(c.UserContext(),
+					`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, level, is_required, source)
+					 VALUES ($1, $2, true, true, $3, true, 'level')
+					 ON CONFLICT (tenant_id, module_key)
+					 DO UPDATE SET is_active = true, enabled = true, level = COALESCE(tenant_modules.level, EXCLUDED.level),
+					               is_required = true, source = EXCLUDED.source, updated_at = NOW()`,
+					tenantID, mod, normalizedLevel); err != nil {
+					return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating level module: "+mod, err))
+				}
 			}
 		}
 	}
 
 	for _, mod := range req.PremiumModules {
-		if _, err := tx.Exec(c.UserContext(),
-			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-			 VALUES ($1, $2, true, true, false, 'plan')
-			 ON CONFLICT (tenant_id, module_key)
-			 DO UPDATE SET is_active = true, enabled = true, source = EXCLUDED.source, updated_at = NOW()`,
-			tenantID, mod); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error activating premium module: "+mod, err))
+		if database.IsMySQL(h.db.Driver()) {
+			step = "activate_premium_module_mysql:" + mod
+			if _, err := tx.Exec(c.UserContext(),
+				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+				 VALUES (?, ?, true, true, false, 'plan')
+				 ON DUPLICATE KEY UPDATE is_active = true,
+				                         enabled = true,
+				                         source = VALUES(source),
+				                         updated_at = CURRENT_TIMESTAMP`,
+				tenantID, mod); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating premium module: "+mod, err))
+			}
+		} else {
+			step = "activate_premium_module_postgres:" + mod
+			if _, err := tx.Exec(c.UserContext(),
+				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
+				 VALUES ($1, $2, true, true, false, 'plan')
+				 ON CONFLICT (tenant_id, module_key)
+				 DO UPDATE SET is_active = true, enabled = true, source = EXCLUDED.source, updated_at = NOW()`,
+				tenantID, mod); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error activating premium module: "+mod, err))
+			}
 		}
 	}
 
@@ -499,6 +587,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 	var schoolYearID string
 	if database.IsMySQL(h.db.Driver()) {
+		step = "seed_school_year_mysql"
 		schoolYearID = database.NewID()
 		now := time.Now()
 		startDate := time.Date(now.Year(), 8, 1, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
@@ -507,34 +596,37 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 			INSERT INTO school_years (id, tenant_id, name, start_date, end_date, status, is_current, notes)
 			VALUES (?, ?, ?, ?, ?, 'active', true, 'Ciclo creado automaticamente al provisionar tenant')`,
 			schoolYearID, tenantID, schoolYearName, startDate, endDate); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school year", err))
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding school year", err))
 		}
 	} else {
+		step = "seed_school_year_postgres"
 		if err := tx.QueryRow(c.UserContext(), `
 			INSERT INTO school_years (tenant_id, name, start_date, end_date, status, is_current, notes)
 			VALUES ($1, $2, make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int, 8, 1),
 			        make_date(EXTRACT(YEAR FROM CURRENT_DATE)::int + 1, 7, 31),
 			        'active', true, 'Ciclo creado automaticamente al provisionar tenant')
 			RETURNING id`, tenantID, schoolYearName).Scan(&schoolYearID); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school year", err))
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding school year", err))
 		}
 	}
 
 	if database.IsMySQL(h.db.Driver()) {
+		step = "seed_school_settings_mysql"
 		if _, err := tx.Exec(c.UserContext(), `
 			INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
 			VALUES (?, ?, '[]', '{"min":0,"max":100,"passing":60}', '#4f46e5', CURRENT_TIMESTAMP)
 			ON DUPLICATE KEY UPDATE school_year = VALUES(school_year), updated_at = CURRENT_TIMESTAMP`,
 			tenantID, schoolYearName); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school settings", err))
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding school settings", err))
 		}
 	} else {
+		step = "seed_school_settings_postgres"
 		if _, err := tx.Exec(c.UserContext(), `
 			INSERT INTO school_settings (tenant_id, school_year, periods, grading_scale, primary_color, updated_at)
 			VALUES ($1, $2, '[]'::jsonb, '{"min":0,"max":100,"passing":60}'::jsonb, '#4f46e5', NOW())
 			ON CONFLICT (tenant_id)
 			DO UPDATE SET school_year = EXCLUDED.school_year, updated_at = NOW()`, tenantID, schoolYearName); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding school settings", err))
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding school settings", err))
 		}
 	}
 
@@ -551,20 +643,22 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 		}
 		var gradeID string
 		if database.IsMySQL(h.db.Driver()) {
+			step = "seed_grade_level_mysql:" + normalizedLevel
 			gradeID = database.NewID()
 			if _, err := tx.Exec(c.UserContext(),
 				`INSERT INTO grade_levels (id, tenant_id, name, level, sort_order)
 				 VALUES (?, ?, ?, ?, ?)`,
 				gradeID, tenantID, gradeName, normalizedLevel, i); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding grade level: "+level, err))
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding grade level: "+level, err))
 			}
 		} else {
+			step = "seed_grade_level_postgres:" + normalizedLevel
 			if err := tx.QueryRow(c.UserContext(),
 				`INSERT INTO grade_levels (tenant_id, name, level, sort_order)
 				 VALUES ($1, $2, $3, $4)
 				 RETURNING id`,
 				tenantID, gradeName, normalizedLevel, i).Scan(&gradeID); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding grade level: "+level, err))
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding grade level: "+level, err))
 			}
 		}
 		if firstGradeID == "" {
@@ -583,43 +677,49 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) error {
 	}
 	for _, subject := range defaultSubjects {
 		if database.IsMySQL(h.db.Driver()) {
+			step = "seed_subject_mysql:" + subject.Code
 			if _, err := tx.Exec(c.UserContext(), `
 				INSERT IGNORE INTO subjects (id, tenant_id, grade_id, name, code, description, credits, status)
 				VALUES (?, ?, NULLIF(?, ''), ?, ?, 'Materia base creada automaticamente', 1, 'active')`,
 				database.NewID(), tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding subject: "+subject.Name, err))
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding subject: "+subject.Name, err))
 			}
 		} else {
+			step = "seed_subject_postgres:" + subject.Code
 			if _, err := tx.Exec(c.UserContext(), `
 				INSERT INTO subjects (tenant_id, grade_id, name, code, description, credits, status)
 				VALUES ($1, NULLIF($2, '')::uuid, $3, $4, 'Materia base creada automaticamente', 1, 'active')
 				ON CONFLICT DO NOTHING`, tenantID, firstGradeID, subject.Name, subject.Code); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding subject: "+subject.Name, err))
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding subject: "+subject.Name, err))
 			}
 		}
 	}
 
 	if firstGradeID != "" {
 		if database.IsMySQL(h.db.Driver()) {
+			step = "seed_default_group_mysql"
 			if _, err := tx.Exec(c.UserContext(), `
 				INSERT IGNORE INTO groups (id, tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
 				VALUES (?, ?, ?, 'A', ?, ?, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')`,
 				database.NewID(), tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding default group", err))
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding default group", err))
 			}
 		} else {
+			step = "seed_default_group_postgres"
 			if _, err := tx.Exec(c.UserContext(), `
 				INSERT INTO groups (tenant_id, grade_id, name, school_year, school_year_id, capacity, room, description, status)
 				VALUES ($1, $2, 'A', $3, $4, 30, 'Aula 1', 'Grupo base creado automaticamente', 'active')
 				ON CONFLICT DO NOTHING`, tenantID, firstGradeID, schoolYearName, schoolYearID); err != nil {
-				return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Error seeding default group", err))
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding default group", err))
 			}
 		}
 	}
 
+	step = "commit"
 	if err := tx.Commit(c.UserContext()); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, superAdminInternalErrorMessage("Could not commit transaction", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Could not commit transaction", err))
 	}
+	committed = true
 
 	return response.Success(c, fiber.Map{
 		"id":          tenantID,
