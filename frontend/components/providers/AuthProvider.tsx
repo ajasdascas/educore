@@ -63,8 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // If authenticated and on login page, redirect to dashboard
-    if (user && (pathname === "/" || pathname === "/login")) {
+    // Keep the marketing landing public; only skip the login form for active sessions.
+    if (user && pathname === "/login") {
       router.replace(getDashboardPath(user.role));
     }
   }, [user, loading, pathname, router]);

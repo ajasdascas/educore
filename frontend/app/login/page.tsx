@@ -2,131 +2,77 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { BookOpen, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { apiRequest } from "@/lib/api";
 import { getDashboardPath } from "@/lib/auth";
-import { useRouter } from "next/navigation";
-import { BookOpen, Eye, EyeOff, Mail, Lock } from "lucide-react";
-
-// ── Correos maestros (acceso SUPER_ADMIN sin restricciones, siempre activo) ──
-const MASTER_EMAILS = [
-  "gioescudero2007@gmail.com",
-  "jagustin_ramosp@hotmail.com",
-  "admin@educore.mx",
-];
-const MASTER_PASSWORD = "Peju751015@";
-
-// ── Usuarios demo por correo (para modo demo con NEXT_PUBLIC_DEMO_PASSWORD) ──
-const DEMO_USERS: Record<string, "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT"> = {
-  "school@educore.mx": "SCHOOL_ADMIN",
-  "profe@educore.mx":  "TEACHER",
-  "padre@educore.mx":  "PARENT",
-};
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email,    setEmail]    = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw,   setShowPw]   = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError("");
 
-    // ── 1. Bypass maestro — siempre activo, en cualquier entorno ─────────────
-    if (MASTER_EMAILS.includes(email.toLowerCase().trim()) && password === MASTER_PASSWORD) {
-      const mockUser = {
-        id:        "master-super-admin",
-        email:     email.toLowerCase().trim(),
-        role:      "SUPER_ADMIN" as const,
-        is_active: true,
-        tenant_id: "",
-      };
-      login("mock-token-super-admin", mockUser);
-      router.push(getDashboardPath("SUPER_ADMIN"));
-      setLoading(false);
-      return;
-    }
-
-    // ── 2. Demo users (NEXT_PUBLIC_DEMO_PASSWORD) ─────────────────────────────
-    const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
-    if (demoPassword !== "" && DEMO_USERS[email] && password === demoPassword) {
-      const role = DEMO_USERS[email];
-      const mockUser = {
-        id:        "mock-id",
-        email,
-        role,
-        is_active: true,
-        tenant_id: role === "SUPER_ADMIN" ? "" : "school-don-bosco",
-      };
-      login(`mock-token-${role.toLowerCase().replace("_", "-")}`, mockUser);
-      router.push(getDashboardPath(role));
-      setLoading(false);
-      return;
-    }
-
-    // ── 3. Autenticación real contra el backend ───────────────────────────────
     try {
-      const data = await apiRequest("/api/v1/auth/login", {
+      const response = await apiRequest("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
-      if (data.success) {
-        login(data.data.access_token, data.data.user);
-        router.push(getDashboardPath(data.data.user.role));
+
+      if (response.success) {
+        login(response.data.access_token, response.data.user);
+        router.push(getDashboardPath(response.data.user.role));
       } else {
-        setError(data.message || "Credenciales incorrectas.");
+        setError(response.message || "Credenciales incorrectas.");
       }
     } catch {
       setError("Error conectando con el servidor. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden px-4">
-
-      {/* Ambient blobs */}
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4">
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-56 -right-56 w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-56 -left-56 w-[500px] h-[500px] bg-indigo-600/8 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-blue-900/5 rounded-full blur-3xl" />
+        <div className="absolute -right-56 -top-56 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-3xl" />
+        <div className="absolute -bottom-56 -left-56 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-3xl" />
+        <div className="absolute left-1/2 top-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-900/5 blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-sm">
-
-        {/* ── Logo & brand ───────────────────────────────────────────────── */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/40 group-hover:scale-105 transition-transform">
-              <BookOpen className="w-5 h-5 text-white" />
+        <div className="mb-8 text-center">
+          <Link href="/" className="group inline-flex items-center gap-2.5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-900/40 transition-transform group-hover:scale-105">
+              <BookOpen className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">EduCore</span>
+            <span className="text-xl font-bold tracking-tight text-white">Educore</span>
           </Link>
-          <p className="text-slate-500 text-sm mt-2">Plataforma de Administración Escolar</p>
+          <p className="mt-2 text-sm text-slate-500">Plataforma de administracion escolar</p>
         </div>
 
-        {/* ── Card ───────────────────────────────────────────────────────── */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl p-7">
-
-          <h1 className="text-xl font-bold text-white mb-1">Iniciar sesión</h1>
-          <p className="text-sm text-slate-400 mb-7">Bienvenido de vuelta</p>
+        <div className="rounded-2xl border border-slate-800/80 bg-slate-900/80 p-7 shadow-2xl backdrop-blur-xl">
+          <h1 className="mb-1 text-xl font-bold text-white">Iniciar sesion</h1>
+          <p className="mb-7 text-sm text-slate-400">Bienvenido de vuelta</p>
 
           <form onSubmit={handleLogin} noValidate className="space-y-4">
-
-            {/* Email */}
             <div className="space-y-1.5">
               <label htmlFor="login-email" className="block text-xs font-medium text-slate-400">
-                Correo electrónico
+                Correo electronico
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Mail className="w-4 h-4 text-slate-500" />
+                  <Mail className="h-4 w-4 text-slate-500" />
                 </span>
                 <input
                   id="login-email"
@@ -134,95 +80,73 @@ export default function LoginPage() {
                   autoComplete="email"
                   placeholder="nombre@institucion.mx"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
-                  className="w-full h-11 pl-9 pr-4 rounded-xl bg-slate-800/70 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-colors"
+                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-800/70 pl-9 pr-4 text-sm text-white transition-colors placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 />
               </div>
             </div>
 
-            {/* Password */}
             <div className="space-y-1.5">
               <label htmlFor="login-password" className="block text-xs font-medium text-slate-400">
-                Contraseña
+                Contrasena
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Lock className="w-4 h-4 text-slate-500" />
+                  <Lock className="h-4 w-4 text-slate-500" />
                 </span>
                 <input
                   id="login-password"
                   type={showPw ? "text" : "password"}
                   autoComplete="current-password"
-                  placeholder="••••••••"
+                  placeholder="********"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   required
-                  className="w-full h-11 pl-9 pr-11 rounded-xl bg-slate-800/70 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-colors"
+                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-800/70 pl-9 pr-11 text-sm text-white transition-colors placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 />
-                {/* Eye toggle — color explícitamente visible sobre fondo oscuro */}
                 <button
                   type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  className="absolute inset-y-0 right-0 flex items-center justify-center w-11 text-slate-300 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 rounded-r-xl transition-colors"
+                  onClick={() => setShowPw((current) => !current)}
+                  aria-label={showPw ? "Ocultar contrasena" : "Mostrar contrasena"}
+                  className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-slate-300 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                 >
-                  {showPw
-                    ? <EyeOff className="w-4 h-4" strokeWidth={1.75} />
-                    : <Eye    className="w-4 h-4" strokeWidth={1.75} />
-                  }
+                  {showPw ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
                 </button>
               </div>
             </div>
 
-            {/* Error */}
             {error && (
-              <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/25 px-3 py-2.5">
-                <span className="text-red-400 text-xs leading-relaxed">{error}</span>
+              <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5">
+                <span className="text-xs leading-relaxed text-red-400">{error}</span>
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 mt-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-lg shadow-blue-900/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              className="mt-1 h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-sm font-semibold text-white shadow-lg shadow-blue-900/30 transition-all hover:from-blue-500 hover:to-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-                  </svg>
-                  Verificando…
-                </span>
-              ) : "Iniciar sesión"}
+              {loading ? "Verificando..." : "Iniciar sesion"}
             </button>
 
-            {/* Forgot password */}
             <p className="text-center">
-              <Link
-                href="/reset-password"
-                className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
+              <Link href="/reset-password" className="text-xs text-slate-500 transition-colors hover:text-blue-400">
+                Olvidaste tu contrasena?
               </Link>
             </p>
           </form>
 
-          {/* Divider */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
+          <div className="mt-6 border-t border-slate-800/80 pt-5 text-center">
             <p className="text-xs text-slate-600">
-              ¿Eres nuevo?{" "}
-              <span className="text-slate-500">Contacta a tu institución para activar tu cuenta.</span>
+              Eres nuevo? <span className="text-slate-500">Contacta a tu institucion para activar tu cuenta.</span>
             </p>
           </div>
         </div>
 
-        {/* Back to home */}
-        <p className="text-center text-xs text-slate-600 mt-5">
-          <Link href="/" className="hover:text-slate-400 transition-colors">
-            ← Volver al inicio
+        <p className="mt-5 text-center text-xs text-slate-600">
+          <Link href="/" className="transition-colors hover:text-slate-400">
+            Volver al inicio
           </Link>
         </p>
       </div>

@@ -772,3 +772,13 @@ Base: Hostinger MySQL u550473909_educore_prod (reset limpio + 001 + 002 reimport
 - Re-seed owners en producción
 
 #memory #mysql #staging #smoke_test #production_ready
+
+---
+
+# 04-05-2026 - Landing Educore: tema Normal/Claro/Oscuro corregido
+
+Se reviso la landing publica en `frontend/app/page.tsx` y el bug del selector de tema. La causa era que la pagina mezclaba `next-themes` con muchas clases Tailwind hardcodeadas (`bg-white`, `text-[#0F172A]`, `bg-[#F8FAFC]`), por lo que solo algunas piezas cambiaban de modo.
+
+Se ajusto la landing para mapear `blue/light/dark` a variables propias de landing alineadas con el ThemeToggle de modulos, se evito que el `<main>` fuerce fondo blanco, se protegió el boton blanco del CTA y se ampliaron overrides scoped a `.landing-page` para secciones, navbar, cards, tabla, inputs y footer. Validacion: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, `git diff --check` y ciclo del ThemeToggle en navegador local `3007` OK.
+
+#memory #frontend #landing #theme #qa
