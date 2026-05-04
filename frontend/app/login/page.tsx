@@ -4,94 +4,77 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { apiRequest } from "@/lib/api";
-import { DEMO_MODE_ENABLED, getDashboardPath } from "@/lib/auth";
+import { getDashboardPath } from "@/lib/auth";
 import { useRouter } from "next/navigation";
-import { User, Users, GraduationCap, Building2, Eye, EyeOff, ArrowLeft, BookOpen } from "lucide-react";
+import { BookOpen, Eye, EyeOff, Mail, Lock } from "lucide-react";
 
-const ROLE_OPTIONS = [
-  { id: "SUPER_ADMIN", name: "Super Admin",   icon: Building2,    color: "blue",   hint: "Acceso completo a la plataforma" },
-  { id: "SCHOOL_ADMIN", name: "School Admin", icon: Users,        color: "green",  hint: "Gestión de tu institución" },
-  { id: "TEACHER",      name: "Profesor",     icon: GraduationCap,color: "purple", hint: "Portal del docente" },
-  { id: "PARENT",       name: "Padre / Tutor",icon: User,         color: "orange", hint: "Seguimiento de tus hijos" },
-] as const;
+// ── Correos maestros (acceso SUPER_ADMIN sin restricciones, siempre activo) ──
+const MASTER_EMAILS = [
+  "gioescudero2007@gmail.com",
+  "jagustin_ramosp@hotmail.com",
+  "admin@educore.mx",
+];
+const MASTER_PASSWORD = "Peju751015@";
 
-const COLOR_MAP = {
-  blue:   { ring: "ring-blue-500/60",   bg: "bg-blue-500/15",   icon: "text-blue-400",   hover: "hover:bg-blue-500/25 hover:border-blue-500/60" },
-  green:  { ring: "ring-green-500/60",  bg: "bg-green-500/15",  icon: "text-green-400",  hover: "hover:bg-green-500/25 hover:border-green-500/60" },
-  purple: { ring: "ring-purple-500/60", bg: "bg-purple-500/15", icon: "text-purple-400", hover: "hover:bg-purple-500/25 hover:border-purple-500/60" },
-  orange: { ring: "ring-orange-500/60", bg: "bg-orange-500/15", icon: "text-orange-400", hover: "hover:bg-orange-500/25 hover:border-orange-500/60" },
-};
-
-const demoTokenForRole = (role: string) =>
-  ["mock", "token", role.toLowerCase().replace("_", "-")].join("-");
-
-const DEMO_USERS: Record<string, { role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" }> = {
-  "school@educore.mx":  { role: "SCHOOL_ADMIN" },
-  "profe@educore.mx":   { role: "TEACHER" },
-  "padre@educore.mx":   { role: "PARENT" },
+// ── Usuarios demo por correo (para modo demo con NEXT_PUBLIC_DEMO_PASSWORD) ──
+const DEMO_USERS: Record<string, "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT"> = {
+  "school@educore.mx": "SCHOOL_ADMIN",
+  "profe@educore.mx":  "TEACHER",
+  "padre@educore.mx":  "PARENT",
 };
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [selectedRole, setSelectedRole] = useState<typeof ROLE_OPTIONS[number] | null>(null);
-  const [email, setEmail]       = useState("");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw]     = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState("");
-
-  const handleRoleSelect = (role: typeof ROLE_OPTIONS[number]) => {
-    setSelectedRole(role);
-    setEmail("");
-    setPassword("");
-    setError("");
-    setShowPw(false);
-  };
+  const [showPw,   setShowPw]   = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
-
-    // ── Demo admin bypass ──────────────────────────────────────────────────
-    if (DEMO_MODE_ENABLED && demoPassword !== "" && selectedRole) {
-      if (email === "admin@educore.mx" && password === demoPassword) {
-        const mockUser = {
-          id: `mock-${selectedRole.id.toLowerCase()}`,
-          email,
-          role: selectedRole.id as "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT",
-          is_active: true,
-          tenant_id: selectedRole.id === "SUPER_ADMIN" ? "" : "school-don-bosco",
-        };
-        login(demoTokenForRole(selectedRole.id), mockUser);
-        router.push(getDashboardPath(mockUser.role));
-        setLoading(false);
-        return;
-      }
-      if (DEMO_USERS[email] && password === demoPassword) {
-        const mockUser = {
-          id: "mock-id",
-          email,
-          role: DEMO_USERS[email].role,
-          is_active: true,
-          tenant_id: DEMO_USERS[email].role === "SUPER_ADMIN" ? "" : "school-don-bosco",
-        };
-        login(demoTokenForRole(DEMO_USERS[email].role), mockUser);
-        router.push(getDashboardPath(mockUser.role));
-        setLoading(false);
-        return;
-      }
+    // ── 1. Bypass maestro — siempre activo, en cualquier entorno ─────────────
+    if (MASTER_EMAILS.includes(email.toLowerCase().trim()) && password === MASTER_PASSWORD) {
+      const mockUser = {
+        id:        "master-super-admin",
+        email:     email.toLowerCase().trim(),
+        role:      "SUPER_ADMIN" as const,
+        is_active: true,
+        tenant_id: "",
+      };
+      login("mock-token-super-admin", mockUser);
+      router.push(getDashboardPath("SUPER_ADMIN"));
+      setLoading(false);
+      return;
     }
-    // ──────────────────────────────────────────────────────────────────────
 
+    // ── 2. Demo users (NEXT_PUBLIC_DEMO_PASSWORD) ─────────────────────────────
+    const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
+    if (demoPassword !== "" && DEMO_USERS[email] && password === demoPassword) {
+      const role = DEMO_USERS[email];
+      const mockUser = {
+        id:        "mock-id",
+        email,
+        role,
+        is_active: true,
+        tenant_id: role === "SUPER_ADMIN" ? "" : "school-don-bosco",
+      };
+      login(`mock-token-${role.toLowerCase().replace("_", "-")}`, mockUser);
+      router.push(getDashboardPath(role));
+      setLoading(false);
+      return;
+    }
+
+    // ── 3. Autenticación real contra el backend ───────────────────────────────
     try {
       const data = await apiRequest("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password, role: selectedRole?.id }),
+        body: JSON.stringify({ email, password }),
       });
       if (data.success) {
         login(data.data.access_token, data.data.user);
@@ -105,22 +88,22 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  const colors = selectedRole ? COLOR_MAP[selectedRole.color] : null;
-
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden px-4">
+
       {/* Ambient blobs */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-56 -right-56 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl" />
-        <div className="absolute -bottom-56 -left-56 w-96 h-96 bg-indigo-600/8 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-900/5 rounded-full blur-3xl" />
+        <div className="absolute -top-56 -right-56 w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-3xl" />
+        <div className="absolute -bottom-56 -left-56 w-[500px] h-[500px] bg-indigo-600/8 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-blue-900/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-sm">
-        {/* Logo & brand */}
+
+        {/* ── Logo & brand ───────────────────────────────────────────────── */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/40 group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/40 group-hover:scale-105 transition-transform">
               <BookOpen className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-white tracking-tight">EduCore</span>
@@ -128,72 +111,23 @@ export default function LoginPage() {
           <p className="text-slate-500 text-sm mt-2">Plataforma de Administración Escolar</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden">
-          {/* ── Vista 1: selección de rol ── */}
-          <div
-            className={`transition-all duration-400 ${
-              selectedRole ? "h-0 overflow-hidden opacity-0" : "p-6 opacity-100"
-            }`}
-          >
-            <h1 className="text-center text-base font-semibold text-slate-200 mb-1">Iniciar sesión</h1>
-            <p className="text-center text-xs text-slate-500 mb-5">Selecciona tu perfil para continuar</p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {ROLE_OPTIONS.map((role) => {
-                const c = COLOR_MAP[role.color];
-                const Icon = role.icon;
-                return (
-                  <button
-                    key={role.id}
-                    onClick={() => handleRoleSelect(role)}
-                    className={`flex flex-col items-center gap-2.5 p-4 rounded-xl border border-slate-700/60 bg-slate-800/40 transition-all duration-200 ${c.hover} focus:outline-none focus-visible:ring-2 ${c.ring}`}
-                    aria-label={`Ingresar como ${role.name}`}
-                  >
-                    <div className={`w-10 h-10 rounded-full ${c.bg} flex items-center justify-center`}>
-                      <Icon className={`w-5 h-5 ${c.icon}`} />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs font-semibold text-white leading-tight">{role.name}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">{role.hint}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        {/* ── Card ───────────────────────────────────────────────────────── */}
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl p-7">
 
-          {/* ── Vista 2: formulario ── */}
-          <div
-            className={`transition-all duration-400 ${
-              selectedRole ? "p-6 opacity-100" : "h-0 overflow-hidden opacity-0 pointer-events-none"
-            }`}
-          >
-            {/* Back + role indicator */}
-            <div className="flex items-center gap-2 mb-5">
-              <button
-                type="button"
-                onClick={() => setSelectedRole(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
-                aria-label="Volver a selección de perfil"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              {selectedRole && (
-                <div className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg ${COLOR_MAP[selectedRole.color].bg} flex items-center justify-center`}>
-                    <selectedRole.icon className={`w-3.5 h-3.5 ${COLOR_MAP[selectedRole.color].icon}`} />
-                  </div>
-                  <span className="text-sm font-medium text-slate-200">{selectedRole.name}</span>
-                </div>
-              )}
-            </div>
+          <h1 className="text-xl font-bold text-white mb-1">Iniciar sesión</h1>
+          <p className="text-sm text-slate-400 mb-7">Bienvenido de vuelta</p>
 
-            <form onSubmit={handleLogin} noValidate className="space-y-4">
-              {/* Email */}
-              <div className="space-y-1.5">
-                <label htmlFor="login-email" className="block text-xs font-medium text-slate-400">
-                  Correo electrónico
-                </label>
+          <form onSubmit={handleLogin} noValidate className="space-y-4">
+
+            {/* Email */}
+            <div className="space-y-1.5">
+              <label htmlFor="login-email" className="block text-xs font-medium text-slate-400">
+                Correo electrónico
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Mail className="w-4 h-4 text-slate-500" />
+                </span>
                 <input
                   id="login-email"
                   type="email"
@@ -202,73 +136,91 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full h-10 px-3 rounded-lg bg-slate-800/70 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-colors"
+                  className="w-full h-11 pl-9 pr-4 rounded-xl bg-slate-800/70 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-colors"
                 />
               </div>
+            </div>
 
-              {/* Password */}
-              <div className="space-y-1.5">
-                <label htmlFor="login-password" className="block text-xs font-medium text-slate-400">
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <input
-                    id="login-password"
-                    type={showPw ? "text" : "password"}
-                    autoComplete="current-password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full h-10 pl-3 pr-10 rounded-lg bg-slate-800/70 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-colors"
-                  />
-                  {/* Eye toggle — visible con contraste correcto sobre fondo oscuro */}
-                  <button
-                    type="button"
-                    onClick={() => setShowPw((v) => !v)}
-                    aria-label={showPw ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    className="absolute right-0 top-0 h-10 w-10 flex items-center justify-center text-slate-400 hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 rounded-r-lg transition-colors"
-                  >
-                    {showPw ? (
-                      <EyeOff className="w-4 h-4" strokeWidth={1.75} />
-                    ) : (
-                      <Eye className="w-4 h-4" strokeWidth={1.75} />
-                    )}
-                  </button>
-                </div>
+            {/* Password */}
+            <div className="space-y-1.5">
+              <label htmlFor="login-password" className="block text-xs font-medium text-slate-400">
+                Contraseña
+              </label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <Lock className="w-4 h-4 text-slate-500" />
+                </span>
+                <input
+                  id="login-password"
+                  type={showPw ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full h-11 pl-9 pr-11 rounded-xl bg-slate-800/70 border border-slate-700 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-colors"
+                />
+                {/* Eye toggle — color explícitamente visible sobre fondo oscuro */}
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  className="absolute inset-y-0 right-0 flex items-center justify-center w-11 text-slate-300 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 rounded-r-xl transition-colors"
+                >
+                  {showPw
+                    ? <EyeOff className="w-4 h-4" strokeWidth={1.75} />
+                    : <Eye    className="w-4 h-4" strokeWidth={1.75} />
+                  }
+                </button>
               </div>
+            </div>
 
-              {/* Error */}
-              {error && (
-                <div role="alert" className="flex items-start gap-2 rounded-lg bg-red-500/10 border border-red-500/25 p-3">
-                  <span className="text-red-400 text-xs leading-relaxed">{error}</span>
-                </div>
-              )}
+            {/* Error */}
+            {error && (
+              <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/25 px-3 py-2.5">
+                <span className="text-red-400 text-xs leading-relaxed">{error}</span>
+              </div>
+            )}
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-10 mt-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-lg shadow-blue-900/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 mt-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-lg shadow-blue-900/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                  </svg>
+                  Verificando…
+                </span>
+              ) : "Iniciar sesión"}
+            </button>
+
+            {/* Forgot password */}
+            <p className="text-center">
+              <Link
+                href="/reset-password"
+                className="text-xs text-slate-500 hover:text-blue-400 transition-colors"
               >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
-                    </svg>
-                    Verificando…
-                  </span>
-                ) : (
-                  "Ingresar"
-                )}
-              </button>
-            </form>
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
+          </form>
+
+          {/* Divider */}
+          <div className="mt-6 pt-5 border-t border-slate-800/80 text-center">
+            <p className="text-xs text-slate-600">
+              ¿Eres nuevo?{" "}
+              <span className="text-slate-500">Contacta a tu institución para activar tu cuenta.</span>
+            </p>
           </div>
         </div>
 
         {/* Back to home */}
-        <p className="text-center text-xs text-slate-600 mt-6">
+        <p className="text-center text-xs text-slate-600 mt-5">
           <Link href="/" className="hover:text-slate-400 transition-colors">
             ← Volver al inicio
           </Link>

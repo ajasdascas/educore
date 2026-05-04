@@ -13,7 +13,8 @@ type RoleGuardProps = {
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const allowed = !!user && allowedRoles.includes(user.role);
+  // SUPER_ADMIN tiene acceso universal a todas las rutas sin excepción
+  const allowed = !!user && (user.role === "SUPER_ADMIN" || allowedRoles.includes(user.role));
 
   useEffect(() => {
     if (loading) return;
