@@ -19,7 +19,9 @@ import {
   Clock,
   ExternalLink,
   Save,
-  Loader2
+  Loader2,
+  AlertTriangle,
+  Globe,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authFetch, setSupportContext } from "@/lib/auth";
@@ -253,12 +255,9 @@ function SchoolDetailContent() {
               <SelectItem value="suspended">Suspendida</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" asChild>
-            {/* External subdomain URL — plain <a>, Next.js Link would prepend basePath (/educore) */}
-            <a href={`https://${school.slug}.onlineu.mx`} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Visitar portal
-            </a>
+          <Button variant="outline" onClick={() => router.push(`/escuela/?slug=${school.slug}`)}>
+            <Globe className="mr-2 h-4 w-4" />
+            Portal interno
           </Button>
         </div>
       </div>
@@ -434,103 +433,160 @@ function SchoolDetailContent() {
         </TabsContent>
 
         <TabsContent value="portals" className="space-y-4">
+          {/* DNS warning banner */}
+          <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div className="space-y-1">
+              <p className="font-semibold">El subdominio <span className="font-mono">{school.slug}.onlineu.mx</span> puede no estar activo en DNS.</p>
+              <p className="text-amber-300/80">
+                Para que funcione, necesitas un wildcard A record <span className="font-mono">*.onlineu.mx</span> apuntando al servidor, o un subdominio individual.
+                Mientras tanto, usa los <strong>portales internos</strong> de abajo — funcionan sin DNS.
+                Ver <span className="font-mono">docs/SCHOOL_PORTALS_AND_DNS.md</span> para instrucciones completas.
+              </p>
+            </div>
+          </div>
+
+          {/* Portales internos por rol */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Shield className="w-4 h-4" /> Modo Soporte — Acceso a Módulos
-              </CardTitle>
+              <CardTitle>Portales por Rol — Acceso Interno</CardTitle>
               <CardDescription>
-                Entra directamente a los módulos de esta escuela como soporte técnico
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Panel Escuela (modo soporte)</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { label: "Dashboard", path: "/school-admin/dashboard" },
-                    { label: "Estudiantes", path: "/school-admin/students" },
-                    { label: "Profesores", path: "/school-admin/teachers" },
-                    { label: "Grupos", path: "/school-admin/groups" },
-                    { label: "Asistencias", path: "/school-admin/attendance" },
-                    { label: "Calificaciones", path: "/school-admin/grades" },
-                    { label: "Boletas", path: "/school-admin/report-cards" },
-                    { label: "Horarios", path: "/school-admin/schedule" },
-                    { label: "Comunicaciones", path: "/school-admin/communications" },
-                  ].map(({ label, path }) => (
-                    <Button key={path} variant="outline" size="sm" onClick={() => enterSupportMode(path)}>
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Portales externos (nueva pestaña)</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { label: "Portal Escuela", url: `https://${school.slug}.onlineu.mx` },
-                    { label: "Login Director", url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
-                    { label: "Login Profesor", url: `https://${school.slug}.onlineu.mx/login?role=teacher` },
-                    { label: "Login Padre", url: `https://${school.slug}.onlineu.mx/login?role=parent` },
-                    { label: "Login Estudiante", url: `https://${school.slug}.onlineu.mx/login?role=student` },
-                  ].map(({ label, url }) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                      <Button variant="secondary" size="sm" className="gap-1">
-                        <ExternalLink className="w-3 h-3" /> {label}
-                      </Button>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Portales por Rol</CardTitle>
-              <CardDescription>
-                Accede a los módulos de esta escuela como administrador. Subdominio:{" "}
-                <span className="font-mono text-blue-400">{school.slug}.onlineu.mx</span>
+                Rutas internas en <span className="font-mono">onlineu.mx/educore</span> — funcionan sin subdominio DNS.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { key: "school-admin", label: "Administración Escolar", desc: "Panel del director y coordinadores. Gestión de profesores, alumnos, grupos, horarios y reportes.", icon: "🏫", available: true,  href: `/escuela/?slug=${school.slug}&role=school_admin` },
-                  { key: "teachers",     label: "Portal de Profesores",   desc: "Registro de asistencias, captura de calificaciones y comunicación con padres de familia.",       icon: "👨‍🏫", available: true,  href: `/escuela/?slug=${school.slug}&role=teacher` },
-                  { key: "parents",      label: "Portal de Padres",       desc: "Seguimiento de hijos: calificaciones, asistencia, pagos, mensajes y consentimientos.",           icon: "👨‍👩‍👧", available: true,  href: `/escuela/?slug=${school.slug}&role=parent` },
-                  { key: "students",     label: "Portal de Alumnos",      desc: "Módulo en desarrollo. Las funcionalidades serán definidas en la siguiente fase del proyecto.",   icon: "🎒", available: false, href: `/escuela/?slug=${school.slug}&role=student` },
+                  {
+                    key: "school-admin",
+                    label: "Administración Escolar",
+                    desc: "Panel del director y coordinadores. Gestión de profesores, alumnos, grupos, horarios y reportes.",
+                    icon: "🏫",
+                    roleBadge: "SCHOOL_ADMIN",
+                    loginHref: `/login?slug=${school.slug}&role=school_admin`,
+                    portalHref: `/escuela/?slug=${school.slug}&role=school_admin`,
+                    available: true,
+                  },
+                  {
+                    key: "teachers",
+                    label: "Portal de Profesores",
+                    desc: "Registro de asistencias, captura de calificaciones y comunicación con padres.",
+                    icon: "👨‍🏫",
+                    roleBadge: "TEACHER",
+                    loginHref: `/login?slug=${school.slug}&role=teacher`,
+                    portalHref: `/escuela/?slug=${school.slug}&role=teacher`,
+                    available: true,
+                  },
+                  {
+                    key: "parents",
+                    label: "Portal de Padres",
+                    desc: "Calificaciones, asistencia, pagos, mensajes y consentimientos de sus hijos.",
+                    icon: "👨‍👩‍👧",
+                    roleBadge: "PARENT",
+                    loginHref: `/login?slug=${school.slug}&role=parent`,
+                    portalHref: `/escuela/?slug=${school.slug}&role=parent`,
+                    available: true,
+                  },
+                  {
+                    key: "students",
+                    label: "Portal de Alumnos",
+                    desc: "Requiere usuario con role=STUDENT vinculado al alumno en la tabla students (columna user_id).",
+                    icon: "🎒",
+                    roleBadge: "STUDENT",
+                    loginHref: `/login?slug=${school.slug}&role=student`,
+                    portalHref: `/escuela/?slug=${school.slug}&role=student`,
+                    available: true,
+                  },
                 ].map((portal) => (
                   <div
                     key={portal.key}
-                    className={`flex flex-col gap-4 p-5 rounded-xl border transition-colors ${
-                      portal.available
-                        ? "border-slate-700/60 hover:border-primary/40 bg-card"
-                        : "border-slate-800/40 opacity-60 bg-muted/20"
-                    }`}
+                    className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-card p-5 hover:border-primary/40 transition-colors"
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">{portal.icon}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm">{portal.label}</span>
-                          {!portal.available && (
-                            <Badge variant="secondary" className="text-[10px]">Próximamente</Badge>
-                          )}
+                          <Badge variant="outline" className="text-[10px] h-4">{portal.roleBadge}</Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{portal.desc}</p>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={portal.available ? "default" : "secondary"}
-                      disabled={!portal.available}
-                      className="self-start"
-                      onClick={() => portal.available && router.push(portal.href)}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-                      {portal.available ? "Abrir portal" : "No disponible"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="default" className="flex-1" onClick={() => router.push(portal.portalHref)}>
+                        <Globe className="w-3.5 h-3.5 mr-1.5" />
+                        Portal
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => router.push(portal.loginHref)}>
+                        <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                        Ir a Login
+                      </Button>
+                    </div>
                   </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Subdominio externo — separado y con advertencia clara */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Subdominio externo</CardTitle>
+              <CardDescription>
+                Solo funciona si el wildcard DNS <span className="font-mono">*.onlineu.mx</span> está configurado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-md bg-muted/50 px-4 py-3 font-mono text-sm">
+                https://{school.slug}.onlineu.mx
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Portal público", url: `https://${school.slug}.onlineu.mx` },
+                  { label: "Login Director", url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
+                  { label: "Login Profesor", url: `https://${school.slug}.onlineu.mx/login?role=teacher` },
+                  { label: "Login Padre",    url: `https://${school.slug}.onlineu.mx/login?role=parent` },
+                  { label: "Login Alumno",   url: `https://${school.slug}.onlineu.mx/login?role=student` },
+                ].map(({ label, url }) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                    <Button variant="secondary" size="sm" className="gap-1">
+                      <ExternalLink className="w-3 h-3" /> {label}
+                    </Button>
+                  </a>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Si ves DNS_PROBE_FINISHED_NXDOMAIN, el subdominio no existe en DNS. Configura el wildcard o usa los portales internos de arriba.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Modo soporte — sin cambios */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Modo Soporte — Acceso Directo a Módulos
+              </CardTitle>
+              <CardDescription>
+                Entra directamente como soporte técnico sin cambiar de sesión JWT.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Dashboard",       path: "/school-admin/dashboard" },
+                  { label: "Estudiantes",     path: "/school-admin/students" },
+                  { label: "Profesores",      path: "/school-admin/teachers" },
+                  { label: "Grupos",          path: "/school-admin/groups" },
+                  { label: "Asistencias",     path: "/school-admin/attendance" },
+                  { label: "Calificaciones",  path: "/school-admin/grades" },
+                  { label: "Boletas",         path: "/school-admin/report-cards" },
+                  { label: "Horarios",        path: "/school-admin/schedule" },
+                  { label: "Comunicaciones",  path: "/school-admin/communications" },
+                ].map(({ label, path }) => (
+                  <Button key={path} variant="outline" size="sm" onClick={() => enterSupportMode(path)}>
+                    {label}
+                  </Button>
                 ))}
               </div>
             </CardContent>
