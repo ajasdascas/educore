@@ -40,6 +40,15 @@ func Protected(secret string) fiber.Handler {
 			c.Locals("tenant_id", claims.TenantID)
 		}
 
+		// SUPER_ADMIN can pass X-Support-Tenant-ID header to operate in school context
+		if claims.Role == "SUPER_ADMIN" {
+			supportTenantID := c.Get("X-Support-Tenant-ID")
+			if supportTenantID != "" {
+				c.Locals("tenant_id", supportTenantID)
+				c.Locals("support_mode", true)
+			}
+		}
+
 		return c.Next()
 	}
 }

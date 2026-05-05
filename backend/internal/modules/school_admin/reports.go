@@ -43,7 +43,10 @@ type GenerateReportRequest struct {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) GetReports(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	items, err := h.service.GetReports(c.Context(), tenantID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -52,7 +55,10 @@ func (h *Handler) GetReports(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetReport(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	item, err := h.service.GetReport(c.Context(), tenantID, c.Params("id"))
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
@@ -61,7 +67,10 @@ func (h *Handler) GetReport(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GenerateReport(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req GenerateReportRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -75,7 +84,10 @@ func (h *Handler) GenerateReport(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ExportReport(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	report, err := h.service.GetReport(c.Context(), tenantID, c.Params("id"))
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
@@ -89,7 +101,10 @@ func (h *Handler) ExportReport(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteReport(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	if err := h.service.DeleteReport(c.Context(), tenantID, c.Params("id")); err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
 	}

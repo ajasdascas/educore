@@ -22,7 +22,7 @@ import {
   Loader2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authFetch } from "@/lib/auth";
+import { authFetch, setSupportContext } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -155,6 +155,12 @@ function SchoolDetailContent() {
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  const enterSupportMode = (path: string) => {
+    if (!school) return;
+    setSupportContext(school.id, school.slug, school.name);
+    router.push(path);
   };
 
   const toggleModule = async (moduleKey: string) => {
@@ -427,7 +433,57 @@ function SchoolDetailContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="portals">
+        <TabsContent value="portals" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Modo Soporte — Acceso a Módulos
+              </CardTitle>
+              <CardDescription>
+                Entra directamente a los módulos de esta escuela como soporte técnico
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Panel Escuela (modo soporte)</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Dashboard", path: "/school-admin/dashboard" },
+                    { label: "Estudiantes", path: "/school-admin/students" },
+                    { label: "Profesores", path: "/school-admin/teachers" },
+                    { label: "Grupos", path: "/school-admin/groups" },
+                    { label: "Asistencias", path: "/school-admin/attendance" },
+                    { label: "Calificaciones", path: "/school-admin/grades" },
+                    { label: "Boletas", path: "/school-admin/report-cards" },
+                    { label: "Horarios", path: "/school-admin/schedule" },
+                    { label: "Comunicaciones", path: "/school-admin/communications" },
+                  ].map(({ label, path }) => (
+                    <Button key={path} variant="outline" size="sm" onClick={() => enterSupportMode(path)}>
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold uppercase mb-2">Portales externos (nueva pestaña)</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Portal Escuela", url: `https://${school.slug}.onlineu.mx` },
+                    { label: "Login Director", url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
+                    { label: "Login Profesor", url: `https://${school.slug}.onlineu.mx/login?role=teacher` },
+                    { label: "Login Padre", url: `https://${school.slug}.onlineu.mx/login?role=parent` },
+                    { label: "Login Estudiante", url: `https://${school.slug}.onlineu.mx/login?role=student` },
+                  ].map(({ label, url }) => (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="secondary" size="sm" className="gap-1">
+                        <ExternalLink className="w-3 h-3" /> {label}
+                      </Button>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Portales por Rol</CardTitle>

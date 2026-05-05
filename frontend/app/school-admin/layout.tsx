@@ -28,6 +28,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { ModuleKey } from "@/lib/modules/registry";
 import { useEnabledModules } from "@/lib/modules/use-enabled-modules";
+import { SupportModeBanner } from "@/components/SupportModeBanner";
 
 const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: ModuleKey }> = [
   { href: "/school-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -155,6 +156,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
             <ProfileDropdown userInitials={userInitials} userRole={userRole} />
           </div>
         </header>
+        <SupportModeBanner />
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-5">
           {children}
         </div>

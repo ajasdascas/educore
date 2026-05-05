@@ -591,7 +591,7 @@ function SchoolStudentsContent() {
         body: JSON.stringify(toPayload(form)),
       });
 
-      if (!response?.success) throw new Error(response?.message || "Operacion rechazada por el servidor.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "Operación rechazada por el servidor.");
 
       toast({
         title: editingStudent ? "Estudiante actualizado" : "Estudiante matriculado",
@@ -616,7 +616,7 @@ function SchoolStudentsContent() {
         method: "PUT",
         body: JSON.stringify({ status }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo cambiar el estado.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo cambiar el estado.");
       setStudents((current) => current.map((item) => (item.id === student.id ? { ...item, status } : item)));
       toast({ title: "Estado actualizado", description: `${fullStudentName(student)} ahora esta ${statusLabel(status).toLowerCase()}.` });
     } catch (error) {
@@ -635,7 +635,7 @@ function SchoolStudentsContent() {
       const response = await authFetch(`/api/v1/school-admin/academic/students/${selectedStudent.id}`, {
         method: "DELETE",
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo eliminar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo eliminar.");
       setStudents((current) => current.filter((student) => student.id !== selectedStudent.id));
       toast({ title: "Estudiante eliminado", description: "El expediente fue retirado del directorio." });
       setDeleteOpen(false);
@@ -706,7 +706,7 @@ function SchoolStudentsContent() {
         method: "POST",
         body: JSON.stringify({ rows, mapping, source_sheet: activeSheet }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo importar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo importar.");
       toast({
         title: "Importacion completada",
         description: `${response.data?.imported || rows.length} alumnos procesados con padres e historial.`,

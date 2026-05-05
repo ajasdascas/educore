@@ -2,10 +2,21 @@ package school_admin
 
 import (
 	"errors"
+	"fmt"
 
 	"educore/internal/pkg/response"
 	"github.com/gofiber/fiber/v2"
 )
+
+// getTenantID extracts the tenant_id from context safely.
+// Returns an error if the local is empty (e.g. SUPER_ADMIN without school context).
+func getTenantID(c *fiber.Ctx) (string, error) {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		return "", fmt.Errorf("no school context: SUPER_ADMIN must select a school before performing this operation")
+	}
+	return tenantID, nil
+}
 
 // quotaStatus returns 402 Payment Required for quota errors, 400 for everything else.
 func quotaStatus(err error) int {
@@ -138,7 +149,10 @@ func (h *Handler) RequireModule(moduleKey string) fiber.Handler {
 }
 
 func (h *Handler) GetSettings(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	settings, err := h.service.GetSettings(c.Context(), tenantID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -147,7 +161,10 @@ func (h *Handler) GetSettings(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateSettings(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req UpdateSchoolSettingsRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -161,7 +178,10 @@ func (h *Handler) UpdateSettings(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	modules, err := h.service.GetEnabledModules(c.Context(), tenantID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -170,7 +190,10 @@ func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetSchoolYears(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	years, err := h.service.GetSchoolYears(c.Context(), tenantID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -179,7 +202,10 @@ func (h *Handler) GetSchoolYears(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateSchoolYear(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateSchoolYearRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -193,7 +219,10 @@ func (h *Handler) CreateSchoolYear(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateSchoolYear(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	yearID := c.Params("id")
 	var req UpdateSchoolYearRequest
@@ -209,7 +238,10 @@ func (h *Handler) UpdateSchoolYear(c *fiber.Ctx) error {
 
 // Dashboard handlers
 func (h *Handler) GetDashboard(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	dashboard, err := h.service.GetDashboard(c.Context(), tenantID)
 	if err != nil {
@@ -220,7 +252,10 @@ func (h *Handler) GetDashboard(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStats(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	stats, err := h.service.GetStats(c.Context(), tenantID)
 	if err != nil {
@@ -232,7 +267,10 @@ func (h *Handler) GetStats(c *fiber.Ctx) error {
 
 // Student management handlers
 func (h *Handler) GetStudents(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	// Parse query parameters
 	page := c.QueryInt("page", 1)
@@ -266,7 +304,10 @@ func (h *Handler) GetStudents(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateStudent(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 
 	var req CreateStudentRequest
@@ -283,7 +324,10 @@ func (h *Handler) CreateStudent(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStudent(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	studentID := c.Params("id")
 
 	student, err := h.service.GetStudent(c.Context(), tenantID, studentID)
@@ -295,7 +339,10 @@ func (h *Handler) GetStudent(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStudentAcademicHistory(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	studentID := c.Params("id")
 
 	history, err := h.service.GetStudentAcademicHistory(c.Context(), tenantID, studentID)
@@ -307,7 +354,10 @@ func (h *Handler) GetStudentAcademicHistory(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateStudent(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	studentID := c.Params("id")
 
@@ -325,11 +375,14 @@ func (h *Handler) UpdateStudent(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteStudent(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	studentID := c.Params("id")
 
-	err := h.service.DeleteStudent(c.Context(), tenantID, userID, studentID)
+	err = h.service.DeleteStudent(c.Context(), tenantID, userID, studentID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
@@ -338,7 +391,10 @@ func (h *Handler) DeleteStudent(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CommitStudentImport(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 
 	var req StudentImportCommitRequest
@@ -356,7 +412,10 @@ func (h *Handler) CommitStudentImport(c *fiber.Ctx) error {
 
 // Teacher management handlers
 func (h *Handler) GetTeachers(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	teachers, err := h.service.GetTeachers(c.Context(), tenantID)
 	if err != nil {
@@ -367,7 +426,10 @@ func (h *Handler) GetTeachers(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateTeacher(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 
 	var req CreateTeacherRequest
@@ -384,7 +446,10 @@ func (h *Handler) CreateTeacher(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetTeacher(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	teacherID := c.Params("id")
 
 	teacher, err := h.service.GetTeacher(c.Context(), tenantID, teacherID)
@@ -396,7 +461,10 @@ func (h *Handler) GetTeacher(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateTeacher(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	teacherID := c.Params("id")
 
@@ -415,7 +483,10 @@ func (h *Handler) UpdateTeacher(c *fiber.Ctx) error {
 
 // Group management handlers
 func (h *Handler) GetGroups(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	groups, err := h.service.GetGroups(c.Context(), tenantID)
 	if err != nil {
@@ -426,7 +497,10 @@ func (h *Handler) GetGroups(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateGroup(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 
 	var req CreateGroupRequest
@@ -443,7 +517,10 @@ func (h *Handler) CreateGroup(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetGroup(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	groupID := c.Params("id")
 
 	group, err := h.service.GetGroup(c.Context(), tenantID, groupID)
@@ -455,7 +532,10 @@ func (h *Handler) GetGroup(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateGroup(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	groupID := c.Params("id")
 
@@ -473,11 +553,14 @@ func (h *Handler) UpdateGroup(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteGroup(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	groupID := c.Params("id")
 
-	err := h.service.DeleteGroup(c.Context(), tenantID, userID, groupID)
+	err = h.service.DeleteGroup(c.Context(), tenantID, userID, groupID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
@@ -487,7 +570,10 @@ func (h *Handler) DeleteGroup(c *fiber.Ctx) error {
 
 // Subject management handlers
 func (h *Handler) GetSubjects(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	subjects, err := h.service.GetSubjects(c.Context(), tenantID)
 	if err != nil {
@@ -498,7 +584,10 @@ func (h *Handler) GetSubjects(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateSubject(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 
 	var req CreateSubjectRequest
@@ -515,7 +604,10 @@ func (h *Handler) CreateSubject(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateSubject(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	subjectID := c.Params("id")
 
@@ -533,7 +625,10 @@ func (h *Handler) UpdateSubject(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteSubject(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	subjectID := c.Params("id")
 
@@ -545,7 +640,10 @@ func (h *Handler) DeleteSubject(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetSchedule(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	groupID := c.Query("group_id")
 	blocks, err := h.service.GetSchedule(c.Context(), tenantID, groupID)
 	if err != nil {
@@ -555,7 +653,10 @@ func (h *Handler) GetSchedule(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStudentSchedule(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	studentID := c.Params("id")
 	blocks, err := h.service.GetStudentSchedule(c.Context(), tenantID, studentID)
 	if err != nil {
@@ -565,7 +666,10 @@ func (h *Handler) GetStudentSchedule(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateScheduleBlock(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateScheduleBlockRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -579,7 +683,10 @@ func (h *Handler) CreateScheduleBlock(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetScheduleBlock(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	blockID := c.Params("id")
 	block, err := h.service.GetScheduleBlock(c.Context(), tenantID, blockID)
 	if err != nil {
@@ -589,7 +696,10 @@ func (h *Handler) GetScheduleBlock(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateScheduleBlock(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	blockID := c.Params("id")
 	var req UpdateScheduleBlockRequest
@@ -604,7 +714,10 @@ func (h *Handler) UpdateScheduleBlock(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteScheduleBlock(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	blockID := c.Params("id")
 	if err := h.service.DeleteScheduleBlock(c.Context(), tenantID, userID, blockID); err != nil {
@@ -615,7 +728,10 @@ func (h *Handler) DeleteScheduleBlock(c *fiber.Ctx) error {
 
 // Attendance handlers
 func (h *Handler) GetTodayAttendance(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	groupID := c.Params("groupId")
 	date := c.Query("date")
 
@@ -628,7 +744,10 @@ func (h *Handler) GetTodayAttendance(c *fiber.Ctx) error {
 }
 
 func (h *Handler) BulkUpdateAttendance(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	groupID := c.Params("groupId")
 
@@ -637,7 +756,7 @@ func (h *Handler) BulkUpdateAttendance(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
 
-	err := h.service.BulkUpdateAttendance(c.Context(), tenantID, userID, groupID, req)
+	err = h.service.BulkUpdateAttendance(c.Context(), tenantID, userID, groupID, req)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
@@ -646,7 +765,10 @@ func (h *Handler) BulkUpdateAttendance(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStudentAttendanceHistory(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	studentID := c.Params("studentId")
 
 	startDate := c.Query("start_date")
@@ -661,7 +783,10 @@ func (h *Handler) GetStudentAttendanceHistory(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetMonthlyAttendanceReport(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 
 	year := c.QueryInt("year")
 	month := c.QueryInt("month")
@@ -676,7 +801,10 @@ func (h *Handler) GetMonthlyAttendanceReport(c *fiber.Ctx) error {
 
 // Grades handlers
 func (h *Handler) GetGroupGrades(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	groupID := c.Params("groupId")
 	subjectID := c.Params("subjectId")
 
@@ -689,7 +817,10 @@ func (h *Handler) GetGroupGrades(c *fiber.Ctx) error {
 }
 
 func (h *Handler) BulkUpdateGrades(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 
 	var req BulkGradesRequest
@@ -697,7 +828,7 @@ func (h *Handler) BulkUpdateGrades(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
 
-	err := h.service.BulkUpdateGrades(c.Context(), tenantID, userID, req)
+	err = h.service.BulkUpdateGrades(c.Context(), tenantID, userID, req)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
@@ -706,7 +837,10 @@ func (h *Handler) BulkUpdateGrades(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStudentReportCard(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	studentID := c.Params("studentId")
 
 	period := c.Query("period", "current")
@@ -720,7 +854,10 @@ func (h *Handler) GetStudentReportCard(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetGroupFinalGrades(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	groupID := c.Params("groupId")
 
 	grades, err := h.service.GetGroupFinalGrades(c.Context(), tenantID, groupID)
@@ -732,7 +869,10 @@ func (h *Handler) GetGroupFinalGrades(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GenerateReportCard(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req GenerateReportCardRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -746,7 +886,10 @@ func (h *Handler) GenerateReportCard(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetStudentDocuments(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	studentID := c.Params("studentId")
 	documents, err := h.service.GetStudentDocuments(c.Context(), tenantID, studentID)
 	if err != nil {
@@ -756,7 +899,10 @@ func (h *Handler) GetStudentDocuments(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateStudentDocument(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateStudentDocumentRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -770,7 +916,10 @@ func (h *Handler) CreateStudentDocument(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateStudentDocument(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	documentID := c.Params("documentId")
 	var req CreateStudentDocumentRequest
@@ -785,7 +934,10 @@ func (h *Handler) UpdateStudentDocument(c *fiber.Ctx) error {
 }
 
 func (h *Handler) VerifyStudentDocument(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	documentID := c.Params("documentId")
 	document, err := h.service.VerifyStudentDocument(c.Context(), tenantID, userID, documentID)
@@ -796,7 +948,10 @@ func (h *Handler) VerifyStudentDocument(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteStudentDocument(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	documentID := c.Params("documentId")
 	if err := h.service.DeleteStudentDocument(c.Context(), tenantID, userID, documentID); err != nil {
@@ -806,7 +961,10 @@ func (h *Handler) DeleteStudentDocument(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetPayments(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	payments, err := h.service.GetPayments(c.Context(), tenantID, GetPaymentsParams{
 		StudentID: c.Query("student_id"),
 		GroupID:   c.Query("group_id"),
@@ -822,7 +980,10 @@ func (h *Handler) GetPayments(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateStudentCharge(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateStudentChargeRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -836,7 +997,10 @@ func (h *Handler) CreateStudentCharge(c *fiber.Ctx) error {
 }
 
 func (h *Handler) RecordStudentPayment(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req RecordStudentPaymentRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -850,7 +1014,10 @@ func (h *Handler) RecordStudentPayment(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetPaymentReceipt(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	receipt, err := h.service.GetPaymentReceipt(c.Context(), tenantID, c.Params("id"))
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
@@ -859,7 +1026,10 @@ func (h *Handler) GetPaymentReceipt(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreatePaymentCheckoutSession(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateCardCheckoutSessionRequest
 	if err := c.BodyParser(&req); err != nil {

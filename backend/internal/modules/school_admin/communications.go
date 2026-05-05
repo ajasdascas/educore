@@ -59,7 +59,10 @@ type CreateCommunicationRequest struct {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) GetCommunications(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	items, err := h.service.GetCommunications(c.Context(), tenantID, c.Query("status"), c.Query("search"))
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -68,7 +71,10 @@ func (h *Handler) GetCommunications(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetCommunicationStats(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	stats, err := h.service.GetCommunicationStats(c.Context(), tenantID)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
@@ -77,7 +83,10 @@ func (h *Handler) GetCommunicationStats(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetCommunication(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	item, err := h.service.GetCommunication(c.Context(), tenantID, c.Params("id"))
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
@@ -86,7 +95,10 @@ func (h *Handler) GetCommunication(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateCommunication(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateCommunicationRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -100,7 +112,10 @@ func (h *Handler) CreateCommunication(c *fiber.Ctx) error {
 }
 
 func (h *Handler) SendCommunication(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req CreateCommunicationRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -114,7 +129,10 @@ func (h *Handler) SendCommunication(c *fiber.Ctx) error {
 }
 
 func (h *Handler) UpdateCommunication(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	var req CreateCommunicationRequest
 	if err := c.BodyParser(&req); err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
@@ -127,7 +145,10 @@ func (h *Handler) UpdateCommunication(c *fiber.Ctx) error {
 }
 
 func (h *Handler) DeleteCommunication(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	if err := h.service.DeleteCommunication(c.Context(), tenantID, c.Params("id")); err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
 	}

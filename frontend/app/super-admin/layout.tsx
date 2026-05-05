@@ -10,6 +10,7 @@ import {
   CreditCard,
   Database,
   Flag,
+  FlaskConical,
   HeartPulse,
   History,
   LayoutDashboard,
@@ -46,6 +47,7 @@ const navItems = [
   { href: "/super-admin/schools", label: "Escuelas", icon: Building },
   { href: "/super-admin/users", label: "Usuarios Globales", icon: Users },
   { href: "/super-admin/settings", label: "Configuración", icon: Settings },
+  { href: "/super-admin/lab", label: "Laboratorio", icon: FlaskConical },
 ];
 
 export default function SuperAdminLayout({ children }: { children: ReactNode }) {

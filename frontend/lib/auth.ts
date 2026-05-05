@@ -50,6 +50,34 @@ function redirectToLogin() {
   window.location.href = `${basePath}/login`;
 }
 
+export function setSupportContext(tenantId: string, schoolSlug: string, schoolName: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem("support_tenant_id", tenantId);
+  sessionStorage.setItem("support_school_slug", schoolSlug);
+  sessionStorage.setItem("support_school_name", schoolName);
+}
+
+export function getSupportContext(): { tenantId: string; schoolSlug: string; schoolName: string } | null {
+  if (typeof window === "undefined") return null;
+  const tenantId = sessionStorage.getItem("support_tenant_id");
+  const schoolSlug = sessionStorage.getItem("support_school_slug");
+  const schoolName = sessionStorage.getItem("support_school_name");
+  if (!tenantId) return null;
+  return { tenantId, schoolSlug: schoolSlug || "", schoolName: schoolName || "" };
+}
+
+export function clearSupportContext() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem("support_tenant_id");
+  sessionStorage.removeItem("support_school_slug");
+  sessionStorage.removeItem("support_school_name");
+}
+
+export function isSupportMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return !!sessionStorage.getItem("support_tenant_id");
+}
+
 function buildAuthHeaders(options: RequestInit = {}) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -59,6 +87,12 @@ function buildAuthHeaders(options: RequestInit = {}) {
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (isNgrok()) headers["ngrok-skip-browser-warning"] = "true";
+
+  const supportCtx = getSupportContext();
+  const user = getUser();
+  if (supportCtx && user?.role === "SUPER_ADMIN") {
+    headers["X-Support-Tenant-ID"] = supportCtx.tenantId;
+  }
 
   return { headers, token };
 }

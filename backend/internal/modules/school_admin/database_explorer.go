@@ -89,7 +89,10 @@ func (h *Handler) registerDatabaseExplorerRoutes(api fiber.Router) {
 }
 
 func (h *Handler) ListTenantDatabaseTables(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	tables := make([]fiber.Map, 0, len(tenantDatabaseTables))
 	keys := make([]string, 0, len(tenantDatabaseTables))
 	for key := range tenantDatabaseTables {
@@ -150,7 +153,10 @@ func (h *Handler) ListTenantDatabaseTableRows(c *fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, fiber.StatusBadRequest, "Tabla no permitida")
 	}
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	page := c.QueryInt("page", 1)
 	perPage := c.QueryInt("per_page", 50)
 	search := strings.TrimSpace(c.Query("search"))
@@ -183,7 +189,10 @@ func (h *Handler) InsertTenantDatabaseTableRow(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusForbidden, "Tabla de solo lectura")
 	}
 
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req tenantDatabaseRowRequest
 	if err := c.BodyParser(&req); err != nil || len(req.Values) == 0 {
@@ -236,7 +245,10 @@ func (h *Handler) UpdateTenantDatabaseTableRow(c *fiber.Ctx) error {
 	if cfg.ReadOnly || !cfg.Direct {
 		return response.Error(c, fiber.StatusForbidden, "Tabla de solo lectura")
 	}
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	id := strings.TrimSpace(c.Params("id"))
 	if id == "" {
@@ -276,7 +288,10 @@ func (h *Handler) DeleteTenantDatabaseTableRow(c *fiber.Ctx) error {
 	if cfg.ReadOnly || !cfg.Direct {
 		return response.Error(c, fiber.StatusForbidden, "Tabla de solo lectura")
 	}
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	id := strings.TrimSpace(c.Params("id"))
 
@@ -322,7 +337,10 @@ func (h *Handler) DeleteTenantDatabaseTableRow(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateTenantCustomField(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req tenantCustomFieldRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -345,7 +363,7 @@ func (h *Handler) CreateTenantCustomField(c *fiber.Ctx) error {
 		optionsJSON = mustJSON(req.Options)
 	}
 	var id string
-	err := h.service.repo.db.QueryRow(c.UserContext(), `
+	err = h.service.repo.db.QueryRow(c.UserContext(), `
 		INSERT INTO tenant_custom_fields (tenant_id, table_name, field_key, label, field_type, required, options, created_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
 		ON CONFLICT (tenant_id, table_name, field_key)
@@ -361,7 +379,10 @@ func (h *Handler) CreateTenantCustomField(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateTenantCustomTable(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	userID := c.Locals("user_id").(string)
 	var req tenantCustomTableRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -372,7 +393,7 @@ func (h *Handler) CreateTenantCustomTable(c *fiber.Ctx) error {
 	}
 	schemaJSON := mustJSON(req.Schema)
 	var id string
-	err := h.service.repo.db.QueryRow(c.UserContext(), `
+	err = h.service.repo.db.QueryRow(c.UserContext(), `
 		INSERT INTO tenant_custom_tables (tenant_id, table_key, name, description, schema, created_by)
 		VALUES ($1, $2, $3, $4, $5::jsonb, $6)
 		ON CONFLICT (tenant_id, table_key)
@@ -391,7 +412,10 @@ func (h *Handler) ExportTenantDatabaseTable(c *fiber.Ctx) error {
 	if !ok {
 		return response.Error(c, fiber.StatusBadRequest, "Tabla no permitida")
 	}
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	rows, _, err := h.tenantDatabaseRows(c, tenantID, cfg, 1, 5000, "")
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "No se pudo exportar tabla")
@@ -401,7 +425,10 @@ func (h *Handler) ExportTenantDatabaseTable(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ExportTenantDatabaseAll(c *fiber.Ctx) error {
-	tenantID := c.Locals("tenant_id").(string)
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
 	payload := fiber.Map{}
 	for _, cfg := range tenantDatabaseTables {
 		rows, _, err := h.tenantDatabaseRows(c, tenantID, cfg, 1, 5000, "")
