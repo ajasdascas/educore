@@ -104,6 +104,26 @@ jobs:
           echo "FTP deploy failed after retries"
           exit 1
 
+      - name: Deploy subdomain router htaccess to root
+        run: |
+          cat <<EOF > ftp-htaccess.lftp
+          set cmd:fail-exit yes
+          set ftp:ssl-allow no
+          set ftp:ssl-force no
+          set ftp:passive-mode yes
+          set ftp:prefer-epsv false
+          set ssl:verify-certificate no
+          set dns:order inet
+          set net:timeout 20
+          set net:max-retries 2
+          set net:reconnect-interval-base 5
+          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          put -O /domains/onlineu.mx/public_html/ frontend/htaccess-subdomain-root -o .htaccess
+          bye
+          EOF
+
+          timeout 60s lftp -f ftp-htaccess.lftp || echo "Warning: htaccess upload failed (non-fatal)"
+
       - name: Verify uploaded files
         run: |
           cat <<EOF > ftp-postcheck.lftp

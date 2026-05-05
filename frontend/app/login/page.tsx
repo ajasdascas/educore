@@ -1,22 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { BookOpen, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { BookOpen, Eye, EyeOff, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, API_URL } from "@/lib/api";
 import { getDashboardPath } from "@/lib/auth";
 
-export default function LoginPage() {
+function formatSlug(s: string) {
+  return s.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  school_admin: "Director / Coordinador",
+  teacher: "Profesor",
+  parent: "Padre de familia",
+};
+
+function LoginInner() {
   const router = useRouter();
+  const params = useSearchParams();
   const { login } = useAuth();
+
+  const slug = params.get("slug") || "";
+  const role = params.get("role") || "";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [schoolName, setSchoolName] = useState("");
+
+  // Try to fetch the school's display name
+  useEffect(() => {
+    if (!slug) return;
+    fetch(`${API_URL}/api/v1/public/school-info?slug=${encodeURIComponent(slug)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.data?.name) setSchoolName(d.data.name); })
+      .catch(() => {});
+  }, [slug]);
+
+  const displaySchool = schoolName || (slug ? formatSlug(slug) : "");
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -47,23 +73,45 @@ export default function LoginPage() {
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-56 -top-56 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-3xl" />
         <div className="absolute -bottom-56 -left-56 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-3xl" />
-        <div className="absolute left-1/2 top-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-900/5 blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-sm">
+        {/* School context banner */}
+        {slug && (
+          <div className="mb-4 flex items-center gap-2">
+            <Link
+              href={`/escuela/?slug=${slug}`}
+              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <ArrowLeft className="h-3 w-3" />
+              {displaySchool || slug}
+            </Link>
+          </div>
+        )}
+
         <div className="mb-8 text-center">
           <Link href="/" className="group inline-flex items-center gap-2.5">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-900/40 transition-transform group-hover:scale-105">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-white">Educore</span>
+            <span className="text-xl font-bold tracking-tight text-white">
+              {displaySchool || "Educore"}
+            </span>
           </Link>
-          <p className="mt-2 text-sm text-slate-500">Plataforma de administracion escolar</p>
+          {slug ? (
+            <p className="mt-2 text-sm text-slate-500">
+              {role && ROLE_LABELS[role] ? `Acceso — ${ROLE_LABELS[role]}` : "Plataforma de administracion escolar"}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">Plataforma de administracion escolar</p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/80 p-7 shadow-2xl backdrop-blur-xl">
           <h1 className="mb-1 text-xl font-bold text-white">Iniciar sesion</h1>
-          <p className="mb-7 text-sm text-slate-400">Bienvenido de vuelta</p>
+          <p className="mb-7 text-sm text-slate-400">
+            {displaySchool ? `Bienvenido a ${displaySchool}` : "Bienvenido de vuelta"}
+          </p>
 
           <form onSubmit={handleLogin} noValidate className="space-y-4">
             <div className="space-y-1.5">
@@ -145,11 +193,31 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-5 text-center text-xs text-slate-600">
-          <Link href="/" className="transition-colors hover:text-slate-400">
-            Volver al inicio
-          </Link>
+          {slug ? (
+            <Link href={`/escuela/?slug=${slug}`} className="transition-colors hover:text-slate-400">
+              ← Volver a {displaySchool || slug}
+            </Link>
+          ) : (
+            <Link href="/" className="transition-colors hover:text-slate-400">
+              Volver al inicio
+            </Link>
+          )}
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-950">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-700 border-t-blue-500" />
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   );
 }

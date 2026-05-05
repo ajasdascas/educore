@@ -122,6 +122,27 @@ func main() {
 	// Webhooks (public, signature-verified)
 	webhook.RegisterRoutes(api.Group("/webhooks"), db)
 
+	// Public school info (used by school landing page — no auth)
+	api.Get("/public/school-info", func(c *fiber.Ctx) error {
+		slug := c.Query("slug")
+		if slug == "" {
+			return response.Error(c, fiber.StatusBadRequest, "slug required")
+		}
+		var name, logoURL string
+		var status string
+		err := db.QueryRow(c.UserContext(),
+			`SELECT name, COALESCE(logo_url, ''), status FROM tenants WHERE slug = $1 LIMIT 1`, slug).
+			Scan(&name, &logoURL, &status)
+		if err != nil || status == "suspended" {
+			return response.Error(c, fiber.StatusNotFound, "School not found")
+		}
+		return response.Success(c, fiber.Map{
+			"name":     name,
+			"slug":     slug,
+			"logo_url": logoURL,
+		}, "ok")
+	})
+
 	// Tenants module (protected, SUPER_ADMIN only)
 	tenantHandler := tenants.NewHandler(db)
 	tenantGroup := api.Group("/tenants", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SUPER_ADMIN"))

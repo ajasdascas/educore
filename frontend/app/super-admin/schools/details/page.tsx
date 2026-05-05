@@ -247,9 +247,9 @@ function SchoolDetailContent() {
             </SelectContent>
           </Select>
           <Button variant="outline" asChild>
-            <a href={`https://${school.slug}.onlineu.mx`} target="_blank" rel="noopener noreferrer">
+            <a href={`/escuela/?slug=${school.slug}`} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-2 h-4 w-4" />
-              Visitar
+              Visitar portal
             </a>
           </Button>
         </div>
@@ -437,10 +437,10 @@ function SchoolDetailContent() {
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { key: "school-admin", label: "Administración Escolar", desc: "Panel del director y coordinadores. Gestión de profesores, alumnos, grupos, horarios y reportes.", icon: "🏫", available: true,  href: `/school-portal/school-admin?slug=${school.slug}` },
-                  { key: "teachers",     label: "Portal de Profesores",   desc: "Registro de asistencias, captura de calificaciones y comunicación con padres de familia.",       icon: "👨‍🏫", available: true,  href: `/school-portal/teachers?slug=${school.slug}` },
-                  { key: "parents",      label: "Portal de Padres",       desc: "Seguimiento de hijos: calificaciones, asistencia, pagos, mensajes y consentimientos.",           icon: "👨‍👩‍👧", available: true,  href: `/school-portal/parents?slug=${school.slug}` },
-                  { key: "students",     label: "Portal de Alumnos",      desc: "Módulo en desarrollo. Las funcionalidades serán definidas en la siguiente fase del proyecto.",   icon: "🎒", available: false, href: `/school-portal/students?slug=${school.slug}` },
+                  { key: "school-admin", label: "Administración Escolar", desc: "Panel del director y coordinadores. Gestión de profesores, alumnos, grupos, horarios y reportes.", icon: "🏫", available: true,  href: `/escuela/?slug=${school.slug}&role=school_admin` },
+                  { key: "teachers",     label: "Portal de Profesores",   desc: "Registro de asistencias, captura de calificaciones y comunicación con padres de familia.",       icon: "👨‍🏫", available: true,  href: `/escuela/?slug=${school.slug}&role=teacher` },
+                  { key: "parents",      label: "Portal de Padres",       desc: "Seguimiento de hijos: calificaciones, asistencia, pagos, mensajes y consentimientos.",           icon: "👨‍👩‍👧", available: true,  href: `/escuela/?slug=${school.slug}&role=parent` },
+                  { key: "students",     label: "Portal de Alumnos",      desc: "Módulo en desarrollo. Las funcionalidades serán definidas en la siguiente fase del proyecto.",   icon: "🎒", available: false, href: `/escuela/?slug=${school.slug}&role=student` },
                 ].map((portal) => (
                   <div
                     key={portal.key}
@@ -467,7 +467,7 @@ function SchoolDetailContent() {
                       variant={portal.available ? "default" : "secondary"}
                       disabled={!portal.available}
                       className="self-start"
-                      onClick={() => portal.available && (window.location.href = portal.href)}
+                      onClick={() => portal.available && router.push(portal.href)}
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                       {portal.available ? "Abrir portal" : "No disponible"}

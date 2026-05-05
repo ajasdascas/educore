@@ -1,0 +1,28 @@
+# EduCore — Wildcard Subdomain Router
+# Upload this file as .htaccess to the ROOT of public_html (NOT inside /educore/)
+# Required: Add *.onlineu.mx wildcard DNS A record pointing to this server's IP first.
+#
+# How to activate:
+#   1. In your DNS panel, add:  *.onlineu.mx  →  A  →  [same IP as onlineu.mx]
+#   2. In your hosting panel (cPanel), create a Wildcard Subdomain pointing to public_html/
+#   3. Upload this file as public_html/.htaccess  (or merge with existing)
+#
+# Effect: kinder1.onlineu.mx → onlineu.mx/educore/escuela/?slug=kinder1
+
+RewriteEngine On
+
+# Skip if the request is already for the main domain or already has /educore
+RewriteCond %{HTTP_HOST} ^(www\.)?onlineu\.mx$ [NC]
+RewriteRule ^ - [L]
+
+# Detect school subdomains (e.g. kinder1.onlineu.mx)
+# Exclude system subdomains
+RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
+RewriteCond %1 !^www$ [NC]
+RewriteCond %1 !^mail$ [NC]
+RewriteCond %1 !^ftp$ [NC]
+RewriteCond %1 !^api$ [NC]
+RewriteCond %1 !^smtp$ [NC]
+RewriteCond %1 !^webmail$ [NC]
+# Redirect ALL paths on the subdomain to the school landing page
+RewriteRule ^ https://onlineu.mx/educore/escuela/?slug=%1 [R=302,L,QSD]
