@@ -16,6 +16,7 @@ import (
 	"educore/internal/modules/reports"
 	"educore/internal/modules/school_admin"
 	superadmin "educore/internal/modules/super_admin"
+	"educore/internal/modules/student"
 	"educore/internal/modules/teacher"
 	"educore/internal/modules/webhook"
 	"educore/internal/modules/tenants"
@@ -155,11 +156,11 @@ func main() {
 
 	// Initialize module repositories, services, and handlers
 
-	// School Admin module (SCHOOL_ADMIN, TEACHER)
+	// School Admin module (SCHOOL_ADMIN + SUPER_ADMIN can impersonate)
 	schoolAdminRepo := school_admin.NewRepository(db)
 	schoolAdminService := school_admin.NewService(schoolAdminRepo, eventBus)
 	schoolAdminHandler := school_admin.NewHandler(schoolAdminService)
-	schoolAdminGroup := api.Group("/school-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN"))
+	schoolAdminGroup := api.Group("/school-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "SUPER_ADMIN"))
 	schoolAdminHandler.RegisterRoutes(schoolAdminGroup)
 
 	// Parent module
@@ -182,6 +183,13 @@ func main() {
 	reportsHandler := reports.NewHandler(reportsService)
 	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
 	reportsHandler.RegisterRoutes(reportsGroup)
+
+	// Student module (STUDENT role — tenant-scoped)
+	studentRepo := student.NewRepository(db)
+	studentService := student.NewService(studentRepo)
+	studentHandler := student.NewHandler(studentService)
+	studentGroup := api.Group("/student", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("STUDENT"))
+	studentHandler.RegisterRoutes(studentGroup)
 
 	// Communications module (All authenticated users)
 	communicationsRepo := communications.NewRepository(db)

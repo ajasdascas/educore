@@ -7,24 +7,55 @@ import { BookOpen, Eye, EyeOff, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { apiRequest, API_URL } from "@/lib/api";
 import { getDashboardPath } from "@/lib/auth";
+import { getTenantFromHost } from "@/lib/tenant";
 
 function formatSlug(s: string) {
-  return s.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  return s.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "Director / Coordinador",
   teacher: "Profesor",
   parent: "Padre de familia",
+  student: "Estudiante",
 };
+
+/**
+ * Resolve the active school slug in priority order:
+ *  1. ?slug= searchParam  (direct link from super-admin or escuela page)
+ *  2. hostname subdomain  (kinder1.onlineu.mx/login?role=school_admin)
+ *  3. null               (onlineu.mx/login — no school context)
+ */
+function resolveSlug(paramSlug: string | null): {
+  slug: string;
+  fromSubdomain: boolean;
+} {
+  if (paramSlug) return { slug: paramSlug, fromSubdomain: false };
+
+  if (typeof window !== "undefined") {
+    const sub = getTenantFromHost(window.location.hostname);
+    if (sub) return { slug: sub, fromSubdomain: true };
+  }
+
+  return { slug: "", fromSubdomain: false };
+}
 
 function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { login } = useAuth();
 
-  const slug = params.get("slug") || "";
   const role = params.get("role") || "";
+
+  // Slug resolution — may update after hydration (hostname check runs client-side)
+  const [slug, setSlug] = useState("");
+  const [fromSubdomain, setFromSubdomain] = useState(false);
+
+  useEffect(() => {
+    const { slug: resolved, fromSubdomain: sub } = resolveSlug(params.get("slug"));
+    setSlug(resolved);
+    setFromSubdomain(sub);
+  }, [params]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,16 +64,23 @@ function LoginInner() {
   const [error, setError] = useState("");
   const [schoolName, setSchoolName] = useState("");
 
-  // Try to fetch the school's display name
+  // Fetch the school's real display name from the backend
   useEffect(() => {
     if (!slug) return;
     fetch(`${API_URL}/api/v1/public/school-info?slug=${encodeURIComponent(slug)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.data?.name) setSchoolName(d.data.name); })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.data?.name) setSchoolName(d.data.name); })
       .catch(() => {});
   }, [slug]);
 
   const displaySchool = schoolName || (slug ? formatSlug(slug) : "");
+
+  // "Back to portal" link — preserves the correct URL scheme
+  const portalHref = fromSubdomain
+    ? `https://${slug}.onlineu.mx`          // they came from subdomain
+    : slug
+    ? `/escuela/?slug=${slug}`              // they came from /escuela page
+    : "/";
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -57,7 +95,40 @@ function LoginInner() {
 
       if (response.success) {
         login(response.data.access_token, response.data.user);
-        router.push(getDashboardPath(response.data.user.role));
+        const userRole = response.data.user.role as string;
+
+        /*
+         * Routing logic:
+         *
+         * If there IS a school context (slug present, from either source):
+         *   - SUPER_ADMIN → school-admin dashboard (impersonating the school)
+         *   - SCHOOL_ADMIN → school-admin dashboard
+         *   - TEACHER     → teacher dashboard
+         *   - PARENT      → parent dashboard
+         *   - anything else → standard path
+         *
+         * If there is NO school context (direct platform login):
+         *   - SUPER_ADMIN → /super-admin/dashboard  (Manager Maestro)
+         *   - others      → their own dashboard
+         *
+         * Note: There is no STUDENT role in EduCore — students are managed
+         * through the PARENT module.
+         */
+        if (slug) {
+          if (userRole === "SUPER_ADMIN" || userRole === "SCHOOL_ADMIN") {
+            router.push("/school-admin/dashboard");
+          } else if (userRole === "TEACHER") {
+            router.push("/teacher/dashboard");
+          } else if (userRole === "PARENT") {
+            router.push("/parent/dashboard");
+          } else if (userRole === "STUDENT") {
+            router.push("/student/dashboard");
+          } else {
+            router.push(getDashboardPath(userRole));
+          }
+        } else {
+          router.push(getDashboardPath(userRole));
+        }
       } else {
         setError(response.message || "Credenciales incorrectas.");
       }
@@ -76,37 +147,47 @@ function LoginInner() {
       </div>
 
       <div className="relative z-10 w-full max-w-sm">
-        {/* School context banner */}
+        {/* Back link — only when there's school context */}
         {slug && (
           <div className="mb-4 flex items-center gap-2">
-            <Link
-              href={`/escuela/?slug=${slug}`}
-              className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              {displaySchool || slug}
-            </Link>
+            {fromSubdomain ? (
+              <a
+                href={portalHref}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 transition-colors hover:text-slate-300"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                {displaySchool || slug}
+              </a>
+            ) : (
+              <Link
+                href={portalHref}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-500 transition-colors hover:text-slate-300"
+              >
+                <ArrowLeft className="h-3 w-3" />
+                {displaySchool || slug}
+              </Link>
+            )}
           </div>
         )}
 
+        {/* Header */}
         <div className="mb-8 text-center">
-          <Link href="/" className="group inline-flex items-center gap-2.5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-900/40 transition-transform group-hover:scale-105">
+          <div className="group inline-flex items-center gap-2.5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-900/40">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight text-white">
               {displaySchool || "Educore"}
             </span>
-          </Link>
-          {slug ? (
-            <p className="mt-2 text-sm text-slate-500">
-              {role && ROLE_LABELS[role] ? `Acceso — ${ROLE_LABELS[role]}` : "Plataforma de administracion escolar"}
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-slate-500">Plataforma de administracion escolar</p>
-          )}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            {slug && role && ROLE_LABELS[role]
+              ? `Acceso — ${ROLE_LABELS[role]}`
+              : "Plataforma de administracion escolar"}
+          </p>
         </div>
 
+        {/* Card */}
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/80 p-7 shadow-2xl backdrop-blur-xl">
           <h1 className="mb-1 text-xl font-bold text-white">Iniciar sesion</h1>
           <p className="mb-7 text-sm text-slate-400">
@@ -114,6 +195,7 @@ function LoginInner() {
           </p>
 
           <form onSubmit={handleLogin} noValidate className="space-y-4">
+            {/* Email */}
             <div className="space-y-1.5">
               <label htmlFor="login-email" className="block text-xs font-medium text-slate-400">
                 Correo electronico
@@ -128,13 +210,14 @@ function LoginInner() {
                   autoComplete="email"
                   placeholder="nombre@institucion.mx"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-800/70 pl-9 pr-4 text-sm text-white transition-colors placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-800/70 pl-9 pr-4 text-sm text-white placeholder:text-slate-600 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 />
               </div>
             </div>
 
+            {/* Password */}
             <div className="space-y-1.5">
               <label htmlFor="login-password" className="block text-xs font-medium text-slate-400">
                 Contrasena
@@ -149,23 +232,30 @@ function LoginInner() {
                   autoComplete="current-password"
                   placeholder="********"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-800/70 pl-9 pr-11 text-sm text-white transition-colors placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-800/70 pl-9 pr-11 text-sm text-white placeholder:text-slate-600 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPw((current) => !current)}
+                  onClick={() => setShowPw((v) => !v)}
                   aria-label={showPw ? "Ocultar contrasena" : "Mostrar contrasena"}
                   className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-slate-300 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
                 >
-                  {showPw ? <EyeOff className="h-4 w-4" strokeWidth={1.75} /> : <Eye className="h-4 w-4" strokeWidth={1.75} />}
+                  {showPw ? (
+                    <EyeOff className="h-4 w-4" strokeWidth={1.75} />
+                  ) : (
+                    <Eye className="h-4 w-4" strokeWidth={1.75} />
+                  )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5">
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5"
+              >
                 <span className="text-xs leading-relaxed text-red-400">{error}</span>
               </div>
             )}
@@ -179,7 +269,10 @@ function LoginInner() {
             </button>
 
             <p className="text-center">
-              <Link href="/reset-password" className="text-xs text-slate-500 transition-colors hover:text-blue-400">
+              <Link
+                href="/reset-password"
+                className="text-xs text-slate-500 transition-colors hover:text-blue-400"
+              >
                 Olvidaste tu contrasena?
               </Link>
             </p>
@@ -187,16 +280,26 @@ function LoginInner() {
 
           <div className="mt-6 border-t border-slate-800/80 pt-5 text-center">
             <p className="text-xs text-slate-600">
-              Eres nuevo? <span className="text-slate-500">Contacta a tu institucion para activar tu cuenta.</span>
+              Eres nuevo?{" "}
+              <span className="text-slate-500">
+                Contacta a tu institucion para activar tu cuenta.
+              </span>
             </p>
           </div>
         </div>
 
+        {/* Bottom back link */}
         <p className="mt-5 text-center text-xs text-slate-600">
           {slug ? (
-            <Link href={`/escuela/?slug=${slug}`} className="transition-colors hover:text-slate-400">
-              ← Volver a {displaySchool || slug}
-            </Link>
+            fromSubdomain ? (
+              <a href={portalHref} className="transition-colors hover:text-slate-400">
+                ← Volver a {displaySchool || slug}
+              </a>
+            ) : (
+              <Link href={portalHref} className="transition-colors hover:text-slate-400">
+                ← Volver a {displaySchool || slug}
+              </Link>
+            )
           ) : (
             <Link href="/" className="transition-colors hover:text-slate-400">
               Volver al inicio

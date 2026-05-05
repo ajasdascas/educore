@@ -49,12 +49,22 @@ const PORTALS: PortalDef[] = [
     ring: "ring-emerald-500/30 hover:ring-emerald-400/60",
     badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
   },
+  {
+    role: "student",
+    label: "Estudiante",
+    desc: "Consulta tus calificaciones, asistencia, horarios y tareas.",
+    icon: "🎒",
+    gradient: "from-amber-600/20 to-orange-600/20",
+    ring: "ring-amber-500/30 hover:ring-amber-400/60",
+    badge: "bg-amber-500/15 text-amber-300 border-amber-500/25",
+  },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
   school_admin: "Director / Coordinador",
   teacher: "Profesor",
   parent: "Padre de familia",
+  student: "Estudiante",
 };
 
 // --- Animation variants ---

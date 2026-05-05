@@ -3,7 +3,7 @@ import { API_URL, isNgrok } from "./api";
 export interface User {
   id: string;
   email: string;
-  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT";
+  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | "STUDENT";
   tenant_id: string;
   first_name?: string;
   last_name?: string;
@@ -146,6 +146,8 @@ export function getDashboardPath(role: string): string {
       return "/teacher/dashboard";
     case "PARENT":
       return "/parent/dashboard";
+    case "STUDENT":
+      return "/student/dashboard";
     default:
       return "/";
   }

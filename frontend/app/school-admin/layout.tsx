@@ -79,7 +79,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
   const userRole = user?.role === "SCHOOL_ADMIN" ? "Administrador Escuela" : user?.role || "";
 
   return (
-    <RoleGuard allowedRoles={["SCHOOL_ADMIN"]}>
+    <RoleGuard allowedRoles={["SCHOOL_ADMIN", "SUPER_ADMIN"]}>
     <div className="min-h-screen overflow-x-hidden bg-background flex flex-col lg:flex-row">
       {sidebarOpen && (
         <div

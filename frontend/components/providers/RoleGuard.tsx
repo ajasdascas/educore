@@ -6,7 +6,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { getDashboardPath, User } from "@/lib/auth";
 
 type RoleGuardProps = {
-  allowedRoles: User["role"][];
+  allowedRoles: Array<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | "STUDENT">;
   children: ReactNode;
 };
 

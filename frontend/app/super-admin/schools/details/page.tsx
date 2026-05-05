@@ -5,15 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Building2, 
-  Users, 
-  Calendar, 
-  ChevronLeft, 
-  Shield, 
-  Settings, 
-  Users2, 
-  CheckCircle2, 
+import Link from "next/link";
+import {
+  Building2,
+  Users,
+  Calendar,
+  ChevronLeft,
+  Shield,
+  Settings,
+  Users2,
+  CheckCircle2,
   XCircle,
   Clock,
   ExternalLink,
@@ -247,7 +248,8 @@ function SchoolDetailContent() {
             </SelectContent>
           </Select>
           <Button variant="outline" asChild>
-            <a href={`/escuela/?slug=${school.slug}`} target="_blank" rel="noopener noreferrer">
+            {/* External subdomain URL — plain <a>, Next.js Link would prepend basePath (/educore) */}
+            <a href={`https://${school.slug}.onlineu.mx`} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-2 h-4 w-4" />
               Visitar portal
             </a>

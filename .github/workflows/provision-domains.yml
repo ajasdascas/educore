@@ -1,0 +1,81 @@
+name: EduCore — School Domain Provisioner
+
+# ─── Triggers ────────────────────────────────────────────────────────────────
+on:
+  # Manually: provide a slug to provision a single school
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: "School slug (e.g. kinder1)"
+        required: true
+        type: string
+      name:
+        description: "School display name (optional)"
+        required: false
+        type: string
+        default: ""
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - provision        # provision-school-domain.js (after DB creation)
+          - check            # check-school-domain.js     (verify DNS + API)
+          - provision-wildcard # One-time wildcard setup
+        default: provision
+
+  # Scheduled: daily health check of all school subdomains (optional)
+  # Uncomment to enable:
+  # schedule:
+  #   - cron: "0 9 * * 1"  # Every Monday 9am UTC
+
+jobs:
+  provision-school:
+    if: ${{ github.event.inputs.action == 'provision' || github.event.inputs.action == 'check' }}
+    runs-on: ubuntu-latest
+    env:
+      DOMAIN: onlineu.mx
+      NEXT_PUBLIC_API_URL: https://educore-production-beef.up.railway.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.3.0
+        with:
+          node-version: "20"
+
+      - name: Provision school domain
+        if: ${{ github.event.inputs.action == 'provision' }}
+        run: |
+          node scripts/provision-school-domain.js \
+            --slug="${{ github.event.inputs.slug }}" \
+            --name="${{ github.event.inputs.name }}"
+
+      - name: Check school domain
+        if: ${{ github.event.inputs.action == 'check' }}
+        run: |
+          node scripts/check-school-domain.js "${{ github.event.inputs.slug }}" --verbose
+
+  provision-wildcard:
+    if: ${{ github.event.inputs.action == 'provision-wildcard' }}
+    runs-on: ubuntu-latest
+    env:
+      DOMAIN: onlineu.mx
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.3.0
+        with:
+          node-version: "20"
+
+      - name: Provision wildcard DNS record
+        env:
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          node scripts/provision-wildcard-domain.js

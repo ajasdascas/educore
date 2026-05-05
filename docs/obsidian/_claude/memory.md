@@ -820,3 +820,83 @@ Se documento la excepcion temporal en el runbook Hostinger/Cloudflare y en decis
 Se empezo el pulido real del SuperAdmin: endpoints para notificaciones derivadas de `audit_logs`, sesiones desde `user_sessions`, actividad real de usuarios globales desde auditoria y paginas conectadas para Notificaciones, Seguridad, Configuracion y Perfil. Tambien se quitaron etiquetas "demo" de acciones enterprise y se agregaron confirmaciones.
 
 #memory #security #mysql #super_admin #frontend #backend
+
+---
+
+# 05-05-2026 - Produccion verificada tras hardening MySQL y SuperAdmin
+
+Se confirmo el deploy productivo por GitHub Actions/FTP en `master`. El commit `a5bdaed` agrego hardening parcial MySQL y pulido SuperAdmin; despues entro el commit `9781fc1` con fixes adicionales de creacion de escuela, feature flags CRUD, historial de deploy y reset de password. El workflow `Deploy EduCore to Production` termino `success` para ambos commits.
+
+Smoke publico: `https://onlineu.mx/educore/`, `/educore/login/` y `/educore/super-admin/users/` respondieron HTTP 200 con HTML Next.js valido. Backend Railway respondio `/api/v1/health` con `env=production`, `db_driver=mysql`, `db_mysql_ready=true`, `redis=false` y `git_commit=9781fc13eec3bbae292293e1b24f6d1cc5938cdd`.
+
+Seguridad: el scan de `frontend/out` y `frontend/.next` no encontro `MYSQL_DSN`, `JWT_SECRET`, `STRIPE_SECRET_KEY`, `EDUCORE_OWNER_ADMIN_PASSWORD`, `mock-token`, `admin123` ni contrasenas reales. En repo solo quedan nombres de variables y placeholders documentales. No se tocaron `.agents/`, `AGENTS.md`, `.env` ni `backend/.env`.
+
+#memory #production #deploy #mysql #super_admin #security
+
+---
+
+# 05-05-2026 - Fix seguro de build estatico y deploy
+
+Se aplico el tramo seguro solicitado: commit `3e7677e` en `master` con solo `frontend/app/escuela/page.tsx` y `frontend/next.config.mjs`. El cambio tipa los variants de Framer Motion con `Variants` y conserva `next.config.mjs` sin `distDir: "out"` para evitar el fallo local de `_not-found/page.js.nft.json`.
+
+Validacion previa: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build`, `go test ./...`, `DB_DRIVER=mysql go test ./...`, `DB_DRIVER=postgres go test ./...`, `go build ./cmd/server`, `git diff --check` y scan de secretos en `frontend/out` + `frontend/.next` sin hallazgos. El primer deploy fallo por FTP transitorio (`max-retries exceeded`), se reintento el job fallido y GitHub Actions termino `success`.
+
+Smoke final: `https://onlineu.mx/educore/`, `/educore/login/` y `/educore/super-admin/users/` responden OK con Next.js. Backend `/api/v1/health` reporta `env=production`, `db_driver=mysql`, `db_mysql_ready=true` y `git_commit=3e7677e9ad47a528d49de68228bb37b5f16c652d`.
+
+#memory #frontend #deploy #production #nextjs
+
+---
+
+# 05-05-2026 - Rol STUDENT, scripts de routing y provision-wildcard mejorado
+
+## Contexto leído
+- Se leyó la bóveda completa: `docs/obsidian/_claude/memory.md`, `03_progress/CONTEXTO_ACTUAL.md`, `03_progress/CAMBIOS_RECIENTES.md`, `DECISIONES_TECNICAS.md`, `docs/AUTOMATIC_SCHOOL_SUBDOMAINS.md`.
+- Se leyó `frontend/app/login/page.tsx`, `frontend/app/escuela/page.tsx`, `frontend/app/student/dashboard/page.tsx` (era placeholder), `frontend/lib/auth.ts`, `frontend/lib/tenant.ts`, `frontend/htaccess-subdomain-root`, `backend/internal/middleware/auth.go`, `backend/internal/modules/auth/handler.go`, `backend/cmd/server/main.go`, `.github/workflows/deploy.yml`.
+
+## Cambios completados
+
+### Backend
+- Nuevo módulo `backend/internal/modules/student/` con `types.go`, `repository.go`, `service.go`, `handler.go`.
+- Endpoints registrados en `main.go`: `/api/v1/student/dashboard|profile|grades|attendance` protegidos con `RequireRoles("STUDENT")`.
+- El módulo student consulta `students`, `grade_records`, `attendance_records` filtrados por `user_id` y `tenant_id` (aislamiento RLS).
+
+### Frontend
+- `frontend/lib/auth.ts`: tipo `User.role` extendido con `"STUDENT"`. `getDashboardPath` agrega `case "STUDENT": return "/student/dashboard"`.
+- `frontend/app/login/page.tsx`: agrega `student: "Estudiante"` en `ROLE_LABELS` y redirect `→ /student/dashboard` para `STUDENT`.
+- `frontend/app/escuela/page.tsx`: agrega tarjeta portal de Estudiante (🎒) en `PORTALS` y `student` en `ROLE_LABELS`.
+- `frontend/components/providers/RoleGuard.tsx`: tipo `allowedRoles` extendido con `"STUDENT"`.
+- `frontend/app/student/layout.tsx`: layout completo con sidebar (Dashboard, Calificaciones, Asistencia, Horario, Notificaciones, Configuración), `RoleGuard allowedRoles={["STUDENT"]}`, ProfileDropdown, ThemeToggle.
+- `frontend/app/student/dashboard/page.tsx`: dashboard real conectado a `/api/v1/student/dashboard` con stats de asistencia, calificaciones recientes y welcome card.
+- Nuevas páginas: `student/grades`, `student/attendance`, `student/schedule`, `student/notifications`, `student/settings`.
+
+### Scripts mejorados
+- `scripts/provision-wildcard-domain.js`: reescrito completamente con soporte de 3 proveedores (Cloudflare, Hostinger, cPanel UAPI). Auto-detecta proveedor por variables de entorno. Idempotente. Mensajes claros. Fallback manual documentado.
+- `scripts/check-auth-routing.js`: nuevo — verifica ROLE_LABELS, getDashboardPath, layout guards, backend STUDENT module, .htaccess.
+- `scripts/check-school-routing.js`: nuevo — verifica tenant.ts, login slug, .htaccess rules, RoleGuard, backend routing.
+
+### Documentación
+- `docs/AUTOMATIC_SCHOOL_SUBDOMAINS.md`: actualizado con rol STUDENT, instrucciones cPanel API, tabla de roles, secrets requeridos.
+
+## Verificación
+- `go build -buildvcs=false ./...` en backend: OK sin errores.
+- `NEXT_PUBLIC_DEMO_MODE=false npm run build` en frontend: OK — 8 páginas `/student/*` generadas estáticamente.
+- `node scripts/check-auth-routing.js`: 18/18 checks PASS.
+- `node scripts/check-school-routing.js`: 20/20 checks PASS.
+
+## Estado del rol STUDENT
+- **Caso B confirmado**: existía `student/dashboard/page.tsx` como placeholder vacío pero NO había: layout, tipo en auth.ts, getDashboardPath, backend module, portal card.
+- **Ahora**: completamente implementado en backend y frontend.
+- **Para activar en producción**: un alumno necesita `users.role = 'STUDENT'` + registro en `students.user_id`. Desde School Admin → Estudiantes.
+
+## Secrets necesarios para wildcard
+- `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ZONE_ID` (recomendado)
+- o `HOSTINGER_API_TOKEN` (alternativa)
+- `CPANEL_HOST` + `CPANEL_USER` + `CPANEL_TOKEN` (para cPanel subdomain — puede requerir paso manual en Hostinger shared)
+- `SERVER_IP` (opcional — se auto-detecta del DNS actual)
+
+## Pendientes
+- Correr `node scripts/provision-wildcard-domain.js` con secrets reales para completar DNS wildcard.
+- Si cPanel API falla: paso manual en hPanel → cPanel → Domains → Subdomains → crear `*`.
+- Agregar `user_id` a tabla `students` en migración si aún no existe (para que STUDENT pueda hacer login y ver su perfil).
+
+#memory #student_portal #routing #wildcard #scripts #backend #frontend
