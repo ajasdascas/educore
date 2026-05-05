@@ -5,21 +5,22 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Plus, 
-  Search, 
-  Building2, 
-  Users, 
-  Calendar, 
-  MoreVertical, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Loader2, 
+import {
+  Plus,
+  Search,
+  Building2,
+  Users,
+  Calendar,
+  MoreVertical,
+  Eye,
+  Edit,
+  Trash2,
+  Loader2,
   Upload,
   ChevronLeft,
   ChevronRight,
-  FilterX
+  FilterX,
+  ShieldCheck
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -39,8 +40,9 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { authFetch } from "@/lib/auth";
+import { authFetch, setSupportContext } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 
 const statusColors = {
@@ -112,6 +114,7 @@ function fileToDataUrl(file: File) {
 }
 
 export default function SchoolsPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
@@ -677,6 +680,15 @@ export default function SchoolsPage() {
                           <Link href={`/super-admin/schools/details?id=${encodeURIComponent(school.id)}`}>
                             <Eye className="w-4 h-4 mr-2" />Ver detalles
                           </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSupportContext(school.id, school.slug, school.name);
+                            router.push("/school-admin/students");
+                          }}
+                        >
+                          <ShieldCheck className="w-4 h-4 mr-2 text-amber-500" />
+                          Modo Soporte → Estudiantes
                         </DropdownMenuItem>
                         <DropdownMenuItem><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>

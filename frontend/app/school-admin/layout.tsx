@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -19,16 +19,19 @@ import {
   CreditCard,
   Settings,
   Menu,
-  X
+  X,
+  Building2
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { ModuleKey } from "@/lib/modules/registry";
 import { useEnabledModules } from "@/lib/modules/use-enabled-modules";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
+import { isSupportMode, setSupportContext } from "@/lib/auth";
 
 const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: ModuleKey }> = [
   { href: "/school-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -50,10 +53,29 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: Modu
 
 export default function SchoolAdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [schoolBrand, setSchoolBrand] = useState<{ name: string; logo_url?: string } | null>(null);
+  const [supportReady, setSupportReady] = useState(false);
   const { user, logout, loading } = useAuth();
   const { isModuleEnabled } = useEnabledModules();
+
+  useEffect(() => {
+    // Hydrate support context from URL query params (resistant to direct links and reloads)
+    if (typeof window === "undefined") return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const qTenantId = searchParams.get("supportTenantId");
+    const qSlug = searchParams.get("supportSlug");
+    const qName = searchParams.get("supportName");
+
+    if (qTenantId && user?.role === "SUPER_ADMIN") {
+      setSupportContext(qTenantId, qSlug || "", qName || "");
+      // Remove query params from URL without reloading
+      router.replace(pathname);
+    }
+
+    setSupportReady(true);
+  }, [user, pathname, router]);
 
   useEffect(() => {
     try {
@@ -68,10 +90,44 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
     }
   }, []);
 
-  if (loading) {
+  if (loading || !supportReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Cargando...</div>
+      </div>
+    );
+  }
+
+  // Block SUPER_ADMIN without a support context — don't let them reach school-admin modules
+  if (user?.role === "SUPER_ADMIN" && !isSupportMode()) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto">
+            <Building2 className="w-8 h-8 text-amber-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">Selecciona una escuela</h2>
+            <p className="text-muted-foreground mt-2">
+              Para acceder a los módulos de administración escolar, primero debes entrar en modo soporte
+              seleccionando una escuela desde el panel de Super Admin.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              onClick={() => router.push(`/super-admin/lab?next=${encodeURIComponent(pathname)}`)}
+            >
+              Ir al Super Admin Lab
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/super-admin/schools")}
+            >
+              Ver escuelas
+            </Button>
+          </div>
+        </div>
+        <Toaster />
       </div>
     );
   }

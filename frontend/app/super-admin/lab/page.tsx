@@ -95,8 +95,16 @@ export default function LabPage() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [checks, setChecks] = useState<Check[]>(makeChecks(null));
   const [runningChecks, setRunningChecks] = useState(false);
+  const [nextPath, setNextPath] = useState<string | null>(null);
 
   const selectedSchool = schools.find((s) => s.id === selectedId) || null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next) setNextPath(next);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -203,6 +211,27 @@ export default function LabPage() {
       </div>
 
       <Separator />
+
+      {/* Banner cuando viene desde school-admin sin contexto */}
+      {nextPath && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-amber-700 dark:text-amber-400">Selecciona una escuela para continuar</p>
+            <p className="text-sm text-muted-foreground">
+              Intentaste acceder a <code className="font-mono text-xs">{nextPath}</code> sin modo soporte activo.
+              Selecciona una escuela y haz clic en "Continuar".
+            </p>
+          </div>
+          {selectedSchool && (
+            <Button
+              className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => enterSupportMode(nextPath)}
+            >
+              Continuar a {nextPath.split("/").pop()}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Selector de escuela */}
       <Card>
