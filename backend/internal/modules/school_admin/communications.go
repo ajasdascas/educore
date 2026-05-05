@@ -305,9 +305,9 @@ func (r *Repository) GetCommunicationStats(ctx context.Context, tenantID string)
 	row := r.db.QueryRow(ctx, `
 		SELECT
 			COUNT(*),
-			COUNT(*) FILTER (WHERE status = 'sent'),
-			COUNT(*) FILTER (WHERE status = 'scheduled'),
-			COUNT(*) FILTER (WHERE status = 'draft'),
+			SUM(CASE WHEN status = 'sent'      THEN 1 ELSE 0 END),
+			SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN status = 'draft'     THEN 1 ELSE 0 END),
 			COALESCE(SUM(delivered_count), 0),
 			COALESCE(SUM(read_count), 0)
 		FROM school_communications WHERE tenant_id = $1 AND deleted_at IS NULL`, tenantID)

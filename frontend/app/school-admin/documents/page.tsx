@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Eye, FileUp, Loader2, Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, Eye, FileUp, Loader2, Pencil, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,6 +86,19 @@ function fileSizeLabel(size?: number) {
   if (!size) return "";
   if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+const MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 MB — MySQL max_allowed_packet safe limit
+
+function downloadDocument(doc: DocumentItem) {
+  if (!doc.file_url) return;
+  const link = Object.assign(document.createElement("a"), {
+    href: doc.file_url,
+    download: doc.file_name || `${doc.title}.pdf`,
+  });
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 async function fileToDataURL(file: File) {
@@ -177,6 +190,10 @@ export default function SchoolAdminDocumentsPage() {
     const allowed = ["application/pdf", "image/jpeg", "image/png"];
     if (!allowed.includes(file.type)) {
       toast({ title: "Archivo no permitido", description: "Solo se aceptan PDF, JPG o PNG.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      toast({ title: "Archivo demasiado grande", description: "El limite es 8 MB por archivo.", variant: "destructive" });
       return;
     }
     const dataUrl = await fileToDataURL(file);
@@ -296,6 +313,7 @@ export default function SchoolAdminDocumentsPage() {
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon-sm" title="Preview" disabled={!doc.file_url} onClick={() => { setPreviewDoc(doc); setPreviewOpen(true); }}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon-sm" title="Descargar" disabled={!doc.file_url} onClick={() => downloadDocument(doc)}><Download className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon-sm" title="Reemplazar" onClick={() => openEdit(doc)}><Pencil className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon-sm" title="Verificar" disabled={!!doc.is_verified} onClick={() => verify(doc)}><ShieldCheck className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon-sm" title="Eliminar" onClick={() => remove(doc)}><Trash2 className="h-4 w-4 text-destructive" /></Button>

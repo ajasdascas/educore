@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CreditCard, Download, FileText, Plus, RefreshCw } from "lucide-react";
 import { authFetch } from "@/lib/auth";
+import { ModuleGuard } from "@/components/providers/ModuleGuard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,6 +154,7 @@ export default function SchoolAdminPaymentsPage() {
   };
 
   return (
+    <ModuleGuard moduleKey="payments">
     <div className="min-w-0 space-y-6">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
@@ -285,6 +287,7 @@ export default function SchoolAdminPaymentsPage() {
         </CardContent>
       </Card>
     </div>
+    </ModuleGuard>
   );
 }
 
