@@ -82,39 +82,49 @@ function LoginInner() {
     ? `/escuela/?slug=${slug}`              // they came from /escuela page
     : "/";
 
+  // Maps portal role param → expected dashboard route
+  const ROLE_DASHBOARDS: Record<string, string> = {
+    school_admin: "/school-admin/dashboard",
+    teacher: "/teacher/dashboard",
+    parent: "/parent/dashboard",
+    student: "/student/dashboard",
+  };
+
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setLoading(true);
     setError("");
 
     try {
+      const body: Record<string, string> = {
+        email: email.trim().toLowerCase(),
+        password,
+      };
+      // Send school context and selected role to backend for validation
+      if (slug) body.tenant_slug = slug;
+      if (role) body.requested_role = role;
+
       const response = await apiRequest("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify(body),
       });
+
+      // ROLE_MISMATCH: credentials are valid but role doesn't match selected portal
+      if (!response.success && response.code === "ROLE_MISMATCH") {
+        setError(response.message || "Este correo no pertenece al portal seleccionado.");
+        return;
+      }
 
       if (response.success) {
         login(response.data.access_token, response.data.user);
         const userRole = response.data.user.role as string;
 
-        /*
-         * Routing logic:
-         *
-         * If there IS a school context (slug present, from either source):
-         *   - SUPER_ADMIN → school-admin dashboard (impersonating the school)
-         *   - SCHOOL_ADMIN → school-admin dashboard
-         *   - TEACHER     → teacher dashboard
-         *   - PARENT      → parent dashboard
-         *   - anything else → standard path
-         *
-         * If there is NO school context (direct platform login):
-         *   - SUPER_ADMIN → /super-admin/dashboard  (Manager Maestro)
-         *   - others      → their own dashboard
-         *
-         * Note: There is no STUDENT role in EduCore — students are managed
-         * through the PARENT module.
-         */
-        if (slug) {
+        // If a specific portal role was selected, redirect to that dashboard
+        // regardless of what getDashboardPath() would normally return.
+        if (role && ROLE_DASHBOARDS[role]) {
+          router.push(ROLE_DASHBOARDS[role]);
+        } else if (slug) {
+          // School context but no specific role — redirect by actual role
           if (userRole === "SUPER_ADMIN" || userRole === "SCHOOL_ADMIN") {
             router.push("/school-admin/dashboard");
           } else if (userRole === "TEACHER") {
@@ -127,10 +137,11 @@ function LoginInner() {
             router.push(getDashboardPath(userRole));
           }
         } else {
+          // No school context — standard platform login
           router.push(getDashboardPath(userRole));
         }
       } else {
-        setError(response.message || "Credenciales incorrectas.");
+        setError(response.message || response.error || "Credenciales incorrectas.");
       }
     } catch {
       setError("Error conectando con el servidor. Intenta de nuevo.");

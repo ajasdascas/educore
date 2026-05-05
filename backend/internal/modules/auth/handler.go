@@ -7,6 +7,7 @@ import (
 	"educore/internal/pkg/response"
 	"encoding/hex"
 	"strconv"
+	"strings"
 	"time"
 
 	"educore/internal/pkg/database"
@@ -44,11 +45,12 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 // --- DTOs ---
 
 type LoginRequest struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	Role       string `json:"role"`
-	TenantID   string `json:"tenant_id"`
-	TenantSlug string `json:"tenant_slug"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	Role          string `json:"role"`
+	TenantID      string `json:"tenant_id"`
+	TenantSlug    string `json:"tenant_slug"`
+	RequestedRole string `json:"requested_role"` // portal role the user selected (teacher/parent/student/school_admin)
 }
 
 type RefreshRequest struct {
@@ -117,6 +119,58 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Invalid credentials")
+	}
+
+	// Validate requested_role matches the user's actual role.
+	// requested_role uses lowercase portal names; role in DB is uppercase.
+	if req.RequestedRole != "" {
+		// Map portal role names → accepted DB roles (uppercase)
+		portalRoleMap := map[string][]string{
+			"school_admin": {"SCHOOL_ADMIN", "ADMIN", "DIRECTOR"},
+			"teacher":      {"TEACHER"},
+			"parent":       {"PARENT"},
+			"student":      {"STUDENT"},
+		}
+		accepted, known := portalRoleMap[strings.ToLower(req.RequestedRole)]
+		if !known {
+			return response.Error(c, fiber.StatusBadRequest, "Invalid requested_role")
+		}
+		// SUPER_ADMIN must not use school portals
+		if role == "SUPER_ADMIN" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"success":        false,
+				"code":           "ROLE_MISMATCH",
+				"message":        "SUPER_ADMIN debe usar el Manager Maestro o Modo Soporte.",
+				"actual_role":    role,
+				"requested_role": req.RequestedRole,
+			})
+		}
+		// Check if actual role is in the accepted list
+		matched := false
+		for _, r := range accepted {
+			if strings.EqualFold(role, r) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			roleMessages := map[string]string{
+				"teacher": "Este correo no pertenece a un profesor de esta escuela.",
+				"parent":  "Este correo no pertenece a un padre/tutor de esta escuela.",
+				"student": "Este correo no pertenece a un estudiante de esta escuela.",
+			}
+			msg, hasMSG := roleMessages[strings.ToLower(req.RequestedRole)]
+			if !hasMSG {
+				msg = "Este correo no pertenece al portal seleccionado."
+			}
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"success":        false,
+				"code":           "ROLE_MISMATCH",
+				"message":        msg,
+				"actual_role":    role,
+				"requested_role": req.RequestedRole,
+			})
+		}
 	}
 
 	tenantID := ""

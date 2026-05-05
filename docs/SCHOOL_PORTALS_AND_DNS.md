@@ -165,3 +165,46 @@ El botón "Portal interno" en el header de Detalles siempre usa la ruta interna.
 | Rutas internas `/escuela/?slug=...` | ✅ Siempre funciona |
 | Botón "Portal interno" en Super Admin | ✅ Usa ruta interna |
 | Links de "Subdominio externo" | Requiere DNS wildcard activo |
+
+---
+
+## Validación de rol en el login del portal (desde 05-05-2026)
+
+**El portal escolar NO es impersonation.** Seleccionar un rol en `/escuela/` no cambia el rol real del usuario — solo declara con qué perfil intenta ingresar. El backend valida que el rol del usuario coincida.
+
+### Cómo funciona
+
+1. El usuario elige su rol en `/escuela/?slug=kinder1` → va a `/login?slug=kinder1&role=teacher`
+2. El frontend envía al backend: `{ email, password, tenant_slug: "kinder1", requested_role: "teacher" }`
+3. El backend autentica las credenciales y verifica que `user.role == "TEACHER"`
+4. Si no coincide → devuelve `403` con `code: "ROLE_MISMATCH"` y mensaje claro
+5. El frontend muestra el error y **NO guarda el token ni redirige**
+
+### Errores por rol incorrecto
+
+| Situación | Error mostrado |
+|-----------|---------------|
+| admin intenta entrar como profesor | "Este correo no pertenece a un profesor de esta escuela." |
+| admin/profesor intenta entrar como padre | "Este correo no pertenece a un padre/tutor de esta escuela." |
+| admin/profesor intenta entrar como alumno | "Este correo no pertenece a un estudiante de esta escuela." |
+| SUPER_ADMIN usa portal escolar | "SUPER_ADMIN debe usar el Manager Maestro o Modo Soporte." |
+
+### SUPER_ADMIN
+
+SUPER_ADMIN no puede usar los portales de escuela directamente. Debe:
+- Usar el **Manager Maestro** (`/super-admin/dashboard`) para administración global
+- Usar el **Modo Soporte** desde Super Admin → Escuelas → Detalles para operar como school admin
+
+### Probar role mismatch
+
+```bash
+# Admin intentando entrar como profesor (debe fallar)
+SCHOOL_ADMIN_EMAIL=admin@kinder1.com SCHOOL_ADMIN_PASSWORD=pass \
+  SCHOOL_SLUG=kinder1 node scripts/check-role-portal-login.js
+
+# Con todas las credenciales
+SCHOOL_ADMIN_EMAIL=admin@kinder1.com SCHOOL_ADMIN_PASSWORD=pass \
+  TEACHER_EMAIL=prof@kinder1.com TEACHER_PASSWORD=pass \
+  PARENT_EMAIL=padre@gmail.com PARENT_PASSWORD=pass \
+  SCHOOL_SLUG=kinder1 node scripts/check-role-portal-login.js
+```

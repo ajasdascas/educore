@@ -26,11 +26,13 @@ export const apiRequest = async (endpoint: string, options: RequestInit = {}) =>
 
     const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
-    if (!response.ok) {
-      const text = await response.text();
-      try { return JSON.parse(text); } catch { throw new Error(`HTTP ${response.status}: ${response.statusText}`); }
+    // Always parse JSON — error responses (403 ROLE_MISMATCH, 401, etc.) carry structured JSON
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    return await response.json();
   } catch (error) {
     console.error('API Request Error:', error);
     throw error;
