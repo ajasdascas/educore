@@ -17,6 +17,7 @@ import (
 	"educore/internal/modules/school_admin"
 	superadmin "educore/internal/modules/super_admin"
 	"educore/internal/modules/teacher"
+	"educore/internal/modules/webhook"
 	"educore/internal/modules/tenants"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/mysqlrepair"
@@ -117,6 +118,9 @@ func main() {
 	// Auth module (public)
 	authHandler := auth.NewHandler(db, cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshExpiration, redisClient)
 	authHandler.RegisterRoutes(api.Group("/auth"))
+
+	// Webhooks (public, signature-verified)
+	webhook.RegisterRoutes(api.Group("/webhooks"), db)
 
 	// Tenants module (protected, SUPER_ADMIN only)
 	tenantHandler := tenants.NewHandler(db)

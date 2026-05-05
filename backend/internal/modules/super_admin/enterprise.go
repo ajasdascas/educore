@@ -1,12 +1,15 @@
 package superadmin
 
 import (
+	"context"
 	"crypto/rand"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/response"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -162,6 +165,7 @@ func (h *Handler) RegisterEnterpriseRoutes(router fiber.Router) {
 	router.Get("/feature-flags", h.ListFeatureFlags)
 	router.Post("/feature-flags", h.UpsertFeatureFlag)
 	router.Put("/feature-flags/:key", h.UpsertFeatureFlag)
+	router.Delete("/feature-flags/:key", h.DeleteFeatureFlag)
 	router.Patch("/feature-flags/:key/scope", h.UpsertFeatureFlagScope)
 
 	router.Get("/backups", h.ListBackups)
@@ -1290,6 +1294,20 @@ func (h *Handler) UpsertFeatureFlagScope(c *fiber.Ctx) error {
 	return response.Success(c, nil, "Feature flag scope saved")
 }
 
+func (h *Handler) DeleteFeatureFlag(c *fiber.Ctx) error {
+	key := c.Params("key")
+	tag, err := h.db.Exec(c.UserContext(),
+		"UPDATE feature_flags SET deleted_at = NOW(), updated_at = NOW() WHERE key = $1 AND deleted_at IS NULL", key)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not delete flag")
+	}
+	if tag.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Flag not found")
+	}
+	h.auditSuperAdmin(c, "feature_flag.delete", "feature_flags", "", "warning", fiber.Map{"key": key}, "")
+	return response.Success(c, nil, "Feature flag deleted")
+}
+
 func (h *Handler) ListBackups(c *fiber.Ctx) error {
 	rows, err := h.db.Query(c.UserContext(),
 		`SELECT bj.id, COALESCE(bj.tenant_id::text, ''), COALESCE(t.name, 'Global'), bj.type, bj.status, bj.size_mb, bj.created_at, bj.completed_at, COALESCE(bj.error, '')
@@ -1322,7 +1340,45 @@ func (h *Handler) CreateBackupJob(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not create backup job")
 	}
 	h.auditSuperAdmin(c, "backup.create", "backup_jobs", id, "warning", fiber.Map{"tenant_id": req.TenantID}, "")
+	// Run the actual backup asynchronously
+	go h.executeBackupJob(id, req.TenantID)
 	return response.Success(c, fiber.Map{"id": id, "status": "queued"}, "Backup job created")
+}
+
+func (h *Handler) executeBackupJob(jobID, tenantID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// Mark as running
+	_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'running', started_at = NOW() WHERE id = $1", jobID)
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2",
+			"DATABASE_URL not configured", jobID)
+		return
+	}
+
+	// Try pg_dump
+	outPath := fmt.Sprintf("/tmp/backup_%s.sql", jobID)
+	cmd := exec.CommandContext(ctx, "pg_dump", "--no-password", "-f", outPath, dbURL)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		errMsg := fmt.Sprintf("pg_dump failed: %s — %s", err.Error(), string(out))
+		if len(errMsg) > 500 {
+			errMsg = errMsg[:500]
+		}
+		_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2", errMsg, jobID)
+		return
+	}
+
+	// Get file size
+	var sizeMB float64
+	if info, err := os.Stat(outPath); err == nil {
+		sizeMB = float64(info.Size()) / (1024 * 1024)
+	}
+	_ = os.Remove(outPath) // Clean up
+
+	_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'completed', size_mb = $1, completed_at = NOW() WHERE id = $2", sizeMB, jobID)
 }
 
 func (h *Handler) RestoreBackupJob(c *fiber.Ctx) error {
@@ -1340,17 +1396,17 @@ func (h *Handler) RestoreBackupJob(c *fiber.Ctx) error {
 }
 
 func (h *Handler) VersionInfo(c *fiber.Ctx) error {
-	rows, err := h.db.Query(c.UserContext(), "SELECT id, version, status, changelog, deployed_at FROM system_versions ORDER BY deployed_at DESC LIMIT 20")
+	rows, err := h.db.Query(c.UserContext(), "SELECT id, version, status, changelog, deployed_at, COALESCE(metadata::text, '{}') FROM system_versions ORDER BY deployed_at DESC LIMIT 50")
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not fetch versions")
 	}
 	defer rows.Close()
 	items := []fiber.Map{}
 	for rows.Next() {
-		var id, version, status, changelog string
+		var id, version, status, changelog, metaRaw string
 		var deployed interface{}
-		_ = rows.Scan(&id, &version, &status, &changelog, &deployed)
-		items = append(items, fiber.Map{"id": id, "version": version, "status": status, "changelog": changelog, "deployed_at": deployed})
+		_ = rows.Scan(&id, &version, &status, &changelog, &deployed, &metaRaw)
+		items = append(items, fiber.Map{"id": id, "version": version, "status": status, "changelog": changelog, "deployed_at": deployed, "metadata": metaRaw})
 	}
 	return response.Success(c, fiber.Map{"versions": items}, "Version info retrieved")
 }

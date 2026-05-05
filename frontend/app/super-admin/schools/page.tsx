@@ -74,11 +74,20 @@ const educationLevelOptions = [
   { value: "universidad", label: "Universidad", supportedNow: false },
 ];
 
-const premiumModuleOptions = [
-  { value: "payments", label: "Pagos y cobranza" },
-  { value: "workshops", label: "Talleres" },
-  { value: "qr_access", label: "Acceso QR" },
-  { value: "credentials", label: "Credenciales" },
+// Catálogo completo de módulos (sincronizado con migration 016)
+const MODULE_CATALOG = [
+  { key: "schedules",       label: "Horarios",                category: "academic" },
+  { key: "attendance",      label: "Asistencias",             category: "academic" },
+  { key: "documents",       label: "Expedientes digitales",   category: "operations" },
+  { key: "report_cards",    label: "Boletas",                 category: "academic" },
+  { key: "communications",  label: "Comunicaciones",          category: "operations" },
+  { key: "parent_portal",   label: "Portal de Padres",        category: "portal" },
+  { key: "teacher_portal",  label: "Portal de Profesores",    category: "portal" },
+  { key: "payments",        label: "Pagos y cobranza",        category: "monetization" },
+  { key: "qr_access",       label: "Acceso QR",               category: "operations" },
+  { key: "credentials",     label: "Credenciales",            category: "operations" },
+  { key: "workshops",       label: "Talleres",                category: "academic" },
+  { key: "analytics",       label: "Analytics",               category: "analytics" },
 ];
 
 interface School {
@@ -120,7 +129,7 @@ export default function SchoolsPage() {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
-    plan: "basic",
+    plan: "",
     admin_email: "",
     admin_name: "",
     levels: [] as string[],
@@ -166,6 +175,8 @@ export default function SchoolsPage() {
   }, [page, limit, searchTerm, statusFilter, planFilter]);
 
   const [plans, setPlans] = useState<any[]>([]);
+  // Keys of modules included in the currently selected plan
+  const [planModuleKeys, setPlanModuleKeys] = useState<string[]>([]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -179,16 +190,41 @@ export default function SchoolsPage() {
     const fetchPlans = async () => {
       try {
         const res = await authFetch("/api/v1/super-admin/plans");
-        if(res.success && res.data) {
-          setPlans(Array.isArray(res.data?.plans) ? res.data.plans : Array.isArray(res.data) ? res.data : []);
+        if (res.success && res.data) {
+          const loaded: any[] = Array.isArray(res.data?.plans) ? res.data.plans : Array.isArray(res.data) ? res.data : [];
+          setPlans(loaded);
+          // Default to first plan UUID
+          if (loaded.length > 0) {
+            const firstPlan = loaded[0];
+            const mods = parsePlanModules(firstPlan.modules);
+            setFormData(f => ({ ...f, plan: firstPlan.id }));
+            setPlanModuleKeys(mods);
+          }
         }
       } catch (error) {
         console.error("Error fetching plans:", error);
       }
     };
-
     fetchPlans();
   }, []);
+
+  function parsePlanModules(raw: string | string[] | undefined): string[] {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    try { return JSON.parse(raw); } catch { return []; }
+  }
+
+  function handlePlanChange(planId: string) {
+    const plan = plans.find(p => p.id === planId);
+    const mods = parsePlanModules(plan?.modules);
+    setPlanModuleKeys(mods);
+    // Remove selected premium_modules that are now included in plan
+    setFormData(f => ({
+      ...f,
+      plan: planId,
+      premium_modules: f.premium_modules.filter(m => !mods.includes(m)),
+    }));
+  }
 
   const handleLevelSelect = (level: string) => {
     setFormData({
@@ -250,18 +286,23 @@ export default function SchoolsPage() {
       });
 
       if (response.success) {
+        const generatedPw: string | undefined = response.data?.admin_password;
         toast({
-          title: "Escuela creada",
-          description: `La escuela ${formData.name} se ha registrado exitosamente.`,
+          title: "Escuela creada ✓",
+          description: generatedPw
+            ? `Escuela registrada. Contraseña temporal del admin: ${generatedPw} — guárdala ahora.`
+            : `La escuela ${formData.name} se ha registrado exitosamente.`,
         });
         setIsModalOpen(false);
+        const defaultPlanId = plans[0]?.id || "";
         // Reset
         setFormData({
-          name: "", slug: "", plan: "basic", admin_email: "", admin_name: "",
+          name: "", slug: "", plan: defaultPlanId, admin_email: "", admin_name: "",
           levels: [], phone: "", contact_email: "", address: "", timezone: "America/Mexico_City",
           premium_modules: [], rfc: "", razon_social: "", regimen: "", codigo_postal: "",
           school_year: "2026-2027", eval_scheme: "0-10", logo_url: ""
         });
+        setPlanModuleKeys(parsePlanModules(plans[0]?.modules));
         setLogoFile(null);
         fetchSchools();
       } else {
@@ -407,7 +448,7 @@ export default function SchoolsPage() {
                     <h3 className="font-semibold text-primary border-b pb-2">4. Suscripción y Fiscal</h3>
                     <div className="grid gap-2">
                       <Label htmlFor="plan">Plan Base</Label>
-                      <Select value={formData.plan} onValueChange={(val: string) => setFormData({ ...formData, plan: val })}>
+                      <Select value={formData.plan} onValueChange={handlePlanChange}>
                         <SelectTrigger><SelectValue placeholder="Selecciona un plan" /></SelectTrigger>
                         <SelectContent>
                           {plans.length > 0 ? (
@@ -415,27 +456,43 @@ export default function SchoolsPage() {
                               <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
                             ))
                           ) : (
-                            <>
-                              <SelectItem value="basic">Básico</SelectItem>
-                              <SelectItem value="professional">Profesional</SelectItem>
-                              <SelectItem value="enterprise">Enterprise</SelectItem>
-                            </>
+                            <SelectItem value="" disabled>Cargando planes...</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <Label>Módulos Premium Activos</Label>
+                      <Label>Módulos del sistema</Label>
+                      <p className="text-xs text-muted-foreground -mt-1">
+                        Los módulos en verde están incluidos en el plan. Los demás se añaden como extra.
+                      </p>
                       <div className="flex flex-wrap gap-2">
-                        {premiumModuleOptions.map((mod) => (
-                          <Badge 
-                            key={mod.value}
-                            variant={formData.premium_modules.includes(mod.value) ? "default" : "outline"}
-                            className="cursor-pointer" 
-                            onClick={() => handleModuleToggle(mod.value)}>
-                            {mod.label}
-                          </Badge>
-                        ))}
+                        {MODULE_CATALOG.map((mod) => {
+                          const inPlan = planModuleKeys.includes(mod.key);
+                          const selected = formData.premium_modules.includes(mod.key);
+                          if (inPlan) {
+                            return (
+                              <Badge
+                                key={mod.key}
+                                className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-default select-none"
+                                title="Incluido en el plan seleccionado"
+                              >
+                                ✓ {mod.label}
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <Badge
+                              key={mod.key}
+                              variant={selected ? "default" : "outline"}
+                              className="cursor-pointer"
+                              onClick={() => handleModuleToggle(mod.key)}
+                              title="Módulo adicional — click para activar/desactivar"
+                            >
+                              {selected ? "＋ " : ""}{mod.label}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
