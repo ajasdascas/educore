@@ -219,6 +219,7 @@ var stagingColumnRepairs = []columnRepair{
 	{"students", "group_id", "group_id CHAR(36) NULL"},
 	{"students", "metadata", "metadata JSON NULL"},
 	{"students", "deleted_at", "deleted_at DATETIME NULL"},
+	{"students", "user_id", "user_id CHAR(36) NULL"},
 
 	{"student_payments", "tutor_id", "tutor_id CHAR(36) NULL"},
 	{"student_payments", "paid_amount", "paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0"},

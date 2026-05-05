@@ -900,3 +900,63 @@ Smoke final: `https://onlineu.mx/educore/`, `/educore/login/` y `/educore/super-
 - Agregar `user_id` a tabla `students` en migración si aún no existe (para que STUDENT pueda hacer login y ver su perfil).
 
 #memory #student_portal #routing #wildcard #scripts #backend #frontend
+
+---
+
+# 05-05-2026 — Corrección módulo student: schema MySQL real
+
+## Driver confirmado
+Producción usa **MySQL** (`env=production`, `db_driver=mysql`, `db_mysql_ready=true`).
+Verificado via `/api/v1/health` y `docs/obsidian/_claude/memory.md` de la sesión de staging.
+
+## Diagnóstico de schema mismatch
+El módulo `backend/internal/modules/student/` fue escrito con columnas PostgreSQL/incorrectas:
+
+| Lo que el código usaba | Columna real en MySQL schema |
+|---|---|
+| `students.last_name_mother` | `students.maternal_last_name` |
+| `students.user_id` | **NO EXISTÍA** — agregada en migration 006 |
+| `grade_records.grade` | `grade_records.score` |
+| `grade_records.eval_type` | **NO EXISTE** — se usa `qualitative_value` como fallback |
+
+## Por qué $1/$2/$3 y TO_CHAR no son el problema real
+El `backend/internal/pkg/database/portable_db.go` ya traduce automáticamente:
+- `$1, $2, $3` → `?` via `rebindMySQLPlaceholders()`
+- `TO_CHAR(campo, 'YYYY-MM-DD')` → `DATE_FORMAT(campo, '%Y-%m-%d')` via `toCharDatePattern`
+
+Los placeholders y funciones de fecha son compatibles por diseño. El bug real era de nombres de columna.
+
+## Correcciones aplicadas
+
+### `backend/internal/modules/student/repository.go`
+- `GetProfileByUserID`: usa `paternal_last_name`/`maternal_last_name` (no `last_name_mother`), JOIN `users u ON u.id = s.user_id`
+- `GetRecentGrades`: usa `score` (no `grade`), usa `qualitative_value` como alias `eval_type`
+- `GetAttendanceSummary`: sin cambios — schema ya era correcto
+
+### `backend/migrations_mysql/006_student_portal_user_id.sql` (NUEVO)
+- `ALTER TABLE students ADD COLUMN IF NOT EXISTS user_id CHAR(36) NULL`
+- Índice `idx_students_user_id`
+- FK hacia `users.id`
+- **Debe importarse en Hostinger antes de que el portal STUDENT funcione en producción**
+
+### `backend/internal/pkg/mysqlrepair/repair.go`
+- Agregada entrada `{"students", "user_id", "user_id CHAR(36) NULL"}` para auto-repair en staging
+
+## Scripts nuevos
+- `scripts/check-student-schema.js` — verifica tablas/columnas reales vs. lo que usa el módulo (estático + live DB opcional)
+- `scripts/check-student-api.js` — smoke test con STUDENT_EMAIL/STUDENT_PASSWORD, salta si faltan credenciales
+
+## Verificaciones ejecutadas
+- `node scripts/check-student-schema.js` → ✅ todos los checks PASS
+- `node scripts/check-auth-routing.js` → ✅ 18/18 PASS
+- `node scripts/check-school-routing.js` → ✅ 20/20 PASS
+- `node scripts/check-student-api.js` → SKIPPED (sin credenciales STUDENT reales — correcto)
+- `go build -buildvcs=false ./...` → ✅ OK
+- `NEXT_PUBLIC_DEMO_MODE=false npm run build` → ✅ OK
+
+## Pendientes reales
+1. **Importar `006_student_portal_user_id.sql` en Hostinger** (phpMyAdmin o Railway staging)
+2. **Crear usuario con `role=STUDENT`** desde School Admin → Estudiantes → asignar credenciales
+3. **Correr smoke real**: `STUDENT_EMAIL=xxx STUDENT_PASSWORD=xxx node scripts/check-student-api.js`
+
+#memory #student_portal #mysql #schema #backend #fix

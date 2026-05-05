@@ -15,13 +15,18 @@ func NewRepository(db *database.DB) *Repository {
 	return &Repository{db: db}
 }
 
+// GetProfileByUserID fetches the student profile linked to a users.id.
+// Column names match the MySQL schema (001_hostinger_core.sql):
+//   - students.maternal_last_name  (not last_name_mother)
+//   - students.user_id             (added in 006_student_portal_user_id.sql)
 func (r *Repository) GetProfileByUserID(ctx context.Context, userID, tenantID string) (*StudentProfile, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT
 			s.id, s.tenant_id,
-			s.first_name, s.last_name,
-			COALESCE(s.last_name_mother, '') AS last_name_mother,
-			u.email,
+			s.first_name,
+			COALESCE(s.paternal_last_name, s.last_name, '') AS last_name,
+			COALESCE(s.maternal_last_name, '') AS last_name_mother,
+			COALESCE(s.email, u.email, '') AS email,
 			gs.group_id,
 			g.name AS group_name,
 			gl.name AS grade_name,
@@ -54,13 +59,18 @@ func (r *Repository) GetProfileByUserID(ctx context.Context, userID, tenantID st
 	return &p, nil
 }
 
+// GetRecentGrades returns recent grade records for a student.
+// Column names match the MySQL schema:
+//   - grade_records.score  (not grade)
+//   - grade_records.qualitative_value used as eval_type fallback (no eval_type column)
+//   - TO_CHAR(...) is translated to DATE_FORMAT(...) automatically by portable_db
 func (r *Repository) GetRecentGrades(ctx context.Context, studentID, tenantID string, limit int) ([]GradeSummary, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			COALESCE(s.name, 'Materia') AS subject_name,
-			gr.grade,
+			COALESCE(gr.score, 0) AS grade,
 			COALESCE(gr.period, '') AS period,
-			COALESCE(gr.eval_type, 'exam') AS eval_type,
+			COALESCE(gr.qualitative_value, 'exam') AS eval_type,
 			TO_CHAR(gr.created_at, 'YYYY-MM-DD') AS recorded_date
 		FROM grade_records gr
 		LEFT JOIN subjects s ON s.id = gr.subject_id
@@ -87,12 +97,14 @@ func (r *Repository) GetRecentGrades(ctx context.Context, studentID, tenantID st
 	return grades, nil
 }
 
+// GetAttendanceSummary returns aggregated attendance for a student.
+// Schema matches: attendance_records.status ENUM('present','absent','late','excused','sick')
 func (r *Repository) GetAttendanceSummary(ctx context.Context, studentID, tenantID string) (*AttendanceSummary, error) {
 	row := r.db.QueryRow(ctx, `
 		SELECT
 			COUNT(*) AS total_days,
 			SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) AS present,
-			SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent,
+			SUM(CASE WHEN status = 'absent'  THEN 1 ELSE 0 END) AS absent,
 			SUM(CASE WHEN status IN ('late', 'sick') THEN 1 ELSE 0 END) AS late
 		FROM attendance_records
 		WHERE student_id = $1 AND tenant_id = $2

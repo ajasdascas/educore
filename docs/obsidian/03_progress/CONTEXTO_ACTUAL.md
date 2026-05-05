@@ -1,5 +1,5 @@
 # Contexto Actual — EduCore SaaS
-**Fecha:** 28-04-2026
+**Fecha:** 05-05-2026
 
 ## 🚀 Estado del Proyecto
 Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la base para la gestión comercial del SaaS.
@@ -19,12 +19,12 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 
 ### 🛑 Pendientes Críticos (Lo que falta por hacer)
 1. ~~**Backend: Middleware de Cuotas**~~ ✅ **COMPLETADO 04-05-2026**
-2. **Verificación final Super Admin:**
-    - Confirmar que todas las secciones del dashboard usan datos reales (no mock).
-3. **Deploy a producción:** push del commit de cuotas y verificar en staging.
+2. ~~**Módulo STUDENT — SQL MySQL**~~ ✅ **CORREGIDO 05-05-2026** — ver sección avance
+3. **Activar estudiante en producción:** agregar columna `user_id` a tabla `students` en Hostinger con migration `006_student_portal_user_id.sql`. Luego crear usuario con `role=STUDENT` desde School Admin.
+4. **Smoke test student portal:** correr `STUDENT_EMAIL=... STUDENT_PASSWORD=... node scripts/check-student-api.js` cuando haya un usuario STUDENT real.
 
 ## 🛠️ Stack y Configuración
-- **Backend:** Go (Fiber) + PostgreSQL + Redis (Railway).
+- **Backend:** Go (Fiber) + MySQL (producción Railway + Hostinger) | PostgreSQL (legacy/dev).
 - **Frontend:** Next.js 14 (Static Export).
 - **Despliegue:** FTP Sync a `onlineu.mx/educore`.
 
