@@ -762,7 +762,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		"tenant_id":   tenantID,
 		"admin_email": adminEmail,
 		"subdomain":   subdomain,
-		"admin_demo":  true,
+		"admin_ready": true,
 		"portals": fiber.Map{
 			"school_admin": "/school-portal/school-admin?slug=" + req.Slug,
 			"parents":      "/school-portal/parents?slug=" + req.Slug,

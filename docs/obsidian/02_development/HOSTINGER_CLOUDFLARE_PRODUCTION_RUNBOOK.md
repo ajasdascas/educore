@@ -71,6 +71,24 @@ go run ./scripts/seed_owner_admins.go
    - `EDUCORE_OWNER_ADMIN_PASSWORD` como secret temporal, nunca en git.
 4. Cambiar a `DB_DRIVER=mysql` solo cuando todos los repos tenant-scoped esten portados y pasen smoke real.
 
+## Excepcion temporal: Remote MySQL con Any Host (%)
+
+Estado 04-05-2026: produccion ya esta usando `DB_DRIVER=mysql` desde Railway y Railway Free no tiene Static Outbound IP. Por eso no se debe quitar `Any Host (%)` todavia: si se cierra Remote MySQL sin una IP fija allowlisteada, el backend productivo puede perder conexion a Hostinger MySQL.
+
+Controles mientras exista esta excepcion:
+
+1. Mantener `MYSQL_DSN` solo como secreto de Railway.
+2. No guardar DSN, passwords ni tokens en repo, docs, frontend build o logs.
+3. Usar un usuario MySQL dedicado para la app, distinto del usuario administrativo de phpMyAdmin.
+4. Dar al usuario de app solo permisos de runtime sobre la base EduCore; evitar permisos globales o administrativos.
+5. Mantener backups/export recientes antes de cambios grandes en SuperAdmin o schema.
+6. Rotar password MySQL cuando se cambie a IP fija o VPS.
+
+Ruta de cierre definitivo:
+
+- Opcion A: Railway Pro + Static Outbound IP -> allowlist solo a esa IPv4 en Hostinger Remote MySQL -> quitar `%` -> rotar password -> redeploy -> smoke `/api/v1/health` y login SuperAdmin.
+- Opcion B: Hostinger VPS -> backend y MariaDB en red local/VPS -> cerrar Remote MySQL publico -> rotar password -> smoke completo.
+
 ## Riesgo controlado
 MySQL queda preparado como puente, pero la API aun falla cerrado si se intenta arrancar en MySQL antes de portar los repositorios que dependen de `pgxpool` y SQL especifico de PostgreSQL.
 

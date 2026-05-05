@@ -136,6 +136,10 @@ func (h *Handler) RegisterEnterpriseRoutes(router fiber.Router) {
 	router.Put("/system/settings", h.SavePlatformSetting)
 	router.Get("/system/security", h.GetPlatformSettings)
 	router.Put("/system/security", h.SavePlatformSetting)
+	router.Get("/system/security/sessions", h.SecuritySessions)
+	router.Post("/system/security/sessions/revoke-others", h.RevokeSecuritySessions)
+	router.Get("/system/notifications", h.SystemNotifications)
+	router.Put("/system/notifications/mark-all-read", h.MarkSystemNotificationsRead)
 	router.Get("/system/email", h.GetPlatformSettings)
 	router.Put("/system/email", h.SavePlatformSetting)
 	router.Get("/system/api", h.GetPlatformSettings)
@@ -952,6 +956,132 @@ func (h *Handler) SavePlatformSetting(c *fiber.Ctx) error {
 	return response.Success(c, nil, "Setting saved")
 }
 
+func (h *Handler) SystemNotifications(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	lastReadAt := h.notificationReadAt(c, userID)
+
+	rows, err := h.db.Query(c.UserContext(),
+		`SELECT al.id, al.action, COALESCE(al.resource, ''),
+		        COALESCE(al.resource_id::text, ''), al.severity, COALESCE(al.module_key, ''), COALESCE(u.email, 'system'), al.created_at
+		 FROM audit_logs al LEFT JOIN users u ON u.id = COALESCE(al.acting_user_id, al.user_id)
+		 ORDER BY al.created_at DESC LIMIT 100`)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not fetch notifications")
+	}
+	defer rows.Close()
+
+	items := []fiber.Map{}
+	unread := 0
+	for rows.Next() {
+		var id, action, resource, resourceID, severity, moduleKey, userEmail string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &action, &resource, &resourceID, &severity, &moduleKey, &userEmail, &createdAt); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Could not read notifications")
+		}
+		read := !lastReadAt.IsZero() && !createdAt.After(lastReadAt)
+		if !read {
+			unread++
+		}
+		items = append(items, fiber.Map{
+			"id":          id,
+			"title":       notificationTitle(action, resource),
+			"description": notificationDescription(action, resource, resourceID, userEmail),
+			"type":        notificationType(severity),
+			"severity":    severity,
+			"module_key":  moduleKey,
+			"user":        userEmail,
+			"read":        read,
+			"created_at":  createdAt,
+		})
+	}
+
+	return response.Success(c, fiber.Map{
+		"notifications": items,
+		"total":         len(items),
+		"unread":        unread,
+		"read":          len(items) - unread,
+		"last_read_at":  lastReadAt,
+	}, "Notifications retrieved")
+}
+
+func (h *Handler) MarkSystemNotificationsRead(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	if strings.TrimSpace(userID) == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "User context missing")
+	}
+	payload, _ := json.Marshal(fiber.Map{"read_at": time.Now().UTC().Format(time.RFC3339)})
+	key := notificationReadKey(userID)
+	_, err := h.db.Exec(c.UserContext(),
+		`INSERT INTO platform_settings (key, category, value, is_sensitive, updated_by)
+		 VALUES ($1, 'notifications', $2, false, NULLIF($3, '')::uuid)
+		 ON CONFLICT (key) DO UPDATE SET value=$2, is_sensitive=false, updated_by=NULLIF($3, '')::uuid, updated_at=NOW()`,
+		key, string(payload), userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not mark notifications")
+	}
+	h.auditSuperAdmin(c, "notifications.mark_all_read", "platform_settings", "", "info", fiber.Map{"key": key}, "")
+	return response.Success(c, nil, "Notifications marked as read")
+}
+
+func (h *Handler) SecuritySessions(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	if strings.TrimSpace(userID) == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "User context missing")
+	}
+	rows, err := h.db.Query(c.UserContext(),
+		`SELECT id, is_active, expires_at, created_at
+		 FROM user_sessions
+		 WHERE user_id = $1
+		 ORDER BY created_at DESC LIMIT 50`, userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not fetch sessions")
+	}
+	defer rows.Close()
+
+	sessions := []fiber.Map{}
+	active := 0
+	for rows.Next() {
+		var id string
+		var isActive bool
+		var expiresAt, createdAt time.Time
+		if err := rows.Scan(&id, &isActive, &expiresAt, &createdAt); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Could not read sessions")
+		}
+		if isActive && expiresAt.After(time.Now()) {
+			active++
+		}
+		sessions = append(sessions, fiber.Map{
+			"id":         id,
+			"device":     "Sesion EduCore",
+			"location":   "No disponible",
+			"ip_address": "",
+			"is_active":  isActive,
+			"expires_at": expiresAt,
+			"created_at": createdAt,
+			"current":    false,
+		})
+	}
+	return response.Success(c, fiber.Map{
+		"sessions":        sessions,
+		"active_sessions": active,
+		"total_sessions":  len(sessions),
+	}, "Sessions retrieved")
+}
+
+func (h *Handler) RevokeSecuritySessions(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	if strings.TrimSpace(userID) == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "User context missing")
+	}
+	result, err := h.db.Exec(c.UserContext(),
+		`UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND is_active = true`, userID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not revoke sessions")
+	}
+	h.auditSuperAdmin(c, "security.sessions_revoke", "user_sessions", "", "warning", fiber.Map{"affected": result.RowsAffected()}, "")
+	return response.Success(c, fiber.Map{"affected": result.RowsAffected()}, "Sessions revoked")
+}
+
 func (h *Handler) AuditLogs(c *fiber.Ctx) error {
 	severity := c.Query("severity")
 	module := c.Query("module")
@@ -1327,6 +1457,73 @@ func stringPtrValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func (h *Handler) notificationReadAt(c *fiber.Ctx, userID string) time.Time {
+	if strings.TrimSpace(userID) == "" {
+		return time.Time{}
+	}
+	var raw []byte
+	if err := h.db.QueryRow(c.UserContext(), "SELECT value FROM platform_settings WHERE key = $1", notificationReadKey(userID)).Scan(&raw); err != nil {
+		return time.Time{}
+	}
+	var payload struct {
+		ReadAt string `json:"read_at"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return time.Time{}
+	}
+	readAt, err := time.Parse(time.RFC3339, payload.ReadAt)
+	if err != nil {
+		return time.Time{}
+	}
+	return readAt
+}
+
+func notificationReadKey(userID string) string {
+	return "superadmin_notifications_read_" + strings.TrimSpace(userID)
+}
+
+func notificationType(severity string) string {
+	switch strings.ToLower(strings.TrimSpace(severity)) {
+	case "critical", "error":
+		return "error"
+	case "warning", "warn":
+		return "warning"
+	case "success":
+		return "success"
+	default:
+		return "info"
+	}
+}
+
+func notificationTitle(action, resource string) string {
+	action = strings.TrimSpace(action)
+	resource = strings.TrimSpace(resource)
+	if action == "" {
+		return "Evento del sistema"
+	}
+	if resource == "" {
+		return action
+	}
+	return fmt.Sprintf("%s en %s", action, resource)
+}
+
+func notificationDescription(action, resource, resourceID, userEmail string) string {
+	parts := []string{}
+	if strings.TrimSpace(userEmail) != "" {
+		parts = append(parts, "Usuario: "+userEmail)
+	}
+	if strings.TrimSpace(resource) != "" {
+		parts = append(parts, "Recurso: "+resource)
+	}
+	if strings.TrimSpace(resourceID) != "" {
+		parts = append(parts, "ID: "+resourceID)
+	}
+	if len(parts) == 0 {
+		return strings.TrimSpace(action)
+	}
+	return strings.Join(parts, " · ")
 }
 
 func parseLimit(c *fiber.Ctx, fallback int) int {

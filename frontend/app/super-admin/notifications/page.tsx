@@ -1,192 +1,178 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { AlertCircle, Bell, Check, CheckCircle, Info, Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Check, Trash2, Settings, AlertCircle, Info, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { authFetch } from "@/lib/auth";
+import { useToast } from "@/components/ui/use-toast";
 
-const notifications = [
-  {
-    id: 1,
-    title: "Nueva escuela registrada",
-    description: "Instituto Tecnológico Don Bosco se ha registrado exitosamente",
-    time: "Hace 2 horas",
-    type: "success",
-    read: false,
-    icon: CheckCircle
-  },
-  {
-    id: 2,
-    title: "Problema de facturación",
-    description: "Error en el pago de la suscripción de Colegio San Miguel",
-    time: "Hace 4 horas",
-    type: "error",
-    read: false,
-    icon: AlertCircle
-  },
-  {
-    id: 3,
-    title: "Mantenimiento programado",
-    description: "Mantenimiento de servidores programado para el próximo domingo",
-    time: "Hace 1 día",
-    type: "info",
-    read: true,
-    icon: Info
-  },
-  {
-    id: 4,
-    title: "Límite de usuarios alcanzado",
-    description: "Escuela Primaria La Paz ha alcanzado su límite de usuarios",
-    time: "Hace 2 días",
-    type: "warning",
-    read: true,
-    icon: AlertCircle
-  }
-];
-
-const typeColors = {
-  success: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  error: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  info: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+type NotificationItem = {
+  id: string;
+  title: string;
+  description: string;
+  type: "success" | "error" | "warning" | "info";
+  severity: string;
+  read: boolean;
+  created_at: string;
+  user?: string;
 };
 
+type NotificationPayload = {
+  notifications: NotificationItem[];
+  total: number;
+  unread: number;
+  read: number;
+};
+
+const toneByType = {
+  success: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
+  error: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200",
+  info: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
+};
+
+function NotificationIcon({ type }: { type: NotificationItem["type"] }) {
+  if (type === "success") return <CheckCircle className="h-5 w-5 text-green-600" />;
+  if (type === "error") return <AlertCircle className="h-5 w-5 text-red-600" />;
+  if (type === "warning") return <AlertCircle className="h-5 w-5 text-yellow-600" />;
+  return <Info className="h-5 w-5 text-blue-600" />;
+}
+
+function formatDate(value: string) {
+  if (!value) return "Sin fecha";
+  return new Date(value).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
+}
+
 export default function NotificationsPage() {
+  const [data, setData] = useState<NotificationPayload>({ notifications: [], total: 0, unread: 0, read: 0 });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await authFetch("/api/v1/super-admin/system/notifications");
+      if (!res.success) throw new Error(res.error || res.message || "No se pudieron cargar las notificaciones");
+      setData({
+        notifications: Array.isArray(res.data?.notifications) ? res.data.notifications : [],
+        total: Number(res.data?.total || 0),
+        unread: Number(res.data?.unread || 0),
+        read: Number(res.data?.read || 0),
+      });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "No se pudieron cargar las notificaciones", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const markAllRead = async () => {
+    setSaving(true);
+    try {
+      const res = await authFetch("/api/v1/super-admin/system/notifications/mark-all-read", { method: "PUT" });
+      if (!res.success) throw new Error(res.error || res.message || "No se pudo actualizar el estado");
+      toast({ title: "Listo", description: "Notificaciones marcadas como leidas." });
+      await load();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "No se pudo actualizar el estado", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const statCards: Array<{ label: string; value: number; Icon: LucideIcon; tone: string }> = [
+    { label: "No leidas", value: data.unread, Icon: AlertCircle, tone: "text-red-600" },
+    { label: "Leidas", value: data.read, Icon: CheckCircle, tone: "text-green-600" },
+    { label: "Total", value: data.total, Icon: Bell, tone: "text-blue-600" },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
             <Bell className="h-8 w-8 text-primary" />
             Notificaciones
           </h1>
-          <p className="text-muted-foreground">
-            Centro de notificaciones del sistema
-          </p>
+          <p className="text-muted-foreground">Eventos reales del sistema derivados de auditoria.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Check className="h-4 w-4 mr-2" />
-            Marcar todas como leídas
+          <Button variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Actualizar
           </Button>
-          <Button variant="outline" size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Configurar
+          <Button onClick={markAllRead} disabled={saving || data.unread === 0}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+            Marcar todo leido
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+        {statCards.map(({ label, value, Icon, tone }) => (
+          <Card key={label}>
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Icon className={`h-6 w-6 ${tone}`} />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">No leídas</p>
-                <p className="text-2xl font-bold text-red-600">2</p>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                <p className="text-2xl font-bold">{value}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Leídas</p>
-                <p className="text-2xl font-bold text-green-600">2</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <Bell className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">{notifications.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Notifications List */}
       <Card>
         <CardHeader>
-          <CardTitle>Todas las Notificaciones</CardTitle>
-          <CardDescription>
-            Últimas notificaciones del sistema
-          </CardDescription>
+          <CardTitle>Centro de eventos</CardTitle>
+          <CardDescription>Ultimos eventos auditados en la plataforma.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {notifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`flex items-start space-x-4 p-4 rounded-lg border transition-colors hover:bg-muted/50 ${
-                  !notification.read ? 'bg-muted/20 border-primary/20' : 'bg-background'
-                }`}
-              >
-                <div className={`p-2 rounded-lg ${
-                  notification.type === 'success' ? 'bg-green-100 dark:bg-green-900/20' :
-                  notification.type === 'error' ? 'bg-red-100 dark:bg-red-900/20' :
-                  notification.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
-                  'bg-blue-100 dark:bg-blue-900/20'
-                }`}>
-                  <notification.icon className={`h-5 w-5 ${
-                    notification.type === 'success' ? 'text-green-600' :
-                    notification.type === 'error' ? 'text-red-600' :
-                    notification.type === 'warning' ? 'text-yellow-600' :
-                    'text-blue-600'
-                  }`} />
-                </div>
-
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{notification.title}</p>
-                    {!notification.read && (
-                      <div className="h-2 w-2 bg-primary rounded-full"></div>
-                    )}
+          {loading ? (
+            <div className="flex h-40 items-center justify-center text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Cargando notificaciones
+            </div>
+          ) : data.notifications.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+              No hay eventos auditados todavia.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {data.notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`flex items-start gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 ${
+                    notification.read ? "bg-background" : "border-primary/30 bg-primary/5"
+                  }`}
+                >
+                  <div className="rounded-lg bg-muted p-2">
+                    <NotificationIcon type={notification.type} />
                   </div>
-                  <p className="text-sm text-muted-foreground">{notification.description}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-muted-foreground">{notification.time}</p>
-                    <Badge
-                      variant="outline"
-                      className={typeColors[notification.type as keyof typeof typeColors]}
-                    >
-                      {notification.type === 'success' ? 'Éxito' :
-                       notification.type === 'error' ? 'Error' :
-                       notification.type === 'warning' ? 'Advertencia' : 'Información'}
-                    </Badge>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="font-medium">{notification.title}</p>
+                      <Badge variant="outline" className={toneByType[notification.type]}>
+                        {notification.severity || notification.type}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{notification.description}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
                   </div>
+                  {!notification.read ? <span className="mt-2 h-2 w-2 rounded-full bg-primary" /> : null}
                 </div>
-
-                <div className="flex space-x-2">
-                  {!notification.read && (
-                    <Button variant="ghost" size="sm">
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

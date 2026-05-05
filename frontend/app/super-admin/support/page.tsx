@@ -20,9 +20,10 @@ export default function SupportPage() {
       ]}
       actions={[
         {
-          label: "Crear ticket demo",
+          label: "Crear ticket interno",
           endpoint: "/api/v1/super-admin/support/tickets",
-          body: { title: "Revision operativa demo", description: "Ticket interno creado desde SuperAdmin.", priority: "medium", status: "open", module_key: "school-admin" },
+          body: { title: "Revision operativa SuperAdmin", description: "Ticket interno creado desde SuperAdmin.", priority: "medium", status: "open", module_key: "school-admin" },
+          confirmMessage: "Se creara un ticket interno real. Confirma que quieres continuar.",
         },
       ]}
     />

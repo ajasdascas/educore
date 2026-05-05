@@ -377,3 +377,21 @@ Los archivos permanecen locales e ignorados; la configuracion compartible debe v
 #decision #security #secrets
 
 ---
+
+# 04-05-2026 - Any Host temporal por Railway sin IP fija
+
+## Decision
+Mantener Hostinger Remote MySQL con `Any Host (%)` de forma temporal mientras el backend productivo siga en Railway sin Static Outbound IP.
+
+## Razon
+Produccion ya usa `DB_DRIVER=mysql` y Railway Free cambia la IP de salida. Quitar `%` antes de tener IP fija o VPS puede cortar la conexion productiva a Hostinger MySQL.
+
+## Impacto
+- No se considera cierre definitivo de base.
+- `MYSQL_DSN` debe vivir solo como secreto de Railway.
+- El cierre final sera Railway Pro con IP fija o Hostinger VPS con MariaDB local.
+- Al cerrar definitivamente se debe quitar `%`, rotar password MySQL, redeploy y ejecutar smoke.
+
+#decision #security #mysql #railway #hostinger
+
+---

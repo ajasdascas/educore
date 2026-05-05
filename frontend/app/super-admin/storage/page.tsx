@@ -17,9 +17,10 @@ export default function StoragePage() {
       ]}
       actions={[
         {
-          label: "Archivar demo",
+          label: "Solicitar archivado",
           endpoint: "/api/v1/super-admin/storage/archive",
           body: { confirmation_text: "ARCHIVE" },
+          confirmMessage: "Se registrara una solicitud de archivado. No borra archivos automaticamente.",
         },
       ]}
     />

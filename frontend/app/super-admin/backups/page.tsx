@@ -19,9 +19,10 @@ export default function BackupsPage() {
       ]}
       actions={[
         {
-          label: "Crear backup demo",
+          label: "Crear backup",
           endpoint: "/api/v1/super-admin/backups",
           body: { type: "full" },
+          confirmMessage: "Se registrara un job de backup global. Confirma que quieres continuar.",
         },
       ]}
     />

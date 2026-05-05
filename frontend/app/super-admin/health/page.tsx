@@ -21,9 +21,10 @@ export default function HealthPage() {
       ]}
       actions={[
         {
-          label: "Registrar evento demo",
+          label: "Registrar evento operativo",
           endpoint: "/api/v1/super-admin/health/events",
-          body: { module_key: "reports", severity: "warning", status: "degraded", message: "Export demo lento", error_rate: 2.5, latency_ms: 680 },
+          body: { module_key: "reports", severity: "warning", status: "degraded", message: "Evento operativo registrado desde SuperAdmin", error_rate: 2.5, latency_ms: 680 },
+          confirmMessage: "Se guardara un evento de health en la base de datos. Confirma que quieres continuar.",
         },
       ]}
     />

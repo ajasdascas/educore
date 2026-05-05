@@ -29,6 +29,7 @@ export type EnterpriseAction = {
   method?: "POST" | "PATCH" | "PUT" | "DELETE";
   body?: Record<string, unknown>;
   variant?: "default" | "outline" | "destructive";
+  confirmMessage?: string;
 };
 
 type Props = {
@@ -73,12 +74,14 @@ export function EnterpriseResourcePage({
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [rawData, setRawData] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [query, setQuery] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { toast } = useToast();
 
   const load = async () => {
     setLoading(true);
+    setErrorMessage("");
     try {
       const res = await authFetch(endpoint);
       if (!res.success) throw new Error(res.message || res.error || "Error al cargar datos");
@@ -86,6 +89,8 @@ export function EnterpriseResourcePage({
       setRawData(data);
       setRows(Array.isArray(data[collectionKey]) ? data[collectionKey] : []);
     } catch (error: any) {
+      setRows([]);
+      setErrorMessage(error.message || "No se pudo cargar la informacion");
       toast({
         title: "Error",
         description: error.message || "No se pudo cargar la informacion",
@@ -107,6 +112,9 @@ export function EnterpriseResourcePage({
   }, [query, rows]);
 
   const runAction = async (action: EnterpriseAction) => {
+    if (action.confirmMessage && !window.confirm(action.confirmMessage)) {
+      return;
+    }
     setActionLoading(action.label);
     try {
       const res = await authFetch(action.endpoint, {
@@ -196,6 +204,15 @@ export function EnterpriseResourcePage({
             <div className="flex h-40 items-center justify-center text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Cargando
+            </div>
+          ) : errorMessage ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-6 text-center">
+              <p className="font-medium text-destructive">No se pudo cargar esta vista</p>
+              <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
+              <Button variant="outline" className="mt-4" onClick={load}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reintentar
+              </Button>
             </div>
           ) : (
             <div className="rounded-md border">

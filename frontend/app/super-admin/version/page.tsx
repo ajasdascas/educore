@@ -20,6 +20,7 @@ export default function VersionPage() {
           label: "Registrar deploy",
           endpoint: "/api/v1/super-admin/version/deploy",
           body: { confirmation_text: "DEPLOY" },
+          confirmMessage: "Se registrara un evento de deploy auditado. No despliega codigo automaticamente.",
         },
       ]}
     />

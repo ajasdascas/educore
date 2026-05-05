@@ -3,6 +3,7 @@ package superadmin
 import (
 	"context"
 	"educore/internal/pkg/response"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -350,7 +351,6 @@ func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 func (h *Handler) GetGlobalUserActivity(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	// Check if user exists
 	exists, err := h.globalUserExists(c.UserContext(), id)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error checking user")
@@ -359,21 +359,33 @@ func (h *Handler) GetGlobalUserActivity(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
 	}
 
-	// For now, return placeholder data
-	// TODO: Implement actual activity tracking
-	activities := []fiber.Map{
-		{
-			"action":      "login",
-			"description": "Logged into the platform",
-			"ip_address":  "192.168.1.100",
-			"timestamp":   time.Now().Add(-2 * time.Hour),
-		},
-		{
-			"action":      "school_created",
-			"description": "Created school: Colegio San Miguel",
-			"ip_address":  "192.168.1.100",
-			"timestamp":   time.Now().Add(-24 * time.Hour),
-		},
+	rows, err := h.db.Query(c.UserContext(),
+		`SELECT action, COALESCE(resource, ''), COALESCE(resource_id::text, ''), severity, details, COALESCE(ip_address::text, ''), created_at
+		 FROM audit_logs
+		 WHERE user_id = $1 OR acting_user_id = $1
+		 ORDER BY created_at DESC LIMIT 50`, id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching user activity")
+	}
+	defer rows.Close()
+
+	activities := []fiber.Map{}
+	for rows.Next() {
+		var action, resource, resourceID, severity, ip string
+		var details []byte
+		var createdAt time.Time
+		if err := rows.Scan(&action, &resource, &resourceID, &severity, &details, &ip, &createdAt); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error reading user activity")
+		}
+		activities = append(activities, fiber.Map{
+			"action":      action,
+			"resource":    resource,
+			"resource_id": resourceID,
+			"severity":    severity,
+			"details":     json.RawMessage(details),
+			"ip_address":  ip,
+			"timestamp":   createdAt,
+		})
 	}
 
 	return response.Success(c, activities, "User activity retrieved")

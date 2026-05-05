@@ -808,3 +808,15 @@ Validacion local: `npx tsc --noEmit`, `NEXT_PUBLIC_DEMO_MODE=false npm run build
 - Se agrego `frontend/public/.htaccess` para no cachear HTML y cachear assets hasheados como immutable.
 - Se modifico `.github/workflows/deploy.yml` para dejar de borrar assets antiguos durante deploy FTP, evitando que HTML cacheado quede sin CSS/JS.
 - No se tocaron `.agents/`, `AGENTS.md`, `.env`, backend productivo, Hostinger MySQL ni Cloudflare.
+
+---
+
+# 04-05-2026 - Hardening MySQL parcial + inicio pulido SuperAdmin
+
+Giovanni confirmo que no hay IP fija en Railway porque no se esta pagando Static Outbound IP. Se decidio no quitar `Any Host (%)` de Hostinger Remote MySQL todavia, porque produccion ya esta corriendo `DB_DRIVER=mysql` desde Railway y cerrar `%` podria romper la API productiva.
+
+Se documento la excepcion temporal en el runbook Hostinger/Cloudflare y en decisiones: `MYSQL_DSN` debe vivir solo como secreto de Railway; el usuario MySQL de app debe ser dedicado y de permisos minimos; el cierre definitivo sera Railway Pro con IP fija o Hostinger VPS con MariaDB local, seguido de rotacion de password y smoke.
+
+Se empezo el pulido real del SuperAdmin: endpoints para notificaciones derivadas de `audit_logs`, sesiones desde `user_sessions`, actividad real de usuarios globales desde auditoria y paginas conectadas para Notificaciones, Seguridad, Configuracion y Perfil. Tambien se quitaron etiquetas "demo" de acciones enterprise y se agregaron confirmaciones.
+
+#memory #security #mysql #super_admin #frontend #backend
