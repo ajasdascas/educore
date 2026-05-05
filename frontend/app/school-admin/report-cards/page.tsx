@@ -36,6 +36,7 @@ export default function SchoolAdminReportCardsPage() {
   const [period, setPeriod] = useState("current");
   const [report, setReport] = useState<ReportCard | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -69,15 +70,110 @@ export default function SchoolAdminReportCardsPage() {
     }
   };
 
-  const downloadPreview = () => {
-    if (!report) return;
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `boleta-${report.student_name.replaceAll(" ", "-").toLowerCase()}-${report.period}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const downloadPDF = async () => {
+    if (!report || exporting) return;
+    try {
+      setExporting(true);
+      const { default: jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const lineH = 7;
+      let y = 22;
+
+      // Header
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("BOLETA DE CALIFICACIONES", margin, y);
+      y += lineH + 2;
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageW - margin, y);
+      y += 9;
+
+      // Student info
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Alumno: ${report.student_name}`, margin, y); y += lineH;
+      doc.text(`Grupo: ${report.group_name || selectedStudent?.group_name || "Sin grupo"}`, margin, y); y += lineH;
+      doc.text(`Periodo: ${report.period}`, margin, y); y += lineH;
+      doc.setFont("helvetica", "bold");
+      doc.text(`Promedio general: ${report.overall_gpa.toFixed(2)}   Nivel: ${report.overall_grade}`, margin, y); y += lineH;
+      doc.setFont("helvetica", "normal");
+      doc.text(`Asistencia: ${report.attendance_rate}%`, margin, y); y += lineH;
+      const genDate = new Date(report.generated_at).toLocaleString("es-MX");
+      doc.text(`Generado: ${genDate}`, margin, y); y += lineH + 4;
+
+      // Grades
+      doc.line(margin, y, pageW - margin, y); y += 7;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("CALIFICACIONES", margin, y); y += lineH + 2;
+      doc.line(margin, y, pageW - margin, y); y += 7;
+
+      if (report.subject_grades.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(10);
+        doc.text("Sin calificaciones registradas para este periodo.", margin, y);
+        y += lineH + 4;
+      } else {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("Materia", margin, y);
+        doc.text("Profesor", margin + 65, y);
+        doc.text("Promedio", margin + 125, y);
+        doc.text("Nivel", margin + 150, y);
+        y += lineH;
+        doc.line(margin, y, pageW - margin, y); y += 4;
+
+        doc.setFont("helvetica", "normal");
+        for (const sg of report.subject_grades) {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.text(sg.subject_name.substring(0, 30), margin, y);
+          doc.text(sg.teacher_name.substring(0, 26), margin + 65, y);
+          doc.text(sg.average.toFixed(2), margin + 125, y);
+          doc.text(sg.letter_grade, margin + 150, y);
+          y += lineH;
+        }
+        y += 4;
+      }
+
+      // Comments
+      if (report.comments.length > 0) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.line(margin, y, pageW - margin, y); y += 7;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text("COMENTARIOS DOCENTES", margin, y); y += lineH + 2;
+        doc.line(margin, y, pageW - margin, y); y += 7;
+
+        doc.setFontSize(10);
+        for (const c of report.comments) {
+          if (y > 260) { doc.addPage(); y = 20; }
+          doc.setFont("helvetica", "bold");
+          doc.text(`${c.subject} — ${c.teacher_name}`, margin, y); y += lineH - 1;
+          doc.setFont("helvetica", "normal");
+          const lines = doc.splitTextToSize(c.comment, pageW - margin * 2) as string[];
+          for (const line of lines) {
+            if (y > 278) { doc.addPage(); y = 20; }
+            doc.text(line, margin, y); y += lineH - 1;
+          }
+          y += 4;
+        }
+      }
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text("Generado por EduCore — Sistema de Administracion Escolar", pageW / 2, 290, { align: "center" });
+
+      const slug = report.student_name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      doc.save(`boleta-${slug}-${report.period}.pdf`);
+      toast({ title: "PDF exportado", description: `boleta-${slug}-${report.period}.pdf descargado.` });
+    } catch {
+      toast({ title: "No se pudo exportar", description: "Intenta de nuevo.", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -121,7 +217,10 @@ export default function SchoolAdminReportCardsPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" disabled={!report} onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Imprimir</Button>
-              <Button variant="outline" disabled={!report} onClick={downloadPreview}><Download className="mr-2 h-4 w-4" />Exportar</Button>
+              <Button variant="outline" disabled={!report || exporting} onClick={() => void downloadPDF()}>
+                {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Exportar PDF
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -133,31 +232,37 @@ export default function SchoolAdminReportCardsPage() {
                   <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Asistencia</p><p className="text-2xl font-bold">{report.attendance_rate}%</p></CardContent></Card>
                   <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Periodo</p><p className="text-lg font-bold">{report.period}</p></CardContent></Card>
                 </div>
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>Profesor</TableHead><TableHead>Promedio</TableHead><TableHead>Nivel</TableHead><TableHead>Esfuerzo</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {report.subject_grades.map((subject) => (
-                        <TableRow key={`${subject.subject_name}-${subject.teacher_name}`}>
-                          <TableCell className="font-medium">{subject.subject_name}</TableCell>
-                          <TableCell>{subject.teacher_name}</TableCell>
-                          <TableCell>{subject.average}</TableCell>
-                          <TableCell><Badge>{subject.letter_grade}</Badge></TableCell>
-                          <TableCell>{subject.effort}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {report.comments.map((comment) => (
-                    <div key={`${comment.subject}-${comment.date}`} className="rounded-lg border p-4">
-                      <p className="font-medium">{comment.subject}</p>
-                      <p className="text-sm text-muted-foreground">{comment.teacher_name}</p>
-                      <p className="mt-2 text-sm">{comment.comment}</p>
-                    </div>
-                  ))}
-                </div>
+                {report.subject_grades.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>Profesor</TableHead><TableHead>Promedio</TableHead><TableHead>Nivel</TableHead><TableHead>Esfuerzo</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {report.subject_grades.map((subject) => (
+                          <TableRow key={`${subject.subject_name}-${subject.teacher_name}`}>
+                            <TableCell className="font-medium">{subject.subject_name}</TableCell>
+                            <TableCell>{subject.teacher_name}</TableCell>
+                            <TableCell>{subject.average}</TableCell>
+                            <TableCell><Badge>{subject.letter_grade}</Badge></TableCell>
+                            <TableCell>{subject.effort}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">Sin calificaciones registradas para este periodo.</div>
+                )}
+                {report.comments.length > 0 && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {report.comments.map((comment) => (
+                      <div key={`${comment.subject}-${comment.date}`} className="rounded-lg border p-4">
+                        <p className="font-medium">{comment.subject}</p>
+                        <p className="text-sm text-muted-foreground">{comment.teacher_name}</p>
+                        <p className="mt-2 text-sm">{comment.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
               <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">Sin preview generado.</div>

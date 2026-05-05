@@ -92,12 +92,69 @@ func (h *Handler) ExportReport(c *fiber.Ctx) error {
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
 	}
+	filename, content, mimeType := buildExportContent(report)
 	return response.Success(c, fiber.Map{
-		"url":      fmt.Sprintf("/exports/%s.%s", report.ID, report.Format),
-		"report":   report,
-		"demo":     true,
-		"message":  "En produccion este endpoint retorna la URL de descarga del archivo generado",
+		"filename":  filename,
+		"content":   content,
+		"mime_type": mimeType,
 	}, "Export ready")
+}
+
+func buildExportContent(report *SchoolReport) (filename, content, mimeType string) {
+	safe := strings.ToLower(strings.ReplaceAll(report.Type, "_", "-"))
+	base := fmt.Sprintf("reporte-%s-%s", safe, report.StartDate)
+
+	switch report.Format {
+	case "json":
+		filename = base + ".json"
+		mimeType = "application/json"
+		b, _ := json.MarshalIndent(report, "", "  ")
+		content = string(b)
+	default: // csv, excel, pdf — CSV is the universal text export
+		filename = base + ".csv"
+		mimeType = "text/csv; charset=utf-8"
+		content = buildCSVContent(report)
+	}
+	return
+}
+
+func buildCSVContent(report *SchoolReport) string {
+	var sb strings.Builder
+	sb.WriteString("Campo,Valor\n")
+	sb.WriteString(fmt.Sprintf("Reporte,%q\n", report.Name))
+	sb.WriteString(fmt.Sprintf("Tipo,%s\n", report.Type))
+	sb.WriteString(fmt.Sprintf("Estado,%s\n", report.Status))
+	sb.WriteString(fmt.Sprintf("Grupo,%s\n", report.GroupName))
+	sb.WriteString(fmt.Sprintf("Inicio,%s\n", report.StartDate))
+	sb.WriteString(fmt.Sprintf("Fin,%s\n", report.EndDate))
+	sb.WriteString(fmt.Sprintf("Generado por,%s\n", report.GeneratedBy))
+	sb.WriteString(fmt.Sprintf("Creado,%s\n", report.CreatedAt.Format("2006-01-02 15:04")))
+	sb.WriteString("\n")
+
+	var summary map[string]interface{}
+	if len(report.Summary) > 0 {
+		_ = json.Unmarshal(report.Summary, &summary)
+	}
+	if len(summary) > 0 {
+		sb.WriteString("RESUMEN\n")
+		sb.WriteString(fmt.Sprintf("Asistencia,%v%%\n", summary["attendance_rate"]))
+		sb.WriteString(fmt.Sprintf("Promedio,%v\n", summary["average_grade"]))
+		sb.WriteString(fmt.Sprintf("Total alumnos,%v\n", summary["total_students"]))
+		sb.WriteString(fmt.Sprintf("En riesgo,%v\n", summary["risk_students"]))
+		sb.WriteString("\n")
+	}
+
+	var insights []string
+	if len(report.Insights) > 0 {
+		_ = json.Unmarshal(report.Insights, &insights)
+	}
+	if len(insights) > 0 {
+		sb.WriteString("HALLAZGOS\n")
+		for _, insight := range insights {
+			sb.WriteString(fmt.Sprintf("%q\n", insight))
+		}
+	}
+	return sb.String()
 }
 
 func (h *Handler) DeleteReport(c *fiber.Ctx) error {
