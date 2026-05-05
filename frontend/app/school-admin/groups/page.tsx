@@ -283,7 +283,7 @@ function SchoolGroupsContent() {
         method: editingGroup ? "PUT" : "POST",
         body: JSON.stringify(toPayload(form)),
       });
-      if (!response?.success) throw new Error(response?.message || "Operacion rechazada por el servidor.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "Operacion rechazada por el servidor.");
       toast({ title: editingGroup ? "Grupo actualizado" : "Grupo creado", description: "La estructura academica quedo sincronizada." });
       setFormOpen(false);
       await loadData();
@@ -305,7 +305,7 @@ function SchoolGroupsContent() {
         method: "PUT",
         body: JSON.stringify({ status }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo cambiar el estado.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo cambiar el estado.");
       setGroups((current) => current.map((item) => (item.id === group.id ? { ...item, status } : item)));
       toast({ title: "Estado actualizado", description: `${group.grade_name} ${group.name} fue actualizado.` });
     } catch (error) {
@@ -322,7 +322,7 @@ function SchoolGroupsContent() {
     try {
       setSaving(true);
       const response = await authFetch(`/api/v1/school-admin/academic/groups/${selectedGroup.id}`, { method: "DELETE" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo eliminar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo eliminar.");
       setGroups((current) => current.filter((group) => group.id !== selectedGroup.id));
       toast({ title: "Grupo eliminado", description: "El grupo fue retirado del ciclo actual." });
       setDeleteOpen(false);

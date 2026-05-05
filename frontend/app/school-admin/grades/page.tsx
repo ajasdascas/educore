@@ -119,7 +119,7 @@ function GradesContent() {
         method: "POST",
         body: JSON.stringify({ grades }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo guardar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo guardar.");
       toast({ title: "Calificaciones guardadas", description: `${grades.length} evaluaciones sincronizadas.` });
       await loadGrades(groupID, subjectID);
     } catch (error) {

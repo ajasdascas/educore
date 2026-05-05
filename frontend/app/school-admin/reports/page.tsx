@@ -220,7 +220,7 @@ function SchoolReportsContent() {
         method: "POST",
         body: JSON.stringify(form),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo generar el reporte.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo generar el reporte.");
       toast({ title: "Reporte generado", description: "El reporte quedo disponible en el historial." });
       setFormOpen(false);
       await loadData();
@@ -250,7 +250,7 @@ function SchoolReportsContent() {
           include_details: true,
         }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo reprocesar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo reprocesar.");
       toast({ title: "Reporte reprocesado", description: "Se genero una copia actualizada." });
       await loadData();
     } catch (error) {
@@ -267,7 +267,7 @@ function SchoolReportsContent() {
   const exportReport = async (report: SchoolReport) => {
     try {
       const response = await authFetch(`/api/v1/school-admin/reports/${report.id}/export`, { method: "POST" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo exportar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo exportar.");
       downloadTextFile(response.data.filename, response.data.content, response.data.mime_type);
       toast({ title: "Descarga lista", description: `${response.data.filename} fue generado.` });
     } catch (error) {
@@ -284,7 +284,7 @@ function SchoolReportsContent() {
     try {
       setSaving(true);
       const response = await authFetch(`/api/v1/school-admin/reports/${selectedReport.id}`, { method: "DELETE" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo eliminar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo eliminar.");
       setReports((current) => current.filter((report) => report.id !== selectedReport.id));
       toast({ title: "Reporte eliminado", description: "El historial fue actualizado." });
       setDeleteOpen(false);

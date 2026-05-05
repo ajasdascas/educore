@@ -82,7 +82,7 @@ export default function SchoolAdminSettingsPage() {
     try {
       setLoading(true);
       const response = await authFetch("/api/v1/school-admin/settings");
-      if (!response?.success) throw new Error(response?.message || "No se pudo cargar configuracion.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo cargar configuracion.");
       setSettings(mergeSettings(response.data || {}));
     } catch (error) {
       toast({ title: "No se pudo cargar configuracion", description: error instanceof Error ? error.message : "Intenta de nuevo.", variant: "destructive" });
@@ -120,7 +120,7 @@ export default function SchoolAdminSettingsPage() {
         method: "PUT",
         body: JSON.stringify(settings),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo guardar configuracion.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo guardar configuracion.");
       setSettings(mergeSettings(response.data || settings));
       toast({ title: "Configuracion guardada", description: "Los ajustes de la escuela quedaron sincronizados." });
     } catch (error) {

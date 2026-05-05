@@ -106,10 +106,18 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     return { success: false, error: "Demo tokens are disabled" };
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (networkErr) {
+    return {
+      success: false,
+      error: `No se pudo conectar al servidor (${API_URL}). Verifica que el backend esté activo y que CORS permita este origen.`,
+    };
+  }
 
   if (response.status === 401 && token) {
     const refreshed = await tryRefreshToken();
@@ -118,11 +126,15 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
         ...headers,
         Authorization: `Bearer ${getAccessToken()}`,
       };
-      const retryResponse = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        headers: retryHeaders,
-      });
-      return retryResponse.json();
+      try {
+        const retryResponse = await fetch(`${API_URL}${endpoint}`, {
+          ...options,
+          headers: retryHeaders,
+        });
+        return retryResponse.json();
+      } catch {
+        return { success: false, error: "No se pudo reconectar después de refrescar sesión." };
+      }
     }
 
     clearAuth();
@@ -130,7 +142,20 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     throw new Error("Session expired");
   }
 
-  return response.json();
+  if (response.status === 403) {
+    let body: any = null;
+    try { body = await response.json(); } catch { /* ignore */ }
+    return {
+      success: false,
+      error: body?.error || "Sin permisos. Si eres Super Admin, selecciona una escuela primero desde /super-admin/schools.",
+    };
+  }
+
+  try {
+    return await response.json();
+  } catch {
+    return { success: false, error: `Respuesta inválida del servidor (HTTP ${response.status}).` };
+  }
 }
 
 async function tryRefreshToken(): Promise<boolean> {

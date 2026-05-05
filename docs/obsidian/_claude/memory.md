@@ -48,6 +48,30 @@ Esta sesión se centró en dos objetivos principales:
 - La base arquitectónica permite desarrollo rápido de módulos adicionales
 - El CLAUDE.md actualizado sirve como guía completa para el desarrollo
 
+---
+
+## Actualización: 2026-05-05 (sesión tarde) — SUPER_ADMIN Support Mode
+
+### Problema raíz resuelto
+SUPER_ADMIN tiene `tenant_id = NULL` en su JWT. Los handlers de `school_admin` hacían `c.Locals("tenant_id").(string)` → panic con nil. Resultado: HTTP 500 → el frontend mostraba "Operación rechazada por el servidor".
+
+### Solución implementada
+- **Backend auth middleware:** Lee `X-Support-Tenant-ID` header; si el rol es SUPER_ADMIN, inyecta ese tenant_id en Fiber locals. Seguro: solo se acepta si role=SUPER_ADMIN.
+- **getTenantID() helper:** Reemplaza 74 aserciones directas en handler.go, communications.go, reports.go, database_explorer.go. Devuelve `403 + "no school context"` en vez de panic.
+- **Frontend auth.ts:** `setSupportContext / getSupportContext / clearSupportContext / isSupportMode` en sessionStorage. `buildAuthHeaders` inyecta el header automáticamente.
+
+### Nuevas páginas/componentes
+- `frontend/components/SupportModeBanner.tsx` — banner amber en school-admin layout para SUPER_ADMIN
+- `frontend/app/super-admin/lab/page.tsx` — Lab/demo QA center con selector de escuela, health checks, acceso a módulos
+- `frontend/app/super-admin/schools/details/page.tsx` — tarjeta "Modo Soporte" con acceso directo a cada módulo
+
+### Commit: e2897e6 — pushed master
+
+### Pasos manuales pendientes (producción)
+1. Importar `backend/migrations_mysql/006_student_portal_user_id.sql` en Hostinger phpMyAdmin
+2. Crear usuario `role=STUDENT` desde School Admin → Estudiantes → "Crear Cuenta de Portal"
+3. `STUDENT_EMAIL=xxx STUDENT_PASSWORD=xxx node scripts/check-student-api.js`
+
 ### Lecciones aprendidas
 - **Theme management:** Importante verificar todas las variables CSS en cada tema
 - **Dependency management:** Verificar todas las dependencias antes de usar componentes

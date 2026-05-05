@@ -285,7 +285,7 @@ function SchoolAdminCommunicationsContent() {
         method: "POST",
         body: JSON.stringify(body),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo guardar el comunicado.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo guardar el comunicado.");
       toast({
         title: formMode === "draft" ? "Borrador guardado" : formMode === "schedule" ? "Comunicado programado" : "Comunicado enviado",
         description: response.message || "Cambios aplicados en modo demo.",
@@ -331,7 +331,7 @@ function SchoolAdminCommunicationsContent() {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo reenviar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo reenviar.");
       toast({ title: "Comunicado reenviado", description: "Se creo un nuevo envio en modo demo." });
       await loadData();
     } catch (error) {
@@ -351,7 +351,7 @@ function SchoolAdminCommunicationsContent() {
         method: "PUT",
         body: JSON.stringify({ read_count: communication.delivered_count }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo actualizar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo actualizar.");
       toast({ title: "Lecturas actualizadas", description: "El comunicado quedo marcado como leido en modo demo." });
       await loadData();
     } catch (error) {
@@ -368,7 +368,7 @@ function SchoolAdminCommunicationsContent() {
     try {
       setSaving(true);
       const response = await authFetch(`/api/v1/school-admin/communications/${selectedCommunication.id}`, { method: "DELETE" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo eliminar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo eliminar.");
       toast({ title: "Comunicado eliminado", description: "El listado fue actualizado." });
       setCommunications((current) => current.filter((item) => item.id !== selectedCommunication.id));
       setDeleteOpen(false);

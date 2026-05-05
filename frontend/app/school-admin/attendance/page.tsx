@@ -127,7 +127,7 @@ function AttendanceContent() {
           })),
         }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo guardar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo guardar.");
       toast({ title: "Asistencia guardada", description: `${students.length} registros sincronizados.` });
       await loadAttendance(groupID);
     } catch (error) {

@@ -20,8 +20,9 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 ### 🛑 Pendientes Críticos (Lo que falta por hacer)
 1. ~~**Backend: Middleware de Cuotas**~~ ✅ **COMPLETADO 04-05-2026**
 2. ~~**Módulo STUDENT — SQL MySQL**~~ ✅ **CORREGIDO 05-05-2026** — ver sección avance
-3. **Activar estudiante en producción:** agregar columna `user_id` a tabla `students` en Hostinger con migration `006_student_portal_user_id.sql`. Luego crear usuario con `role=STUDENT` desde School Admin.
-4. **Smoke test student portal:** correr `STUDENT_EMAIL=... STUDENT_PASSWORD=... node scripts/check-student-api.js` cuando haya un usuario STUDENT real.
+3. ~~**SUPER_ADMIN — error 403 al crear estudiante**~~ ✅ **CORREGIDO 05-05-2026** — ver avance sesión 4
+4. **Activar estudiante en producción:** agregar columna `user_id` a tabla `students` en Hostinger con migration `006_student_portal_user_id.sql`. Luego crear usuario con `role=STUDENT` desde School Admin.
+5. **Smoke test student portal:** correr `STUDENT_EMAIL=... STUDENT_PASSWORD=... node scripts/check-student-api.js` cuando haya un usuario STUDENT real.
 
 ## 🛠️ Stack y Configuración
 - **Backend:** Go (Fiber) + MySQL (producción Railway + Hostinger) | PostgreSQL (legacy/dev).
@@ -83,6 +84,22 @@ Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la ba
 - **Catalogo modular SaaS:** se alinearon 4 Core reales (`auth`, `users`, `academic_core`, `grading`) y extensiones vendibles por plan/add-on con migracion `016_modular_saas_catalog_and_plans.sql`.
 
 #module #school_admin #academic_core #grading #frontend #backend #security
+
+## Avance 05-05-2026 (sesión tarde — Soporte SUPER_ADMIN + Fix 403)
+- **SUPER_ADMIN Modo Soporte:** SUPER_ADMIN ahora puede seleccionar una escuela desde `/super-admin/schools/details` o desde el Lab y operar dentro de su contexto via header `X-Support-Tenant-ID`. El JWT del SUPER_ADMIN no se modifica; el tenant se inyecta solo como contexto local en Fiber.
+- **Fix 74 panic — getTenantID():** Reemplazadas 74 aserciones `.(string)` inseguras en `handler.go`, `communications.go`, `reports.go`, `database_explorer.go` por helper `getTenantID(c)` que devuelve `403 + mensaje claro` en vez de panic.
+- **SupportModeBanner:** Componente amber visible solo en rutas `/school-admin/*` cuando el usuario es SUPER_ADMIN en modo soporte. Muestra nombre de escuela y botón "Salir".
+- **Super Admin Lab:** Nueva ruta `/super-admin/lab` — selector de escuela, acceso a todos los módulos en modo soporte, health check del backend y verificación de school-info pública.
+- **School Details — Modo Soporte:** Tarjeta "Acceso Rápido" en `/super-admin/schools/details` con botones a cada módulo de la escuela seleccionada.
+- **Fix error messages frontend:** `students/page.tsx` ahora usa `response?.error || response?.message` — se mostraba "undefined" porque el backend envía `error`, no `message`.
+- **Commit:** `e2897e6` — pushed a `master`.
+
+### 🔴 Pasos manuales pendientes en producción
+- Importar `006_student_portal_user_id.sql` en Hostinger phpMyAdmin para agregar `students.user_id`.
+- Crear un usuario con `role=STUDENT` desde School Admin → Estudiantes → crear cuenta de portal.
+- Smoke test: `STUDENT_EMAIL=xxx STUDENT_PASSWORD=xxx node scripts/check-student-api.js`
+
+#module #super_admin #school_admin #backend #security #student_portal
 
 ## Avance 04-05-2026 (sesión tarde)
 - **Landing page pública `/`:** página de marketing completa con Framer Motion — navbar sticky con mobile menu AnimatePresence, hero con blobs animados + AnimatedCounter en stats, grid de 9 soluciones con stagger 80ms, diferenciadores con scroll-trigger, testimonios con estrellas spring, video block con ripple rings, FAQ accordion AnimatePresence, formulario de contacto con spinner y success state animado. `prefers-reduced-motion` respetado en todos los elementos.

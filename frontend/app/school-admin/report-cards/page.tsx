@@ -59,7 +59,7 @@ export default function SchoolAdminReportCardsPage() {
         method: "POST",
         body: JSON.stringify({ student_id: studentID, period, include_attendance: true, include_comments: true }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo generar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo generar.");
       setReport(response.data);
       toast({ title: "Boleta generada", description: "Preview listo para revision y exportacion." });
     } catch (error) {

@@ -244,7 +244,7 @@ function SchoolTeachersContent() {
       });
 
       if (!response?.success) {
-        throw new Error(response?.message || "Operacion rechazada por el servidor.");
+        throw new Error(response?.error || response?.message || "Operacion rechazada por el servidor.");
       }
 
       toast({
@@ -273,7 +273,7 @@ function SchoolTeachersContent() {
       });
 
       if (!response?.success) {
-        throw new Error(response?.message || "No se pudo cambiar el estado.");
+        throw new Error(response?.error || response?.message || "No se pudo cambiar el estado.");
       }
 
       setTeachers((current) =>

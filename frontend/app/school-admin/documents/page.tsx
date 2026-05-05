@@ -199,7 +199,7 @@ export default function SchoolAdminDocumentsPage() {
         method: editingDoc ? "PUT" : "POST",
         body: JSON.stringify(form),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo guardar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo guardar.");
       toast({ title: editingDoc ? "Documento reemplazado" : "Documento guardado", description: "El expediente digital fue actualizado." });
       setUploadOpen(false);
       await loadDocuments();
@@ -213,7 +213,7 @@ export default function SchoolAdminDocumentsPage() {
   const verify = async (doc: DocumentItem) => {
     try {
       const response = await authFetch(`/api/v1/school-admin/documents/${doc.id}/verify`, { method: "PATCH" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo verificar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo verificar.");
       setDocuments((current) => current.map((item) => item.id === doc.id ? { ...item, is_verified: true, verified_at: new Date().toISOString() } : item));
       toast({ title: "Documento verificado" });
     } catch (error) {
@@ -224,7 +224,7 @@ export default function SchoolAdminDocumentsPage() {
   const remove = async (doc: DocumentItem) => {
     try {
       const response = await authFetch(`/api/v1/school-admin/documents/${doc.id}`, { method: "DELETE" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo eliminar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo eliminar.");
       setDocuments((current) => current.filter((item) => item.id !== doc.id));
       toast({ title: "Documento eliminado" });
     } catch (error) {

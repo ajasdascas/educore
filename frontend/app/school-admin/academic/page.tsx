@@ -166,7 +166,7 @@ function SchoolAcademicStructureContent() {
         method: editingYear ? "PUT" : "POST",
         body: JSON.stringify(yearForm),
       });
-      if (!response?.success) throw new Error(response?.message || "Operacion rechazada.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "Operacion rechazada.");
       toast({ title: editingYear ? "Ciclo actualizado" : "Ciclo creado", description: "La estructura de ciclos quedo sincronizada." });
       setYearOpen(false);
       await loadData();
@@ -190,7 +190,7 @@ function SchoolAcademicStructureContent() {
         method: editingSubject ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
-      if (!response?.success) throw new Error(response?.message || "Operacion rechazada.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "Operacion rechazada.");
       toast({ title: editingSubject ? "Materia actualizada" : "Materia creada", description: "El catalogo academico quedo actualizado." });
       setSubjectOpen(false);
       await loadData();

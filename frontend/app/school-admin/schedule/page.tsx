@@ -330,7 +330,7 @@ function SchoolScheduleContent() {
         method: editingBlock ? "PUT" : "POST",
         body: JSON.stringify(toPayload(form)),
       });
-      if (!response?.success) throw new Error(response?.message || "Operacion rechazada por el servidor.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "Operacion rechazada por el servidor.");
       toast({ title: editingBlock ? "Horario actualizado" : "Bloque creado", description: "La agenda semanal quedo sincronizada." });
       setFormOpen(false);
       await loadData();
@@ -352,7 +352,7 @@ function SchoolScheduleContent() {
         method: "PUT",
         body: JSON.stringify({ ...block, status }),
       });
-      if (!response?.success) throw new Error(response?.message || "No se pudo cambiar el estado.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo cambiar el estado.");
       setBlocks((current) => current.map((item) => (item.id === block.id ? { ...item, status } : item)));
       toast({ title: "Estado actualizado", description: `${block.subject} fue ${status === "active" ? "activado" : "pausado"}.` });
     } catch (error) {
@@ -369,7 +369,7 @@ function SchoolScheduleContent() {
     try {
       setSaving(true);
       const response = await authFetch(`/api/v1/school-admin/academic/schedule/${selectedBlock.id}`, { method: "DELETE" });
-      if (!response?.success) throw new Error(response?.message || "No se pudo eliminar.");
+      if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo eliminar.");
       setBlocks((current) => current.filter((block) => block.id !== selectedBlock.id));
       toast({ title: "Bloque eliminado", description: "El horario se retiro de la agenda semanal." });
       setDeleteOpen(false);
