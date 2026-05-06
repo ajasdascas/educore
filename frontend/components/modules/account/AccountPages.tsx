@@ -136,12 +136,23 @@ interface Notification {
   created_at: string;
 }
 
+function notificationEndpointForRole(role?: string): string {
+  switch (role) {
+    case "TEACHER": return "/api/v1/teacher/notifications";
+    case "SCHOOL_ADMIN": return "/api/v1/school-admin/notifications";
+    case "PARENT": return "/api/v1/parent/notifications";
+    default: return "/api/v1/student/notifications";
+  }
+}
+
 export function AccountNotificationsPage({ roleLabel }: AccountPageProps) {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    authFetch("/api/v1/student/notifications")
+    const endpoint = notificationEndpointForRole(user?.role);
+    authFetch(endpoint)
       .then((res) => {
         if (res?.success) {
           const raw = Array.isArray(res.data) ? res.data : res.data?.notifications ?? [];
@@ -149,7 +160,7 @@ export function AccountNotificationsPage({ roleLabel }: AccountPageProps) {
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.role]);
 
   return (
     <div className="space-y-6">
