@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, GraduationCap, Calendar, FileText, MessageCircle,
   Bell, ClipboardCheck, CreditCard, FolderOpen, Settings, Menu, User, X, Building2,
+  ClipboardList, Utensils, Moon, Droplets, Smile, AlertTriangle, ShoppingBag,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -19,6 +20,13 @@ import { Button } from "@/components/ui/button";
 const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
   { href: "/parent/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
   { href: "/parent/children",       label: "Mis Hijos",       icon: GraduationCap },
+  { href: "/parent/daily-logs",     label: "Registro Diario", icon: ClipboardList,  moduleKey: "daily_logs" },
+  { href: "/parent/meals",          label: "Comidas",         icon: Utensils,       moduleKey: "meals" },
+  { href: "/parent/naps",           label: "Siestas",         icon: Moon,           moduleKey: "naps" },
+  { href: "/parent/diapers",        label: "Higiene",         icon: Droplets,       moduleKey: "diapers" },
+  { href: "/parent/mood",           label: "Estado Emocional",icon: Smile,          moduleKey: "mood" },
+  { href: "/parent/incidents",      label: "Incidentes",      icon: AlertTriangle,  moduleKey: "incidents" },
+  { href: "/parent/store",          label: "Tienda Escolar",  icon: ShoppingBag,    moduleKey: "school_store" },
   { href: "/parent/grades",         label: "Calificaciones",  icon: FileText,       moduleKey: "grading" },
   { href: "/parent/attendance",     label: "Asistencia",      icon: Calendar,       moduleKey: "attendance" },
   { href: "/parent/messages",       label: "Mensajes",        icon: MessageCircle,  moduleKey: "communications" },

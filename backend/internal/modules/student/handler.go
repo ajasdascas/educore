@@ -24,6 +24,12 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schedule", h.GetSchedule)
 	router.Get("/notifications", h.GetNotifications)
 	router.Put("/notifications/:id/read", h.MarkNotificationRead)
+
+	// Preescolar-specific routes
+	router.Get("/qualitative-assessments", h.GetQualitativeAssessments)
+	router.Get("/development-areas", h.GetDevelopmentAreas)
+	router.Get("/observations", h.GetObservations)
+	router.Get("/evidence", h.GetEvidence)
 }
 
 func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
@@ -182,4 +188,29 @@ func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Error marking notification as read")
 	}
 	return response.SuccessMessage(c, "Notification marked as read")
+}
+
+// Preescolar handlers — return empty list when feature data not yet stored
+func (h *Handler) getPreescolarData(c *fiber.Ctx, dataKey string) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	}
+	return response.Success(c, fiber.Map{dataKey: []interface{}{}}, "ok")
+}
+
+func (h *Handler) GetQualitativeAssessments(c *fiber.Ctx) error {
+	return h.getPreescolarData(c, "assessments")
+}
+
+func (h *Handler) GetDevelopmentAreas(c *fiber.Ctx) error {
+	return h.getPreescolarData(c, "development_areas")
+}
+
+func (h *Handler) GetObservations(c *fiber.Ctx) error {
+	return h.getPreescolarData(c, "observations")
+}
+
+func (h *Handler) GetEvidence(c *fiber.Ctx) error {
+	return h.getPreescolarData(c, "evidence")
 }

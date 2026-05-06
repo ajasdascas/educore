@@ -36,6 +36,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Post("/schools/:id/modules/toggle", h.ToggleModule)
 	router.Get("/modules-catalog", h.GetModulesCatalog)
 	router.Get("/education-levels", h.GetEducationLevels)
+	router.Get("/schools/:id/levels", h.GetSchoolLevels)
 	router.Post("/schools/:id/apply-module-template", h.ApplyModuleTemplate)
 	router.Post("/upload", h.UploadLogo)
 
@@ -1131,6 +1132,44 @@ func defaultPeriodsForLevels(levels []string) []string {
 		}
 	}
 	return []string{"Semestre 1", "Semestre 2"}
+}
+
+// GetSchoolLevels returns the education levels active for a specific school.
+func (h *Handler) GetSchoolLevels(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var exists bool
+	if err := h.db.QueryRow(c.UserContext(),
+		"SELECT EXISTS(SELECT 1 FROM tenants WHERE id = ?)", id).Scan(&exists); err != nil || !exists {
+		return response.Error(c, fiber.StatusNotFound, "School not found")
+	}
+
+	rows, err := h.db.Query(c.UserContext(),
+		"SELECT level_key, name, enabled, sort_order FROM school_levels WHERE tenant_id = ? ORDER BY sort_order", id)
+	if err != nil {
+		// school_levels may not exist yet for older tenants — return empty
+		return response.Success(c, fiber.Map{"levels": []fiber.Map{}}, "No levels configured")
+	}
+	defer rows.Close()
+
+	var levels []fiber.Map
+	for rows.Next() {
+		var key, name string
+		var enabled bool
+		var sortOrder int
+		if rows.Scan(&key, &name, &enabled, &sortOrder) == nil {
+			levels = append(levels, fiber.Map{
+				"level_key":  key,
+				"name":       name,
+				"enabled":    enabled,
+				"sort_order": sortOrder,
+			})
+		}
+	}
+	if levels == nil {
+		levels = []fiber.Map{}
+	}
+	return response.Success(c, fiber.Map{"levels": levels}, "School levels retrieved")
 }
 
 // GetEducationLevels returns supported education levels from the catalog.

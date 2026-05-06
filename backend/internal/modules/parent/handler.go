@@ -36,6 +36,14 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	child.Get("/teachers", h.GetChildTeachers)
 	child.Get("/assignments", h.GetChildAssignments)
 
+	// Kinder-specific child routes
+	child.Get("/daily-logs", h.GetChildDailyLogs)
+	child.Get("/meals", h.GetChildMeals)
+	child.Get("/naps", h.GetChildNaps)
+	child.Get("/diapers", h.GetChildDiapers)
+	child.Get("/mood", h.GetChildMood)
+	child.Get("/incidents", h.GetChildIncidents)
+
 	// Communications
 	api.Get("/notifications", h.GetNotifications)
 	api.Put("/notifications/:id/read", h.MarkNotificationRead)
@@ -437,4 +445,42 @@ func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching modules")
 	}
 	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved")
+}
+
+// Kinder handlers — return empty list when data not yet available (module may exist but no records)
+func (h *Handler) getKinderChildData(c *fiber.Ctx, dataKey string) error {
+	tenantID := c.Locals("tenant_id").(string)
+	userID := c.Locals("user_id").(string)
+	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
+
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
+	if err != nil || !hasAccess {
+		return response.Error(c, fiber.StatusForbidden, "Access denied")
+	}
+	return response.Success(c, fiber.Map{dataKey: []interface{}{}}, "No records yet")
+}
+
+func (h *Handler) GetChildDailyLogs(c *fiber.Ctx) error {
+	return h.getKinderChildData(c, "daily_logs")
+}
+
+func (h *Handler) GetChildMeals(c *fiber.Ctx) error {
+	return h.getKinderChildData(c, "meals")
+}
+
+func (h *Handler) GetChildNaps(c *fiber.Ctx) error {
+	return h.getKinderChildData(c, "naps")
+}
+
+func (h *Handler) GetChildDiapers(c *fiber.Ctx) error {
+	return h.getKinderChildData(c, "diapers")
+}
+
+func (h *Handler) GetChildMood(c *fiber.Ctx) error {
+	return h.getKinderChildData(c, "mood")
+}
+
+func (h *Handler) GetChildIncidents(c *fiber.Ctx) error {
+	return h.getKinderChildData(c, "incidents")
 }

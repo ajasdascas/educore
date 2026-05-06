@@ -98,6 +98,7 @@ function SchoolDetailContent() {
   const [school, setSchool] = useState<School | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [users, setUsers] = useState<SchoolUser[]>([]);
+  const [schoolLevels, setSchoolLevels] = useState<{level_key: string; name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -112,15 +113,17 @@ function SchoolDetailContent() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [schoolRes, modulesRes, usersRes] = await Promise.all([
+      const [schoolRes, modulesRes, usersRes, levelsRes] = await Promise.all([
         authFetch(`/api/v1/super-admin/schools/${id}`),
         authFetch(`/api/v1/super-admin/schools/${id}/modules`),
-        authFetch(`/api/v1/super-admin/schools/${id}/users`)
+        authFetch(`/api/v1/super-admin/schools/${id}/users`),
+        authFetch(`/api/v1/super-admin/schools/${id}/levels`),
       ]);
 
       if (schoolRes.success) setSchool(schoolRes.data);
       if (modulesRes.success) setModules(Array.isArray(modulesRes.data?.modules) ? modulesRes.data.modules : []);
       if (usersRes.success) setUsers(Array.isArray(usersRes.data?.users) ? usersRes.data.users : []);
+      if (levelsRes.success) setSchoolLevels(Array.isArray(levelsRes.data?.levels) ? levelsRes.data.levels : []);
     } catch (error) {
       toast({
         title: "Error",
@@ -357,6 +360,16 @@ function SchoolDetailContent() {
                     <Label className="text-muted-foreground">Última Actualización</Label>
                     <p className="font-medium">{new Date(school.updated_at).toLocaleString()}</p>
                   </div>
+                  {schoolLevels.length > 0 && (
+                    <div className="col-span-2">
+                      <Label className="text-muted-foreground">Niveles Educativos</Label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {schoolLevels.map((lvl) => (
+                          <Badge key={lvl.level_key} variant="secondary">{lvl.name || lvl.level_key}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -379,8 +392,24 @@ function SchoolDetailContent() {
               <CardDescription>Activa o desactiva funcionalidades específicas para esta escuela.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {modules.map((mod) => (
+              {(() => {
+                const coreModules = modules.filter(m => m.is_core || m.source === 'core' || !m.level);
+                const levelModules = modules.filter(m => !m.is_core && m.source !== 'core' && m.level);
+                const levelGroups: Record<string, typeof modules> = {};
+                for (const m of levelModules) {
+                  const key = m.level || 'otro';
+                  if (!levelGroups[key]) levelGroups[key] = [];
+                  levelGroups[key].push(m);
+                }
+                const levelLabels: Record<string, string> = {
+                  kinder: 'Kinder / Estancia',
+                  preescolar: 'Preescolar',
+                  primaria: 'Primaria',
+                  secundaria: 'Secundaria',
+                  preparatoria: 'Preparatoria',
+                };
+
+                const renderModuleRow = (mod: Module) => (
                   <div key={mod.key} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
@@ -400,14 +429,37 @@ function SchoolDetailContent() {
                         <p className="text-xs font-semibold text-blue-600">${mod.price_monthly_mxn} MXN/mes</p>
                       )}
                     </div>
-                    <Switch 
-                      checked={mod.is_active} 
+                    <Switch
+                      checked={mod.is_active}
                       disabled={mod.is_core || mod.is_required}
                       onCheckedChange={() => toggleModule(mod.key)}
                     />
                   </div>
-                ))}
-              </div>
+                );
+
+                return (
+                  <div className="space-y-8">
+                    {coreModules.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Módulos Core</h3>
+                        <div className="space-y-3">
+                          {coreModules.map(renderModuleRow)}
+                        </div>
+                      </div>
+                    )}
+                    {Object.entries(levelGroups).map(([levelKey, mods]) => (
+                      <div key={levelKey} className="space-y-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                          {levelLabels[levelKey] || levelKey}
+                        </h3>
+                        <div className="space-y-3">
+                          {mods.map(renderModuleRow)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>

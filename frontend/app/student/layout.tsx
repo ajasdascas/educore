@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, BookOpen, Building2, Calendar, ClipboardCheck,
   Bell, Settings, Menu, X, User, BookMarked, MessageCircle,
+  Star, MessageSquare, FolderOpen,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -21,6 +22,10 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: stri
   { href: "/student/profile",       label: "Mi Perfil",        icon: User },
   { href: "/student/grades",        label: "Calificaciones",   icon: BookOpen,       moduleKey: "grading" },
   { href: "/student/attendance",    label: "Asistencia",       icon: ClipboardCheck, moduleKey: "attendance" },
+  { href: "/student/qualitative-assessments", label: "Mis Evaluaciones",  icon: Star,          moduleKey: "qualitative_assessments" },
+  { href: "/student/development-areas",       label: "Campos Formativos", icon: BookMarked,    moduleKey: "development_areas" },
+  { href: "/student/observations",            label: "Observaciones",     icon: MessageSquare, moduleKey: "observations" },
+  { href: "/student/evidence",                label: "Evidencias",        icon: FolderOpen,    moduleKey: "photos_evidence" },
   { href: "/student/assignments",   label: "Tareas",           icon: BookMarked,     moduleKey: "assignments" },
   { href: "/student/schedule",      label: "Horario",          icon: Calendar,       moduleKey: "schedules" },
   { href: "/student/messages",      label: "Mensajes",         icon: MessageCircle,  moduleKey: "communications" },
