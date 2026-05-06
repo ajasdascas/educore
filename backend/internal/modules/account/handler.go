@@ -1,6 +1,7 @@
 package account
 
 import (
+	"database/sql"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/response"
 	"time"
@@ -115,12 +116,15 @@ func (h *Handler) UpdatePassword(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnprocessableEntity, "New password must be at least 8 characters")
 	}
 
-	var currentHash string
+	var currentHash sql.NullString
 	if err := h.db.QueryRow(c.Context(),
 		`SELECT password_hash FROM users WHERE id = $1`, userID).Scan(&currentHash); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+	if !currentHash.Valid || currentHash.String == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Account has no password set — use invitation flow")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(currentHash.String), []byte(req.CurrentPassword)); err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Current password is incorrect")
 	}
 
@@ -140,21 +144,35 @@ func (h *Handler) UpdatePassword(c *fiber.Ctx) error {
 func (h *Handler) GetSettings(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
-	var raw string
-	err := h.db.QueryRow(c.Context(),
-		`SELECT COALESCE(settings->>'account_prefs', '{}') FROM users WHERE id = $1`, userID).Scan(&raw)
-	if err != nil {
+	// Verify user exists first
+	var exists bool
+	if err := h.db.QueryRow(c.Context(),
+		`SELECT COUNT(*) > 0 FROM users WHERE id = $1`, userID).Scan(&exists); err != nil || !exists {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
 	}
 
-	// Default settings — stored in users.settings JSONB under "account_prefs"
 	settings := SettingsResponse{
 		EmailNotifications: true,
 		PushNotifications:  true,
 		CompactMode:        false,
 	}
-	// Parse stored overrides if present (non-critical if JSON is empty/malformed)
-	parseSettingsJSON(raw, &settings)
+
+	var emailNot, pushNot, compact sql.NullBool
+	row := h.db.QueryRow(c.Context(),
+		`SELECT email_notifications, push_notifications, compact_mode
+		 FROM account_settings WHERE user_id = $1 LIMIT 1`, userID)
+	if err := row.Scan(&emailNot, &pushNot, &compact); err == nil {
+		if emailNot.Valid {
+			settings.EmailNotifications = emailNot.Bool
+		}
+		if pushNot.Valid {
+			settings.PushNotifications = pushNot.Bool
+		}
+		if compact.Valid {
+			settings.CompactMode = compact.Bool
+		}
+	}
+	// If no row, defaults are returned as-is
 
 	return response.Success(c, settings, "Success")
 }
@@ -167,25 +185,44 @@ func (h *Handler) UpdateSettings(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
 	}
 
-	// Build JSON patch — only update fields provided
-	patches := []interface{}{}
-	query := `UPDATE users SET settings = jsonb_set(
-		jsonb_set(
-			jsonb_set(
-				COALESCE(settings, '{}'),
-				'{account_prefs,email_notifications}', $1::jsonb
-			),
-			'{account_prefs,push_notifications}', $2::jsonb
-		),
-		'{account_prefs,compact_mode}', $3::jsonb
-	), updated_at = NOW() WHERE id = $4`
+	// Read current to apply partial updates
+	current := SettingsResponse{EmailNotifications: true, PushNotifications: true, CompactMode: false}
+	var emailNot, pushNot, compact sql.NullBool
+	row := h.db.QueryRow(c.Context(),
+		`SELECT email_notifications, push_notifications, compact_mode
+		 FROM account_settings WHERE user_id = $1 LIMIT 1`, userID)
+	if err := row.Scan(&emailNot, &pushNot, &compact); err == nil {
+		if emailNot.Valid {
+			current.EmailNotifications = emailNot.Bool
+		}
+		if pushNot.Valid {
+			current.PushNotifications = pushNot.Bool
+		}
+		if compact.Valid {
+			current.CompactMode = compact.Bool
+		}
+	}
 
-	emailNot := boolToJSON(req.EmailNotifications, true)
-	pushNot := boolToJSON(req.PushNotifications, true)
-	compact := boolToJSON(req.CompactMode, false)
-	patches = append(patches, emailNot, pushNot, compact, userID)
+	if req.EmailNotifications != nil {
+		current.EmailNotifications = *req.EmailNotifications
+	}
+	if req.PushNotifications != nil {
+		current.PushNotifications = *req.PushNotifications
+	}
+	if req.CompactMode != nil {
+		current.CompactMode = *req.CompactMode
+	}
 
-	if _, err := h.db.Exec(c.Context(), query, patches...); err != nil {
+	_, err := h.db.Exec(c.Context(),
+		`INSERT INTO account_settings (user_id, email_notifications, push_notifications, compact_mode, updated_at)
+		 VALUES ($1, $2, $3, $4, NOW())
+		 ON CONFLICT (user_id) DO UPDATE SET
+		   email_notifications = $2,
+		   push_notifications  = $3,
+		   compact_mode        = $4,
+		   updated_at          = NOW()`,
+		userID, current.EmailNotifications, current.PushNotifications, current.CompactMode)
+	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not update settings")
 	}
 	return response.SuccessMessage(c, "Settings updated")
@@ -196,10 +233,10 @@ func (h *Handler) GetSecurity(c *fiber.Ctx) error {
 
 	var lastLogin *time.Time
 	var emailVerifiedAt *time.Time
-	var passwordHash string
+	var passwordHash sql.NullString
 
 	err := h.db.QueryRow(c.Context(),
-		`SELECT last_login_at, email_verified_at, COALESCE(password_hash, '') FROM users WHERE id = $1`, userID).
+		`SELECT last_login_at, email_verified_at, password_hash FROM users WHERE id = $1`, userID).
 		Scan(&lastLogin, &emailVerifiedAt, &passwordHash)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
@@ -208,52 +245,7 @@ func (h *Handler) GetSecurity(c *fiber.Ctx) error {
 	return response.Success(c, SecurityResponse{
 		LastLoginAt:   lastLogin,
 		EmailVerified: emailVerifiedAt != nil,
-		HasPassword:   passwordHash != "",
+		HasPassword:   passwordHash.Valid && passwordHash.String != "",
 	}, "Success")
 }
 
-// helpers
-
-func boolToJSON(ptr *bool, defaultVal bool) string {
-	if ptr == nil {
-		if defaultVal {
-			return "true"
-		}
-		return "false"
-	}
-	if *ptr {
-		return "true"
-	}
-	return "false"
-}
-
-func parseSettingsJSON(raw string, out *SettingsResponse) {
-	// Minimal inline parse without importing encoding/json for a simple map
-	// Use encoding/json indirectly via the existing response package approach
-	if raw == "" || raw == "{}" {
-		return
-	}
-	// We use a simple check for known keys
-	if contains(raw, `"email_notifications":false`) {
-		out.EmailNotifications = false
-	}
-	if contains(raw, `"push_notifications":false`) {
-		out.PushNotifications = false
-	}
-	if contains(raw, `"compact_mode":true`) {
-		out.CompactMode = true
-	}
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsStr(s, sub))
-}
-
-func containsStr(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
-}

@@ -29,7 +29,10 @@ console.log("\n📧  EDUCORE — AUTH EMAIL RESET AUDIT\n");
 console.log("1. Forgot Password endpoint");
 const handler = read("backend/internal/modules/auth/handler.go");
 check("ForgotPassword generates 32-byte random token", handler.includes("rand.Read(tokenBytes)") && handler.includes("make([]byte, 32)"));
-check("Token stored in DB with 1-hour expiry", handler.includes("invitation_expires_at = NOW() + INTERVAL '1 hour'"));
+// Expiry is now computed in Go (time.Now().UTC().Add(time.Hour)) and passed as a parameter
+check("Token stored in DB with 1-hour expiry",
+  (handler.includes("invitation_expires_at = $2") || handler.includes("invitation_expires_at = NOW() + INTERVAL")) &&
+  (handler.includes("time.Hour") || handler.includes("INTERVAL '1 hour'")));
 check("Returns same generic message regardless of email existence", handler.includes("If the email exists"));
 check("No TODO comment for email left unimplemented", !handler.includes("TODO: Send email"));
 check("Email client called when configured", handler.includes("emailClient.Configured()") && handler.includes("SendPasswordReset"));
