@@ -60,6 +60,14 @@ func RequireRoles(roles ...string) fiber.Handler {
 			return response.Error(c, fiber.StatusForbidden, "Role not found in context")
 		}
 
+		// SUPER_ADMIN in support mode (X-Support-Tenant-ID present) passes any role gate.
+		// They are previewing portals as read-only soporte — not performing mutations as the role.
+		if userRole == "SUPER_ADMIN" {
+			if _, isSupport := c.Locals("support_mode").(bool); isSupport {
+				return c.Next()
+			}
+		}
+
 		for _, role := range roles {
 			if role == userRole {
 				return c.Next()

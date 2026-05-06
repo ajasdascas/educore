@@ -12,14 +12,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default function TeacherDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEmpty, setIsEmpty] = useState(false);
 
   useEffect(() => {
     authFetch("/api/v1/teacher/dashboard")
-      .then((res) => setData(res.success ? res.data : null))
+      .then((res) => {
+        if (res.success) {
+          setData(res.data);
+        } else {
+          setIsEmpty(true);
+        }
+      })
+      .catch(() => setIsEmpty(true))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="animate-pulse text-muted-foreground">Cargando panel docente...</div>;
+
+  if (isEmpty || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <GraduationCap className="w-12 h-12 text-muted-foreground/40" />
+        <div className="text-center">
+          <p className="font-semibold">No hay profesores creados para esta escuela.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Crea un profesor desde School Admin → Profesores y luego genera su acceso portal.
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/school-admin/teachers">Crear profesor</Link>
+        </Button>
+      </div>
+    );
+  }
 
   const stats = data?.stats || {};
   const todayClasses = data?.today_classes || [];

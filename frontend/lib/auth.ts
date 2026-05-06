@@ -50,20 +50,33 @@ function redirectToLogin() {
   window.location.href = `${basePath}/login`;
 }
 
-export function setSupportContext(tenantId: string, schoolSlug: string, schoolName: string) {
+export type SupportRole = "school_admin" | "teacher" | "parent" | "student";
+
+export function setSupportContext(tenantId: string, schoolSlug: string, schoolName: string, supportRole?: SupportRole) {
   if (typeof window === "undefined") return;
   sessionStorage.setItem("support_tenant_id", tenantId);
   sessionStorage.setItem("support_school_slug", schoolSlug);
   sessionStorage.setItem("support_school_name", schoolName);
+  if (supportRole) {
+    sessionStorage.setItem("support_role", supportRole);
+  } else {
+    sessionStorage.removeItem("support_role");
+  }
 }
 
-export function getSupportContext(): { tenantId: string; schoolSlug: string; schoolName: string } | null {
+export function getSupportContext(): { tenantId: string; schoolSlug: string; schoolName: string; supportRole?: SupportRole } | null {
   if (typeof window === "undefined") return null;
   const tenantId = sessionStorage.getItem("support_tenant_id");
   const schoolSlug = sessionStorage.getItem("support_school_slug");
   const schoolName = sessionStorage.getItem("support_school_name");
   if (!tenantId) return null;
-  return { tenantId, schoolSlug: schoolSlug || "", schoolName: schoolName || "" };
+  const supportRole = (sessionStorage.getItem("support_role") as SupportRole | null) ?? undefined;
+  return { tenantId, schoolSlug: schoolSlug || "", schoolName: schoolName || "", supportRole };
+}
+
+export function getSupportRole(): SupportRole | null {
+  if (typeof window === "undefined") return null;
+  return (sessionStorage.getItem("support_role") as SupportRole | null);
 }
 
 export function clearSupportContext() {
@@ -71,6 +84,7 @@ export function clearSupportContext() {
   sessionStorage.removeItem("support_tenant_id");
   sessionStorage.removeItem("support_school_slug");
   sessionStorage.removeItem("support_school_name");
+  sessionStorage.removeItem("support_role");
 }
 
 export function isSupportMode(): boolean {

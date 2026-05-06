@@ -22,9 +22,10 @@ import {
   Loader2,
   AlertTriangle,
   Globe,
+  Eye,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authFetch, setSupportContext } from "@/lib/auth";
+import { authFetch, setSupportContext, type SupportRole } from "@/lib/auth";
 import { API_URL } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -163,6 +164,26 @@ function SchoolDetailContent() {
     if (!school) return;
     setSupportContext(school.id, school.slug, school.name);
     router.push(path);
+  };
+
+  const enterSupportRoleMode = (role: SupportRole) => {
+    if (!school) return;
+    const paths: Record<SupportRole, string> = {
+      school_admin: "/school-admin/dashboard",
+      teacher:      "/teacher/dashboard",
+      parent:       "/parent/dashboard",
+      student:      "/student/dashboard",
+    };
+    setSupportContext(school.id, school.slug, school.name, role);
+    // Pass params in URL so the destination layout can hydrate support context even on hard reload
+    const dest = paths[role];
+    const qp = new URLSearchParams({
+      supportTenantId: school.id,
+      supportSlug:     school.slug,
+      supportName:     school.name,
+      supportRole:     role,
+    });
+    router.push(`${dest}?${qp.toString()}`);
   };
 
   const toggleModule = async (moduleKey: string) => {
@@ -571,33 +592,56 @@ function SchoolDetailContent() {
             </CardContent>
           </Card>
 
-          {/* Modo soporte — sin cambios */}
+          {/* Modo soporte — Ver portales de rol */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Shield className="w-4 h-4" /> Modo Soporte — Acceso Directo a Módulos
+                <Eye className="w-4 h-4 text-blue-500" /> Modo Soporte — Ver portales de rol
               </CardTitle>
               <CardDescription>
-                Entra directamente como soporte técnico sin cambiar de sesión JWT.
+                Previsualiza cada portal como lo vería el usuario final. Tu JWT no cambia — usas el header <span className="font-mono text-xs">X-Support-Tenant-ID</span>.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: "Dashboard",       path: "/school-admin/dashboard" },
-                  { label: "Estudiantes",     path: "/school-admin/students" },
-                  { label: "Profesores",      path: "/school-admin/teachers" },
-                  { label: "Grupos",          path: "/school-admin/groups" },
-                  { label: "Asistencias",     path: "/school-admin/attendance" },
-                  { label: "Calificaciones",  path: "/school-admin/grades" },
-                  { label: "Boletas",         path: "/school-admin/report-cards" },
-                  { label: "Horarios",        path: "/school-admin/schedule" },
-                  { label: "Comunicaciones",  path: "/school-admin/communications" },
-                ].map(({ label, path }) => (
-                  <Button key={path} variant="outline" size="sm" onClick={() => enterSupportMode(path)}>
-                    {label}
-                  </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                {([
+                  { role: "school_admin" as SupportRole, label: "Ver como Director / Coordinador", icon: "🏫", desc: "Panel completo de school admin con todos sus módulos activos." },
+                  { role: "teacher" as SupportRole,      label: "Ver como Profesor",               icon: "👨‍🏫", desc: "Dashboard docente: grupos, asistencias, calificaciones." },
+                  { role: "parent" as SupportRole,       label: "Ver como Padre de familia",       icon: "👨‍👩‍👧", desc: "Portal de padres: hijos, calificaciones, mensajes, pagos." },
+                  { role: "student" as SupportRole,      label: "Ver como Estudiante",             icon: "🎒", desc: "Portal de alumnos: calificaciones, asistencia, horario." },
+                ] as const).map(({ role, label, icon, desc }) => (
+                  <button
+                    key={role}
+                    onClick={() => enterSupportRoleMode(role)}
+                    className="flex items-start gap-3 rounded-xl border border-slate-700/60 bg-card p-4 text-left hover:border-blue-500/50 hover:bg-blue-500/5 transition-colors group"
+                  >
+                    <span className="text-xl shrink-0 mt-0.5">{icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold group-hover:text-blue-400 transition-colors">{label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
+                    </div>
+                  </button>
                 ))}
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground mb-2 font-medium">Acceso directo a módulos de administración escolar:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "Dashboard",       path: "/school-admin/dashboard" },
+                    { label: "Estudiantes",     path: "/school-admin/students" },
+                    { label: "Profesores",      path: "/school-admin/teachers" },
+                    { label: "Grupos",          path: "/school-admin/groups" },
+                    { label: "Asistencias",     path: "/school-admin/attendance" },
+                    { label: "Calificaciones",  path: "/school-admin/grades" },
+                    { label: "Boletas",         path: "/school-admin/report-cards" },
+                    { label: "Horarios",        path: "/school-admin/schedule" },
+                    { label: "Comunicaciones",  path: "/school-admin/communications" },
+                  ].map(({ label, path }) => (
+                    <Button key={path} variant="outline" size="sm" onClick={() => enterSupportMode(path)}>
+                      {label}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

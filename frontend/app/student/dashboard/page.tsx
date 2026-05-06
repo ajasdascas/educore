@@ -99,14 +99,18 @@ export default function StudentDashboard() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <GraduationCap className="w-12 h-12 text-muted-foreground/50" />
-        <div className="text-center">
+        <div className="text-center max-w-sm">
           <p className="font-semibold text-foreground">Portal de Estudiantes</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {error || "No se encontró tu perfil de estudiante."}
+            No hay cuenta de alumno vinculada. Crea acceso de portal estudiante.
           </p>
-          <p className="text-xs text-muted-foreground mt-3 bg-muted/50 p-3 rounded-lg">
-            Si acabas de ser inscrito, espera a que tu institución active tu acceso.
-          </p>
+          <div className="text-xs text-muted-foreground mt-3 bg-muted/50 p-3 rounded-lg text-left space-y-1">
+            <p className="font-medium">Para activar este portal:</p>
+            <p>1. Ve a <strong>School Admin → Estudiantes</strong></p>
+            <p>2. Abre el detalle del alumno</p>
+            <p>3. Haz clic en <strong>"Acceso estudiante"</strong></p>
+            <p className="text-amber-500/80 mt-1">Requiere migración <code>006_student_portal_user_id.sql</code> en Hostinger.</p>
+          </div>
         </div>
       </div>
     );

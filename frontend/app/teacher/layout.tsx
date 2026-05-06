@@ -1,34 +1,75 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, BookOpen, Calendar, FileText, LayoutDashboard, Menu, MessageCircle, Settings, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, BookOpen, Building2, Calendar, FileText, LayoutDashboard, Menu, MessageCircle, Settings, X } from "lucide-react";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { Toaster } from "@/components/ui/toaster";
+import { SupportModeBanner } from "@/components/SupportModeBanner";
+import { isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { href: "/teacher/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/teacher/classes", label: "Mis Grupos", icon: BookOpen },
-  { href: "/teacher/grades", label: "Calificaciones", icon: FileText },
-  { href: "/teacher/attendance", label: "Asistencia", icon: Calendar },
-  { href: "/teacher/messages", label: "Mensajes", icon: MessageCircle },
+  { href: "/teacher/dashboard",     label: "Dashboard",      icon: LayoutDashboard },
+  { href: "/teacher/classes",       label: "Mis Grupos",     icon: BookOpen },
+  { href: "/teacher/grades",        label: "Calificaciones", icon: FileText },
+  { href: "/teacher/attendance",    label: "Asistencia",     icon: Calendar },
+  { href: "/teacher/messages",      label: "Mensajes",       icon: MessageCircle },
   { href: "/teacher/notifications", label: "Notificaciones", icon: Bell },
-  { href: "/teacher/settings", label: "Configuracion", icon: Settings },
+  { href: "/teacher/settings",      label: "Configuracion",  icon: Settings },
 ];
 
 export default function TeacherLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [supportReady, setSupportReady] = useState(false);
   const { user, loading } = useAuth();
 
-  if (loading) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const qTenantId = sp.get("supportTenantId");
+    const qSlug     = sp.get("supportSlug");
+    const qName     = sp.get("supportName");
+    const qRole     = (sp.get("supportRole") as SupportRole | null) ?? "teacher";
+
+    if (qTenantId && user?.role === "SUPER_ADMIN") {
+      setSupportContext(qTenantId, qSlug || "", qName || "", qRole);
+      router.replace(pathname);
+    }
+    setSupportReady(true);
+  }, [user, pathname, router]);
+
+  if (loading || !supportReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (user?.role === "SUPER_ADMIN" && !isSupportMode()) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto">
+            <Building2 className="w-8 h-8 text-amber-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">Selecciona una escuela</h2>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Para ver el portal de profesores en modo soporte, ve a
+              Super Admin → Escuelas → Detalles → Portales → "Ver como Profesor".
+            </p>
+          </div>
+          <Button onClick={() => router.push("/super-admin/schools")}>Ver escuelas</Button>
+        </div>
+        <Toaster />
       </div>
     );
   }
@@ -41,7 +82,6 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
         {sidebarOpen && (
           <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
-
         <aside className={`
           fixed inset-y-0 left-0 z-30 w-64 bg-sidebar text-sidebar-foreground flex flex-col shadow-xl border-r border-border
           transition-transform duration-300 ease-in-out
@@ -59,15 +99,11 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-
           <nav className="flex-1 py-4 space-y-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
+                <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
                   className={`flex items-center px-6 py-3 transition-colors ${
                     isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-4 border-primary"
@@ -81,7 +117,6 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
             })}
           </nav>
         </aside>
-
         <main className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden">
           <header className="h-16 overflow-visible bg-card border-b border-border flex items-center justify-between gap-2 px-3 sm:px-4 lg:px-5 shadow-sm sticky top-0 z-40 transition-colors">
             <div className="flex min-w-0 flex-1 items-center overflow-hidden">
@@ -95,6 +130,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
               <ProfileDropdown userInitials={userInitials} userRole="Profesor" />
             </div>
           </header>
+          <SupportModeBanner />
           <div className="min-w-0 max-w-full p-3 sm:p-4 lg:p-5 flex-1 overflow-x-hidden overflow-y-auto">{children}</div>
         </main>
         <Toaster />

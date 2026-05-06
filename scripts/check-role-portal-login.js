@@ -111,6 +111,23 @@ section("Fase 4 — Guards de dashboards");
   }
 }
 
+section("Fase 5 — Modo soporte en layouts teacher/parent/student");
+{
+  const roleLayouts = [
+    ["frontend/app/teacher/layout.tsx", "teacher"],
+    ["frontend/app/parent/layout.tsx",  "parent"],
+    ["frontend/app/student/layout.tsx", "student"],
+  ];
+  for (const [file, role] of roleLayouts) {
+    const src = read(file);
+    if (!src) { fail(`${file} no encontrado`); continue; }
+    src.includes("SupportModeBanner")     ? pass(`${role}: SupportModeBanner renderizado`)     : fail(`${role}: falta SupportModeBanner`);
+    src.includes("isSupportMode")         ? pass(`${role}: verifica isSupportMode`)            : fail(`${role}: no verifica isSupportMode`);
+    src.includes("supportTenantId")       ? pass(`${role}: hidrata supportTenantId de URL`)    : fail(`${role}: no hidrata supportTenantId`);
+    src.includes("Selecciona una escuela") ? pass(`${role}: gate SUPER_ADMIN sin soporte`)     : fail(`${role}: falta gate para SUPER_ADMIN sin soporte`);
+  }
+}
+
 // ─── Live API checks (optional) ─────────────────────────────────────────────
 const adminEmail    = process.env.SCHOOL_ADMIN_EMAIL;
 const adminPass     = process.env.SCHOOL_ADMIN_PASSWORD;
