@@ -170,6 +170,27 @@ if (parentLayout) {
   check("Parent payments → payments", parentLayout.includes('"payments"'));
 }
 
+// ─── 5b. CreateSchool — grading scales, submodules, provisioning events ───────
+console.log("\n5b. CreateSchool completeness — grading scales / submodules / events");
+
+if (saHandler) {
+  check("CreateSchool seeds school_grading_scales", saHandler.includes("school_grading_scales"));
+  check("CreateSchool seeds tenant_module_submodules", saHandler.includes("tenant_module_submodules"));
+  check("CreateSchool records provisioning event", saHandler.includes("school_provisioning_events"));
+  check("CreateSchool seeds permisos por rol (tenant_roles)", saHandler.includes("tenant_roles") && saHandler.includes("admin") && saHandler.includes("teacher") && saHandler.includes("parent") && saHandler.includes("student"));
+  check("CreateSchool activates portal_school_admin", saHandler.includes("portal_school_admin"));
+  check("CreateSchool activates portal_parents", saHandler.includes("portal_parents"));
+  check("CreateSchool activates portal_teachers", saHandler.includes("portal_teachers"));
+  check("CreateSchool activates portal_students", saHandler.includes("portal_students"));
+  check("CreateSchool returns portal URLs", saHandler.includes('"portals"'));
+}
+
+// Migration 017 also creates tenant_module_submodules table
+if (mig017) {
+  check("Migration 017 creates tenant_module_submodules table",
+    mig017.includes("tenant_module_submodules"));
+}
+
 // ─── 6. Backfill script ───────────────────────────────────────────────────────
 console.log("\n6. Backfill script for existing schools");
 

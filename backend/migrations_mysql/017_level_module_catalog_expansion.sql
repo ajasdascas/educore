@@ -315,3 +315,20 @@ VALUES
   (UUID(), 'payments',    'colegiaturas',         'Colegiaturas',          'Pagos de colegiatura',           '/school-admin/payments', '["SCHOOL_ADMIN","PARENT"]',          'primaria', 1),
   (UUID(), 'payments',    'estado_cuenta',        'Estado de cuenta',      'Saldo y adeudos',                '/school-admin/payments', '["SCHOOL_ADMIN","PARENT","STUDENT"]','primaria', 2)
 ON DUPLICATE KEY UPDATE name = VALUES(name), allowed_roles = VALUES(allowed_roles), updated_at = CURRENT_TIMESTAMP;
+
+-- ─── 11. Create tenant_module_submodules (per-tenant submodule activations) ──
+-- Tracks which submodules are enabled per tenant.
+-- Seeded during CreateSchool from level_module_templates.
+CREATE TABLE IF NOT EXISTS tenant_module_submodules (
+  id            CHAR(36)     NOT NULL PRIMARY KEY DEFAULT (UUID()),
+  tenant_id     CHAR(36)     NOT NULL,
+  module_key    VARCHAR(80)  NOT NULL,
+  submodule_key VARCHAR(120) NOT NULL,
+  enabled       TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_tenant_submodule (tenant_id, module_key, submodule_key),
+  KEY idx_tms_tenant  (tenant_id),
+  KEY idx_tms_module  (tenant_id, module_key),
+  CONSTRAINT fk_tms_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

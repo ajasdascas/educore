@@ -800,6 +800,53 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
+	// 7. Seed default grading scale for this tenant
+	step = "seed_grading_scale"
+	if database.IsMySQL(h.db.Driver()) {
+		_, _ = tx.Exec(c.UserContext(),
+			`INSERT IGNORE INTO school_grading_scales (id, tenant_id, name, min_score, max_score, passing, is_default)
+			 VALUES (?, ?, 'Escala default', 0, 100, 60, 1)`,
+			database.NewID(), tenantID)
+	}
+
+	// 8. Seed submodules from level_module_templates (where submodule_key IS NOT NULL)
+	step = "seed_level_submodules"
+	for _, level := range req.Levels {
+		normalizedLevel := normalizeEducationLevel(level)
+		if database.IsMySQL(h.db.Driver()) {
+			subRows, subErr := tx.Query(c.UserContext(),
+				`SELECT module_key, submodule_key FROM level_module_templates
+				 WHERE education_level_code = ? AND submodule_key IS NOT NULL AND is_default_enabled = 1`,
+				normalizedLevel)
+			if subErr == nil {
+				for subRows.Next() {
+					var modKey, subKey string
+					if subRows.Scan(&modKey, &subKey) == nil {
+						_, _ = tx.Exec(c.UserContext(),
+							`INSERT IGNORE INTO tenant_module_submodules (id, tenant_id, module_key, submodule_key, enabled)
+							 VALUES (?, ?, ?, ?, 1)`,
+							database.NewID(), tenantID, modKey, subKey)
+					}
+				}
+				subRows.Close()
+			}
+		}
+	}
+
+	// 9. Record provisioning event
+	step = "record_provisioning_event"
+	if database.IsMySQL(h.db.Driver()) {
+		provPayload := fmt.Sprintf(`{"levels":%s,"plan":"%s","modules_count":%d}`,
+			func() string {
+				b, _ := json.Marshal(req.Levels)
+				return string(b)
+			}(), req.Plan, len(portalMods))
+		_, _ = tx.Exec(c.UserContext(),
+			`INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, status, payload_json)
+			 VALUES (?, ?, 'provision_school', 'completed', ?)`,
+			database.NewID(), tenantID, provPayload)
+	}
+
 	step = "commit"
 	if err := tx.Commit(c.UserContext()); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, internalError("Could not commit transaction", err))
