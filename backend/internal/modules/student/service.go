@@ -33,3 +33,7 @@ func (s *Service) GetDashboard(ctx context.Context, userID, tenantID string) (*S
 		RecentMessages:    []MessageSummary{},
 	}, nil
 }
+
+func (s *Service) GetEnabledModules(ctx context.Context, tenantID string) ([]map[string]interface{}, error) {
+	return s.repo.GetEnabledModules(ctx, tenantID)
+}

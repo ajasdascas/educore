@@ -20,6 +20,8 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	// Parent portal routes - the parent router is already mounted at /api/v1/parent.
 	api := app
 
+	// Modules
+	api.Get("/modules", h.GetEnabledModules)
 	// Dashboard
 	api.Get("/dashboard", h.GetDashboard)
 	api.Get("/children", h.GetChildren)
@@ -423,4 +425,16 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 	}
 
 	return response.SuccessMessage(c, "Password changed successfully")
+}
+
+func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "Missing tenant context")
+	}
+	modules, err := h.service.GetEnabledModules(c.Context(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching modules")
+	}
+	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved")
 }

@@ -10,16 +10,16 @@ import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { Toaster } from "@/components/ui/toaster";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
-import { isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
+import { authFetch, isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
   { href: "/teacher/dashboard",     label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/teacher/classes",       label: "Mis Grupos",     icon: BookOpen },
-  { href: "/teacher/grades",        label: "Calificaciones", icon: FileText },
-  { href: "/teacher/attendance",    label: "Asistencia",     icon: Calendar },
-  { href: "/teacher/schedule",      label: "Mi Horario",     icon: Clock },
-  { href: "/teacher/messages",      label: "Mensajes",       icon: MessageCircle },
+  { href: "/teacher/classes",       label: "Mis Grupos",     icon: BookOpen,       moduleKey: "academic_core" },
+  { href: "/teacher/grades",        label: "Calificaciones", icon: FileText,       moduleKey: "grading" },
+  { href: "/teacher/attendance",    label: "Asistencia",     icon: Calendar,       moduleKey: "attendance" },
+  { href: "/teacher/schedule",      label: "Mi Horario",     icon: Clock,          moduleKey: "schedules" },
+  { href: "/teacher/messages",      label: "Mensajes",       icon: MessageCircle,  moduleKey: "communications" },
   { href: "/teacher/notifications", label: "Avisos",          icon: Megaphone },
   { href: "/teacher/profile",       label: "Mi Perfil",      icon: User },
   { href: "/teacher/security",      label: "Seguridad",      icon: KeyRound },
@@ -31,7 +31,15 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supportReady, setSupportReady] = useState(false);
+  const [enabledModuleKeys, setEnabledModuleKeys] = useState<Set<string> | null>(null);
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    authFetch("/api/v1/teacher/modules").then((res) => {
+      const mods: Array<{ key: string }> = res?.data?.modules || [];
+      if (mods.length > 0) setEnabledModuleKeys(new Set(mods.map((m) => m.key)));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -103,7 +111,11 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
             </button>
           </div>
           <nav className="flex-1 py-4 space-y-1">
-            {navItems.map((item) => {
+            {navItems.filter((item) => {
+              if (!item.moduleKey) return true;
+              if (enabledModuleKeys === null) return true;
+              return enabledModuleKeys.has(item.moduleKey);
+            }).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}

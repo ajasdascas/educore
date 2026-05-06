@@ -13,17 +13,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
-import { isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
+import { authFetch, isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
   { href: "/parent/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
   { href: "/parent/children",       label: "Mis Hijos",       icon: GraduationCap },
-  { href: "/parent/grades",         label: "Calificaciones",  icon: FileText },
-  { href: "/parent/attendance",     label: "Asistencia",      icon: Calendar },
-  { href: "/parent/messages",       label: "Mensajes",        icon: MessageCircle },
-  { href: "/parent/documents",      label: "Documentos",      icon: FolderOpen },
-  { href: "/parent/payments",       label: "Pagos",           icon: CreditCard },
+  { href: "/parent/grades",         label: "Calificaciones",  icon: FileText,       moduleKey: "grading" },
+  { href: "/parent/attendance",     label: "Asistencia",      icon: Calendar,       moduleKey: "attendance" },
+  { href: "/parent/messages",       label: "Mensajes",        icon: MessageCircle,  moduleKey: "communications" },
+  { href: "/parent/documents",      label: "Documentos",      icon: FolderOpen,     moduleKey: "documents" },
+  { href: "/parent/payments",       label: "Pagos",           icon: CreditCard,     moduleKey: "payments" },
   { href: "/parent/consents",       label: "Permisos",        icon: ClipboardCheck },
   { href: "/parent/notifications",  label: "Notificaciones",  icon: Bell },
   { href: "/parent/profile",        label: "Mi Perfil",       icon: User },
@@ -35,7 +35,15 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supportReady, setSupportReady] = useState(false);
+  const [enabledModuleKeys, setEnabledModuleKeys] = useState<Set<string> | null>(null);
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    authFetch("/api/v1/parent/modules").then((res) => {
+      const mods: Array<{ key: string }> = res?.data?.modules || [];
+      if (mods.length > 0) setEnabledModuleKeys(new Set(mods.map((m) => m.key)));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -107,7 +115,11 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
             </button>
           </div>
           <nav className="flex-1 py-4 space-y-1">
-            {navItems.map((item) => {
+            {navItems.filter((item) => {
+              if (!item.moduleKey) return true;
+              if (enabledModuleKeys === null) return true;
+              return enabledModuleKeys.has(item.moduleKey);
+            }).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}

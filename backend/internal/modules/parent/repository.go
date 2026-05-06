@@ -1499,3 +1499,36 @@ func mapKeys(values map[string]int) []string {
 	}
 	return keys
 }
+
+// GetEnabledModules returns active modules for this tenant (PARENT role).
+func (r *Repository) GetEnabledModules(ctx context.Context, tenantID string) ([]map[string]interface{}, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT mc.`+"`key`"+`, mc.name, COALESCE(mc.description,''),
+		       COALESCE(tm.level,''), mc.is_core,
+		       COALESCE(tm.enabled, tm.is_active, false)
+		FROM tenant_modules tm
+		INNER JOIN modules_catalog mc ON mc.`+"`key`"+` = tm.module_key
+		WHERE tm.tenant_id = $1
+		  AND COALESCE(tm.enabled, tm.is_active, false) = true
+		ORDER BY mc.is_core DESC, mc.name`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []map[string]interface{}
+	for rows.Next() {
+		var key, name, desc, level string
+		var isCore, enabled bool
+		if err := rows.Scan(&key, &name, &desc, &level, &isCore, &enabled); err != nil {
+			continue
+		}
+		result = append(result, map[string]interface{}{
+			"key": key, "name": name, "description": desc,
+			"level": level, "is_core": isCore, "enabled": enabled,
+		})
+	}
+	if result == nil {
+		result = []map[string]interface{}{}
+	}
+	return result, nil
+}

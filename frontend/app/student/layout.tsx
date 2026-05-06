@@ -13,17 +13,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
-import { isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
+import { authFetch, isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
   { href: "/student/dashboard",     label: "Dashboard",        icon: LayoutDashboard },
   { href: "/student/profile",       label: "Mi Perfil",        icon: User },
-  { href: "/student/grades",        label: "Calificaciones",   icon: BookOpen },
-  { href: "/student/attendance",    label: "Asistencia",       icon: ClipboardCheck },
-  { href: "/student/assignments",   label: "Tareas",           icon: BookMarked },
-  { href: "/student/schedule",      label: "Horario",          icon: Calendar },
-  { href: "/student/messages",      label: "Mensajes",         icon: MessageCircle },
+  { href: "/student/grades",        label: "Calificaciones",   icon: BookOpen,       moduleKey: "grading" },
+  { href: "/student/attendance",    label: "Asistencia",       icon: ClipboardCheck, moduleKey: "attendance" },
+  { href: "/student/assignments",   label: "Tareas",           icon: BookMarked,     moduleKey: "assignments" },
+  { href: "/student/schedule",      label: "Horario",          icon: Calendar,       moduleKey: "schedules" },
+  { href: "/student/messages",      label: "Mensajes",         icon: MessageCircle,  moduleKey: "communications" },
   { href: "/student/notifications", label: "Notificaciones",   icon: Bell },
   { href: "/student/settings",      label: "Configuración",    icon: Settings },
 ];
@@ -33,7 +33,15 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [supportReady, setSupportReady] = useState(false);
+  const [enabledModuleKeys, setEnabledModuleKeys] = useState<Set<string> | null>(null);
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    authFetch("/api/v1/student/modules").then((res) => {
+      const mods: Array<{ key: string }> = res?.data?.modules || [];
+      if (mods.length > 0) setEnabledModuleKeys(new Set(mods.map((m) => m.key)));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -105,7 +113,11 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
             </button>
           </div>
           <nav className="flex-1 py-4 space-y-1">
-            {navItems.map((item) => {
+            {navItems.filter((item) => {
+              if (!item.moduleKey) return true;
+              if (enabledModuleKeys === null) return true; // show all while loading
+              return enabledModuleKeys.has(item.moduleKey);
+            }).map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}

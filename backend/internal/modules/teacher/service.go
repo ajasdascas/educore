@@ -103,3 +103,7 @@ func (s *Service) SendMessage(ctx context.Context, tenantID, teacherID string, r
 	s.bus.Publish("teacher.message_sent", map[string]interface{}{"tenant_id": tenantID, "teacher_id": teacherID, "recipient_id": req.RecipientID, "message_id": message.ID, "timestamp": time.Now()})
 	return message, nil
 }
+
+func (s *Service) GetEnabledModules(ctx context.Context, tenantID string) ([]map[string]interface{}, error) {
+	return s.repo.GetEnabledModules(ctx, tenantID)
+}

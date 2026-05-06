@@ -14,6 +14,7 @@ func NewHandler(svc *Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router fiber.Router) {
+	router.Get("/modules", h.GetEnabledModules)
 	router.Get("/dashboard", h.GetDashboard)
 	router.Get("/profile", h.GetProfile)
 	router.Get("/grades", h.GetGrades)
@@ -23,6 +24,18 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schedule", h.GetSchedule)
 	router.Get("/notifications", h.GetNotifications)
 	router.Put("/notifications/:id/read", h.MarkNotificationRead)
+}
+
+func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "Missing tenant context")
+	}
+	modules, err := h.svc.GetEnabledModules(c.Context(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching modules")
+	}
+	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved")
 }
 
 func (h *Handler) GetDashboard(c *fiber.Ctx) error {

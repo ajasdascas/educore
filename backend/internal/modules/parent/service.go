@@ -395,3 +395,7 @@ func (s *Service) validatePasswordStrength(password string) error {
 
 	return nil
 }
+
+func (s *Service) GetEnabledModules(ctx context.Context, tenantID string) ([]map[string]interface{}, error) {
+	return s.repo.GetEnabledModules(ctx, tenantID)
+}
