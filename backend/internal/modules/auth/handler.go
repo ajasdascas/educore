@@ -2,10 +2,12 @@ package auth
 
 import (
 	"crypto/rand"
+	"educore/internal/pkg/email"
 	"educore/internal/pkg/jwt"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
 	"encoding/hex"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -21,15 +23,17 @@ type Handler struct {
 	jwtExpiry     time.Duration
 	refreshExpiry time.Duration
 	redis         *redis.Client
+	emailClient   *email.Client
 }
 
-func NewHandler(db *database.DB, secret string, expiry, refreshExpiry time.Duration, redisClient *redis.Client) *Handler {
+func NewHandler(db *database.DB, secret string, expiry, refreshExpiry time.Duration, redisClient *redis.Client, emailClient *email.Client) *Handler {
 	return &Handler{
 		db:            db,
 		jwtSecret:     secret,
 		jwtExpiry:     expiry,
 		refreshExpiry: refreshExpiry,
 		redis:         redisClient,
+		emailClient:   emailClient,
 	}
 }
 
@@ -263,22 +267,25 @@ func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
 	}
 
-	// Generate reset token
 	tokenBytes := make([]byte, 32)
 	_, _ = rand.Read(tokenBytes)
 	token := hex.EncodeToString(tokenBytes)
 
-	// Save token in DB
-	_, err := h.db.Exec(c.Context(),
+	result, err := h.db.Exec(c.Context(),
 		"UPDATE users SET invitation_token = $1, invitation_expires_at = NOW() + INTERVAL '1 hour' WHERE email = $2",
 		token, req.Email)
 
-	if err != nil {
-		// Don't reveal if email exists
+	if err != nil || result.RowsAffected() == 0 {
 		return response.Success(c, nil, "If the email exists, a reset link has been sent")
 	}
 
-	// TODO: Send email via Resend with link: APP_BASE_URL/reset-password?token=<token>
+	if h.emailClient != nil && h.emailClient.Configured() {
+		if sendErr := h.emailClient.SendPasswordReset(c.Context(), req.Email, token); sendErr != nil {
+			log.Printf("auth.ForgotPassword: email send failed for %s: %v", req.Email, sendErr)
+		}
+	} else {
+		log.Printf("auth.ForgotPassword: email provider not configured — reset token saved but not sent")
+	}
 
 	return response.Success(c, nil, "If the email exists, a reset link has been sent")
 }

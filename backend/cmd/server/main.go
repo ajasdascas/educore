@@ -11,8 +11,10 @@ import (
 	"educore/internal/config"
 	"educore/internal/events"
 	"educore/internal/middleware"
+	"educore/internal/modules/account"
 	"educore/internal/modules/auth"
 	"educore/internal/modules/communications"
+	pkgemail "educore/internal/pkg/email"
 	"educore/internal/modules/parent"
 	"educore/internal/modules/reports"
 	"educore/internal/modules/school_admin"
@@ -119,7 +121,8 @@ func main() {
 	})
 
 	// Auth module (public)
-	authHandler := auth.NewHandler(db, cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshExpiration, redisClient)
+	emailClient := pkgemail.NewClient(cfg.ResendAPIKey, cfg.EmailFrom, cfg.EmailFromName, cfg.PublicAppURL)
+	authHandler := auth.NewHandler(db, cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshExpiration, redisClient, emailClient)
 	authHandler.RegisterRoutes(api.Group("/auth"))
 	// Authenticated auth actions (requires valid JWT, any role)
 	authHandler.RegisterProtectedRoutes(api.Group("/auth", middleware.Protected(cfg.JWTSecret)))
@@ -289,6 +292,7 @@ func main() {
 	reportsHandler := reports.NewHandler(reportsService)
 	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
 	reportsHandler.RegisterRoutes(reportsGroup)
+	reportsHandler.RegisterQuickRoutes(reportsGroup)
 
 	// Student module (STUDENT role — tenant-scoped)
 	studentRepo := student.NewRepository(db)
@@ -296,6 +300,11 @@ func main() {
 	studentHandler := student.NewHandler(studentService)
 	studentGroup := api.Group("/student", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("STUDENT"))
 	studentHandler.RegisterRoutes(studentGroup)
+
+	// Account module — profile/settings/security for all authenticated roles
+	accountHandler := account.NewHandler(db)
+	accountGroup := api.Group("/account", middleware.Protected(cfg.JWTSecret))
+	accountHandler.RegisterRoutes(accountGroup)
 
 	// Communications module (All authenticated users)
 	communicationsRepo := communications.NewRepository(db)

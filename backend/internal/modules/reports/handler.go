@@ -417,10 +417,10 @@ func (h *Handler) GetQuickGradesThisWeek(c *fiber.Ctx) error {
 	return response.Success(c, report, "Success")
 }
 
-// Register additional quick report routes
-func (h *Handler) RegisterQuickRoutes(app *fiber.App) {
-	quick := app.Group("/api/v1/reports/quick")
-
+// RegisterQuickRoutes registers convenience read routes under the same protected
+// router group that RegisterRoutes uses, ensuring auth + tenant middleware applies.
+func (h *Handler) RegisterQuickRoutes(router fiber.Router) {
+	quick := router.Group("/quick")
 	quick.Get("/attendance/today", h.GetQuickAttendanceToday)
 	quick.Get("/grades/week", h.GetQuickGradesThisWeek)
 	quick.Get("/:id/status", h.GetReportStatus)
