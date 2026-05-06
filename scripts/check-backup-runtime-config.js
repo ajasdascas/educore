@@ -100,12 +100,18 @@ check("No HTTP 302 redirect in download handler",
 check("URL field in JSON response",            dlBody.includes(`"url"`));
 check("expires_at field in JSON response",     dlBody.includes(`"expires_at"`));
 
-// ── 6. Frontend uses authFetch for signed URL ─────────────────────────────────
-console.log("\n6. Frontend download flow — authFetch + window.open(signedUrl)");
+// ── 6. Frontend uses authFetch for signed URL (correct contract) ──────────────
+console.log("\n6. Frontend download flow — authFetch contract + window.open(signedUrl)");
 
 check("downloadBackup function exists",          frontendPage.includes("downloadBackup"));
-check("authFetch used in downloadBackup",
+check("authFetch called with /download-url endpoint",
   frontendPage.includes("authFetch") && frontendPage.includes("download-url"));
+check("response.success checked (authFetch returns parsed JSON)",
+  frontendPage.includes("response.success"));
+check("response.error used for error message (not res.json() / not body.error)",
+  frontendPage.includes("response.error") && !frontendPage.includes("res.json()") && !frontendPage.includes("res.ok"));
+check("signedUrl extracted from response.data.url",
+  frontendPage.includes("response.data?.url") || frontendPage.includes("response.data.url"));
 check("window.open called with signedUrl variable",
   frontendPage.includes("window.open(signedUrl") || frontendPage.includes("window.open(signedURL"));
 check("setActionLoading used during download",   frontendPage.includes("setActionLoading(backup.id)"));

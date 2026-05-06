@@ -219,14 +219,12 @@ export default function BackupsPage() {
     }
     setActionLoading(backup.id);
     try {
-      const res = await authFetch(`/api/v1/super-admin/backups/${backup.id}/download-url`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast({ title: "Error al generar descarga", description: body?.error?.message || "No se pudo obtener la URL de descarga.", variant: "destructive" });
+      const response = await authFetch(`/api/v1/super-admin/backups/${backup.id}/download-url`);
+      if (!response.success) {
+        toast({ title: "Error al generar descarga", description: response.error || response.message || "No se pudo obtener la URL de descarga.", variant: "destructive" });
         return;
       }
-      const body = await res.json();
-      const signedUrl: string = body?.data?.url;
+      const signedUrl: string = response.data?.url;
       if (!signedUrl) {
         toast({ title: "Error", description: "Respuesta inesperada del servidor.", variant: "destructive" });
         return;
