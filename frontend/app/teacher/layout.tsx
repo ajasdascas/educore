@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BookOpen, Building2, Calendar, FileText, LayoutDashboard, Menu, MessageCircle, Settings, X } from "lucide-react";
+import { Bell, BookOpen, Building2, Calendar, Clock, FileText, LayoutDashboard, Menu, MessageCircle, Settings, User, X } from "lucide-react";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -18,9 +18,11 @@ const navItems = [
   { href: "/teacher/classes",       label: "Mis Grupos",     icon: BookOpen },
   { href: "/teacher/grades",        label: "Calificaciones", icon: FileText },
   { href: "/teacher/attendance",    label: "Asistencia",     icon: Calendar },
+  { href: "/teacher/schedule",      label: "Mi Horario",     icon: Clock },
   { href: "/teacher/messages",      label: "Mensajes",       icon: MessageCircle },
   { href: "/teacher/notifications", label: "Notificaciones", icon: Bell },
-  { href: "/teacher/settings",      label: "Configuracion",  icon: Settings },
+  { href: "/teacher/profile",       label: "Mi Perfil",      icon: User },
+  { href: "/teacher/settings",      label: "Configuración",  icon: Settings },
 ];
 
 export default function TeacherLayout({ children }: { children: ReactNode }) {

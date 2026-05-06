@@ -136,6 +136,22 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	rpts.Get("/:id", h.GetReport)
 	rpts.Post("/:id/export", h.ExportReport)
 	rpts.Delete("/:id", h.DeleteReport)
+
+	// Notifications for the school admin user
+	api.Get("/notifications", h.GetNotifications)
+}
+
+func (h *Handler) GetNotifications(c *fiber.Ctx) error {
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
+	userID, _ := c.Locals("user_id").(string)
+	notifications, err := h.service.GetNotifications(c.Context(), tenantID, userID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, fiber.Map{"notifications": notifications}, "Success")
 }
 
 func (h *Handler) RequireModule(moduleKey string) fiber.Handler {

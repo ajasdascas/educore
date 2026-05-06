@@ -69,6 +69,14 @@ func (s *Service) GetMessages(ctx context.Context, tenantID, teacherID string, p
 	return s.repo.GetMessages(ctx, tenantID, teacherID, page, perPage)
 }
 
+func (s *Service) GetSchedule(ctx context.Context, tenantID, teacherID string) ([]TeacherClass, error) {
+	return s.repo.GetSchedule(ctx, tenantID, teacherID)
+}
+
+func (s *Service) GetNotifications(ctx context.Context, tenantID, userID string) ([]TeacherNotification, error) {
+	return s.repo.GetNotifications(ctx, tenantID, userID)
+}
+
 func (s *Service) SendMessage(ctx context.Context, tenantID, teacherID string, req SendMessageRequest) (*TeacherMessage, error) {
 	if req.RecipientID == "" || req.Subject == "" || req.Content == "" {
 		return nil, fmt.Errorf("recipient_id, subject and content are required")

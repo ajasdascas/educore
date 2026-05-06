@@ -23,6 +23,8 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	app.Post("/grades", h.SaveGrades)
 	app.Get("/messages", h.GetMessages)
 	app.Post("/messages", h.SendMessage)
+	app.Get("/schedule", h.GetSchedule)
+	app.Get("/notifications", h.GetNotifications)
 }
 
 func (h *Handler) GetDashboard(c *fiber.Ctx) error {
@@ -93,6 +95,26 @@ func (h *Handler) GetMessages(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
 	return response.Success(c, data, "Success")
+}
+
+func (h *Handler) GetSchedule(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	userID, _ := c.Locals("user_id").(string)
+	schedule, err := h.service.GetSchedule(c.Context(), tenantID, userID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, fiber.Map{"schedule": schedule}, "Success")
+}
+
+func (h *Handler) GetNotifications(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	userID, _ := c.Locals("user_id").(string)
+	notifications, err := h.service.GetNotifications(c.Context(), tenantID, userID)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, fiber.Map{"notifications": notifications}, "Success")
 }
 
 func (h *Handler) SendMessage(c *fiber.Ctx) error {

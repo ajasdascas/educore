@@ -3103,3 +3103,34 @@ func (r *Repository) CountActiveTeachers(ctx context.Context, tenantID string) (
 	`, tenantID).Scan(&n)
 	return n, err
 }
+
+func (r *Repository) GetNotifications(ctx context.Context, tenantID, userID string) ([]AdminNotification, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			n.id,
+			COALESCE(n.title, '') AS title,
+			COALESCE(n.body, n.message, n.content, '') AS message,
+			DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i') AS created_at,
+			n.is_read
+		FROM notifications n
+		WHERE n.user_id = $1 AND n.tenant_id = $2
+		ORDER BY n.created_at DESC
+		LIMIT 50
+	`), userID, tenantID)
+	if err != nil {
+		return []AdminNotification{}, nil
+	}
+	defer rows.Close()
+	var items []AdminNotification
+	for rows.Next() {
+		var n AdminNotification
+		if err := rows.Scan(&n.ID, &n.Title, &n.Message, &n.CreatedAt, &n.IsRead); err != nil {
+			continue
+		}
+		items = append(items, n)
+	}
+	if items == nil {
+		items = []AdminNotification{}
+	}
+	return items, nil
+}

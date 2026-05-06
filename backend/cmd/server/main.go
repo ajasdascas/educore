@@ -121,6 +121,8 @@ func main() {
 	// Auth module (public)
 	authHandler := auth.NewHandler(db, cfg.JWTSecret, cfg.JWTExpiration, cfg.RefreshExpiration, redisClient)
 	authHandler.RegisterRoutes(api.Group("/auth"))
+	// Authenticated auth actions (requires valid JWT, any role)
+	authHandler.RegisterProtectedRoutes(api.Group("/auth", middleware.Protected(cfg.JWTSecret)))
 
 	// Webhooks (public, signature-verified)
 	webhook.RegisterRoutes(api.Group("/webhooks"), db)

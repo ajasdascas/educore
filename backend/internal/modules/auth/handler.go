@@ -42,6 +42,10 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Post("/accept-invitation", h.AcceptInvitation)
 }
 
+func (h *Handler) RegisterProtectedRoutes(router fiber.Router) {
+	router.Post("/change-password", h.ChangePassword)
+}
+
 // --- DTOs ---
 
 type LoginRequest struct {
@@ -302,6 +306,44 @@ func (h *Handler) ResetPassword(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid or expired token")
 	}
 
+	return response.Success(c, nil, "Password updated successfully")
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+func (h *Handler) ChangePassword(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	if userID == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	var req ChangePasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
+	}
+	if len(req.NewPassword) < 8 {
+		return response.Error(c, fiber.StatusBadRequest, "New password must be at least 8 characters")
+	}
+
+	var currentHash string
+	row := h.db.QueryRow(c.UserContext(), `SELECT password_hash FROM users WHERE id = $1`, userID)
+	if err := row.Scan(&currentHash); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "User not found")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Current password is incorrect")
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error processing password")
+	}
+	if _, err := h.db.Exec(c.UserContext(), `UPDATE users SET password_hash = $1 WHERE id = $2`, string(newHash), userID); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error updating password")
+	}
 	return response.Success(c, nil, "Password updated successfully")
 }
 

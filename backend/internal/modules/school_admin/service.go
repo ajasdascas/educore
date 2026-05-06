@@ -995,3 +995,16 @@ func (s *Service) validateBulkGrades(ctx context.Context, tenantID string, req B
 
 	return nil
 }
+
+
+type AdminNotification struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"created_at"`
+	IsRead    bool   `json:"is_read"`
+}
+
+func (s *Service) GetNotifications(ctx context.Context, tenantID, userID string) ([]AdminNotification, error) {
+	return s.repo.GetNotifications(ctx, tenantID, userID)
+}

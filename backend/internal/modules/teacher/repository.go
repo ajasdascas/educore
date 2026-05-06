@@ -71,8 +71,8 @@ func (r *Repository) GetClasses(ctx context.Context, tenantID, teacherID string)
 		       COALESCE(s.id::text, ''),
 		       COALESCE(s.name, 'Materia sin asignar'),
 		       COALESCE(csb.day, 'monday'),
-		       COALESCE(TO_CHAR(csb.start_time, 'HH24:MI'), ''),
-		       COALESCE(TO_CHAR(csb.end_time, 'HH24:MI'), ''),
+		       COALESCE(TIME_FORMAT(csb.start_time, '%H:%i'), ''),
+		       COALESCE(TIME_FORMAT(csb.end_time, '%H:%i'), ''),
 		       COALESCE(csb.room, ''),
 		       COALESCE((SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id), 0),
 		       COALESCE(csb.status, 'active'),
@@ -139,7 +139,7 @@ func (r *Repository) GetClassStudents(ctx context.Context, tenantID, teacherID, 
 		        WHERE gr.tenant_id = $1 AND gr.student_id = s.id
 		       ), 0)::float8,
 		       COALESCE((
-		        SELECT TO_CHAR(ar.date, 'YYYY-MM-DD')
+		        SELECT DATE_FORMAT(ar.date, '%Y-%m-%d')
 		        FROM attendance_records ar
 		        WHERE ar.tenant_id = $1 AND ar.student_id = s.id
 		        ORDER BY ar.date DESC LIMIT 1
@@ -353,6 +353,81 @@ func (r *Repository) GetMessages(ctx context.Context, tenantID, teacherID string
 		messages = append(messages, item)
 	}
 	return messages, rows.Err()
+}
+
+// GetNotifications returns school notifications for the teacher user.
+func (r *Repository) GetNotifications(ctx context.Context, tenantID, userID string) ([]TeacherNotification, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			n.id,
+			COALESCE(n.title, '') AS title,
+			COALESCE(n.body, n.message, n.content, '') AS message,
+			DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i') AS created_at,
+			n.is_read
+		FROM notifications n
+		WHERE n.user_id = $1 AND n.tenant_id = $2
+		ORDER BY n.created_at DESC
+		LIMIT 50
+	`), userID, tenantID)
+	if err != nil {
+		return []TeacherNotification{}, nil
+	}
+	defer rows.Close()
+	var items []TeacherNotification
+	for rows.Next() {
+		var n TeacherNotification
+		if err := rows.Scan(&n.ID, &n.Title, &n.Message, &n.CreatedAt, &n.IsRead); err != nil {
+			continue
+		}
+		items = append(items, n)
+	}
+	if items == nil {
+		items = []TeacherNotification{}
+	}
+	return items, nil
+}
+
+// GetSchedule returns the full weekly schedule for a teacher across all their groups.
+func (r *Repository) GetSchedule(ctx context.Context, tenantID, teacherID string) ([]TeacherClass, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			csb.id,
+			COALESCE(g.id, '') AS group_id,
+			COALESCE(g.name, '') AS group_name,
+			COALESCE(gl.name, '') AS grade_name,
+			COALESCE(s.id, '') AS subject_id,
+			COALESCE(s.name, '') AS subject_name,
+			COALESCE(csb.day, '') AS day,
+			COALESCE(TIME_FORMAT(csb.start_time, '%H:%i'), '') AS start_time,
+			COALESCE(TIME_FORMAT(csb.end_time, '%H:%i'), '') AS end_time,
+			COALESCE(csb.room, '') AS room,
+			COALESCE((SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id), 0) AS student_count,
+			csb.status,
+			csb.updated_at
+		FROM class_schedule_blocks csb
+		LEFT JOIN groups g ON g.id = csb.group_id AND g.tenant_id = $1
+		LEFT JOIN grade_levels gl ON gl.id = g.grade_id
+		LEFT JOIN subjects s ON s.id = csb.subject_id
+		WHERE csb.teacher_id = $2 AND csb.tenant_id = $1 AND csb.status = 'active'
+		ORDER BY FIELD(csb.day, 'monday','tuesday','wednesday','thursday','friday','saturday'), csb.start_time
+		LIMIT 100
+	`), tenantID, teacherID)
+	if err != nil {
+		return []TeacherClass{}, nil
+	}
+	defer rows.Close()
+	var blocks []TeacherClass
+	for rows.Next() {
+		var item TeacherClass
+		if err := rows.Scan(&item.ID, &item.GroupID, &item.GroupName, &item.GradeName, &item.SubjectID, &item.SubjectName, &item.Day, &item.StartTime, &item.EndTime, &item.Room, &item.StudentCount, &item.Status, &item.UpdatedAt); err != nil {
+			continue
+		}
+		blocks = append(blocks, item)
+	}
+	if blocks == nil {
+		blocks = []TeacherClass{}
+	}
+	return blocks, nil
 }
 
 func (r *Repository) SendMessage(ctx context.Context, tenantID, teacherID string, req SendMessageRequest) (*TeacherMessage, error) {

@@ -138,6 +138,14 @@ type TeacherMessage struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
+type TeacherNotification struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"created_at"`
+	IsRead    bool   `json:"is_read"`
+}
+
 type SendMessageRequest struct {
 	RecipientID string `json:"recipient_id"`
 	Subject     string `json:"subject"`
