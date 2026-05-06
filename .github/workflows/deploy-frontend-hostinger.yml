@@ -59,9 +59,11 @@ jobs:
             **/Thumbs.db
 
       - name: Record deployment in EduCore
+        if: always()
         env:
           EDUCORE_DEPLOY_WEBHOOK_URL: ${{ secrets.EDUCORE_DEPLOY_WEBHOOK_URL }}
           EDUCORE_DEPLOY_WEBHOOK_SECRET: ${{ secrets.EDUCORE_DEPLOY_WEBHOOK_SECRET }}
+          JOB_STATUS: ${{ job.status }}
           GITHUB_REF_NAME_VALUE: ${{ github.ref_name }}
           GITHUB_ACTOR_VALUE: ${{ github.actor }}
           GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
@@ -71,24 +73,33 @@ jobs:
           GITHUB_RUN_ATTEMPT_VALUE: ${{ github.run_attempt }}
         run: |
           if [ -z "${EDUCORE_DEPLOY_WEBHOOK_URL}" ] || [ -z "${EDUCORE_DEPLOY_WEBHOOK_SECRET}" ]; then
-            echo "::warning::Deployment history webhook is not configured."
+            echo "::warning::Deployment history webhook secrets (EDUCORE_DEPLOY_WEBHOOK_URL / EDUCORE_DEPLOY_WEBHOOK_SECRET) not configured — skipping."
             exit 0
           fi
 
-          commit_title="$(git log -1 --pretty=%s)"
-          commit_description="$(git log -1 --pretty=%b)"
+          # Map job.status to EduCore allowed values
+          raw_status="$(echo "${JOB_STATUS}" | tr '[:upper:]' '[:lower:]')"
+          case "${raw_status}" in
+            success)   deploy_status="success" ;;
+            failure)   deploy_status="failure" ;;
+            cancelled) deploy_status="cancelled" ;;
+            *)         deploy_status="failure" ;;
+          esac
+
+          commit_title="$(git log -1 --pretty=%s 2>/dev/null || echo 'Deploy frontend')"
+          commit_description="$(git log -1 --pretty=%b 2>/dev/null || echo '')"
           if [ -z "${commit_description}" ]; then
             commit_description="Deploy automatico del frontend a Hostinger desde GitHub Actions."
           fi
 
-          COMMIT_TITLE="${commit_title}" COMMIT_DESCRIPTION="${commit_description}" node <<'NODE'
+          COMMIT_TITLE="${commit_title}" COMMIT_DESCRIPTION="${commit_description}" DEPLOY_STATUS="${deploy_status}" node <<'NODE'
           const fs = require("fs");
           const payload = {
             environment: "production",
             service: "frontend",
             provider: "github_actions",
-            status: "success",
-            title: process.env.COMMIT_TITLE,
+            status: process.env.DEPLOY_STATUS || "failure",
+            title: process.env.COMMIT_TITLE || "Deploy Frontend to Hostinger",
             description: process.env.COMMIT_DESCRIPTION,
             commit_sha: process.env.GITHUB_SHA,
             commit_short_sha: (process.env.GITHUB_SHA || "").slice(0, 7),
@@ -112,11 +123,11 @@ jobs:
           curl_status=$?
 
           if [ "${curl_status}" -ne 0 ]; then
-            echo "::warning::Could not record deployment in EduCore."
+            echo "::warning::Could not reach EduCore deployment webhook (curl error ${curl_status})."
             exit 0
           fi
 
           case "${http_code}" in
-            2*) echo "Deployment history recorded in EduCore." ;;
+            2*) echo "Deployment history recorded in EduCore (status=${deploy_status})." ;;
             *) echo "::warning::EduCore deployment history webhook returned HTTP ${http_code}." ;;
           esac

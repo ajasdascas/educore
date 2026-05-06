@@ -100,20 +100,38 @@ check(workflow.includes("EDUCORE_DEPLOY_WEBHOOK_SECRET"), "workflow uses EDUCORE
 check(workflow.includes("Record deployment in EduCore"), "workflow records deployment after FTP", "deployment record step missing");
 check(workflow.includes("github.sha") || workflow.includes("GITHUB_SHA"), "workflow sends commit sha", "workflow missing commit sha");
 check(workflow.includes("github.run_id") || workflow.includes("GITHUB_RUN_ID"), "workflow sends run id", "workflow missing run id");
+// if: always() ensures the webhook fires even when the deploy step fails
+check(workflow.includes("if: always()"), "workflow Record step has if: always() (fires on failure too)", "Record step missing if: always() — failed deploys will NOT be recorded");
+// Dynamic status — must not hardcode "success"
+check(workflow.includes("job.status") || workflow.includes("JOB_STATUS"), "workflow sends dynamic job status (not hardcoded success)", "workflow hardcodes status=success — failures not captured");
+// Safety checks: secrets must not be echoed or dumped
 check(!workflow.includes("echo $EDUCORE_DEPLOY_WEBHOOK_SECRET"), "workflow does not echo secret with shell expansion", "workflow echoes deploy secret");
 check(!workflow.includes("echo \"${EDUCORE_DEPLOY_WEBHOOK_SECRET}\""), "workflow does not echo secret with braces", "workflow echoes deploy secret");
 check(!workflow.includes("cat deployment-payload.json"), "workflow does not dump payload", "workflow dumps deployment payload");
+// Graceful skip if secrets not configured
+check(workflow.includes("exit 0") && (workflow.includes("not configured") || workflow.includes("skipping")), "workflow skips gracefully if secrets absent", "workflow may fail pipeline when secrets are missing");
 
 section("Static: Super Admin UI");
 const backupsPage = read("frontend/app/super-admin/backups/page.tsx");
 check(backupsPage.includes("/api/v1/super-admin/deployments"), "Super Admin Respaldos consumes /super-admin/deployments", "Respaldos page does not consume deployments API");
 check(backupsPage.includes("Historial de actualizaciones"), "UI has Historial de actualizaciones section", "deployment history section missing");
-check(backupsPage.includes("Aún no hay despliegues registrados."), "UI has requested empty state", "empty state missing");
+// Updated empty state includes GitHub Actions hint
+check(
+  backupsPage.includes("Aún no hay despliegues registrados") && backupsPage.includes("GitHub Actions"),
+  "UI empty state mentions GitHub Actions",
+  "empty state does not mention GitHub Actions — user has no guidance"
+);
 check(backupsPage.includes("No se pudo cargar el historial de despliegues."), "UI has requested error state", "error state missing");
 check(backupsPage.includes("deployment.title") || backupsPage.includes(".title"), "UI shows title", "UI title missing");
 check(backupsPage.includes("deployment.description") || backupsPage.includes(".description"), "UI shows description", "UI description missing");
 check(backupsPage.includes("commit_short_sha") || backupsPage.includes("commit_sha"), "UI shows commit", "UI commit missing");
 check(backupsPage.includes("run_url") && backupsPage.includes("Ver workflow"), "UI shows run_url workflow action", "UI run_url/workflow action missing");
+
+section("Static: seed script");
+const seedScript = read("scripts/seed-deployment-history-local.js");
+check(!!seedScript, "seed-deployment-history-local.js exists", "seed script missing");
+check(seedScript.includes("EDUCORE_DEPLOY_WEBHOOK_URL") && seedScript.includes("EDUCORE_DEPLOY_WEBHOOK_SECRET"), "seed script reads webhook env vars", "seed script missing env var reads");
+check(!seedScript.includes("process.exit(0)") || seedScript.includes("process.exit(1)"), "seed script exits 1 on error", "seed script swallows errors");
 
 async function liveChecks() {
   const hasLiveEnv = API_BASE_URL && DEPLOY_SECRET && SUPER_ADMIN_EMAIL && SUPER_ADMIN_PASSWORD;
