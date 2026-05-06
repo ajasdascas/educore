@@ -217,7 +217,26 @@ export default function BackupsPage() {
       toast({ title: "No disponible", description: "Este backup no tiene archivo guardado en almacenamiento.", variant: "destructive" });
       return;
     }
-    window.open(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/v1/super-admin/backups/${backup.id}/download`, "_blank", "noopener,noreferrer");
+    setActionLoading(backup.id);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/backups/${backup.id}/download-url`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast({ title: "Error al generar descarga", description: body?.error?.message || "No se pudo obtener la URL de descarga.", variant: "destructive" });
+        return;
+      }
+      const body = await res.json();
+      const signedUrl: string = body?.data?.url;
+      if (!signedUrl) {
+        toast({ title: "Error", description: "Respuesta inesperada del servidor.", variant: "destructive" });
+        return;
+      }
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      toast({ title: "Error de red", description: "No se pudo conectar con el servidor.", variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const copyCommit = async (text: string) => {

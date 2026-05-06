@@ -178,7 +178,7 @@ func (h *Handler) RegisterEnterpriseRoutes(router fiber.Router) {
 	router.Get("/backups/:id", h.GetBackupJob)
 	router.Put("/backups/:id", h.UpdateBackupJob)
 	router.Delete("/backups/:id", h.DeleteBackupJob)
-	router.Get("/backups/:id/download", h.DownloadBackupJob)
+	router.Get("/backups/:id/download-url", h.DownloadBackupURL)
 	router.Post("/backups/:id/restore", h.RestoreBackupJob)
 
 	router.Get("/version", h.VersionInfo)
@@ -1444,7 +1444,11 @@ func (h *Handler) DeleteBackupJob(c *fiber.Ctx) error {
 	return response.Success(c, fiber.Map{"id": id}, "Backup deleted")
 }
 
-func (h *Handler) DownloadBackupJob(c *fiber.Ctx) error {
+// DownloadBackupURL returns a short-lived presigned URL for the backup file.
+// The client must use authFetch to call this endpoint (JWT in Authorization header),
+// then open the returned URL directly — window.open(signedUrl) is safe because
+// the signed URL does not require an Authorization header.
+func (h *Handler) DownloadBackupURL(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var status, storageKey string
 	if err := h.db.QueryRow(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
@@ -1452,17 +1456,20 @@ func (h *Handler) DownloadBackupJob(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Backup not found")
 	}
 	if status != "completed" {
-		return response.Error(c, fiber.StatusConflict, "Backup is not completed")
+		return response.Error(c, fiber.StatusConflict, "Backup is not completed yet")
 	}
 	if storageKey == "" {
-		return response.Error(c, fiber.StatusConflict, "Backup file is not available — storage_key is empty. This backup was created before storage was configured.")
+		return response.Error(c, fiber.StatusConflict, "Backup file not available — storage_key is empty. This backup was created before storage was configured.")
 	}
-	// Download from S3-compatible storage
-	url, err := h.generatePresignedURL(storageKey)
+	signedURL, err := h.generatePresignedURL(storageKey)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not generate download URL: "+err.Error())
 	}
-	return c.Redirect(url, fiber.StatusFound)
+	expiresAt := time.Now().UTC().Add(15 * time.Minute).Format(time.RFC3339)
+	return response.Success(c, fiber.Map{
+		"url":        signedURL,
+		"expires_at": expiresAt,
+	}, "Download URL generated")
 }
 
 // generatePresignedURL produces a time-limited signed URL for the given object key.

@@ -174,7 +174,7 @@ check("POST /backups registered",         enterprise.includes('router.Post("/bac
 check("GET /backups/:id registered",      enterprise.includes('router.Get("/backups/:id"'));
 check("PUT /backups/:id registered",      enterprise.includes('router.Put("/backups/:id"'));
 check("DELETE /backups/:id registered",   enterprise.includes('router.Delete("/backups/:id"'));
-check("GET /backups/:id/download",        enterprise.includes('router.Get("/backups/:id/download"'));
+check("GET /backups/:id/download-url",     enterprise.includes('router.Get("/backups/:id/download-url"'));
 check("POST /backups/:id/restore registered",
   enterprise.includes('router.Post("/backups/:id/restore"'));
 
