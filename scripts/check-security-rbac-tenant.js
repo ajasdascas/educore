@@ -133,6 +133,23 @@ for (const file of backendGoFiles) {
 check("No hardcoded credential patterns in backend .go files", hardcodedCount === 0,
   hardcodedCount > 0 ? `${hardcodedCount} files with suspicious patterns` : "");
 
+// ── 9. Kinder parent portal — child ownership check ───────────────────────
+console.log("\n9. Kinder Parent Portal — Authorization");
+const kinderGo = read("backend/internal/modules/parent/kinder.go");
+check("parent/kinder.go exists", kinderGo.length > 0,
+  kinderGo.length === 0 ? "file missing — kinder parent portal not yet implemented" : "");
+if (kinderGo.length > 0) {
+  check("parent/kinder.go has verifyAndGetChild (child ownership guard)",
+    kinderGo.includes("verifyAndGetChild"),
+    "must verify parent owns child BEFORE returning any kinder data");
+  check("verifyAndGetChild uses tenant_id isolation",
+    kinderGo.includes("tenant_id"),
+    "query must scope by tenant_id to prevent cross-tenant data leaks");
+  check("verifyAndGetChild checks parent_id against authenticated user",
+    kinderGo.includes("parent_id") || kinderGo.includes("parentID"),
+    "must validate the requesting user is a parent of the requested child");
+}
+
 // ── Summary ────────────────────────────────────────────────────────────────
 console.log(`\n📊 RESULTADO: ${passed}/${passed + failed} checks passed, ${warnings} warnings`);
 if (failed > 0) {

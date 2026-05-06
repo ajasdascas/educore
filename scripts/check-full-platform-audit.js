@@ -119,8 +119,40 @@ const migrations = [
 ];
 migrations.forEach(m => check(path.basename(m), exists(m)));
 
-// ── 5. QA Scripts ────────────────────────────────────────────────────────────
-console.log("\n5. QA Scripts");
+// ── 5. Kinder / Preschool modules ────────────────────────────────────────────
+console.log("\n5. Kinder & Preschool Modules");
+const kinderPreschoolFiles = [
+  "backend/internal/modules/teacher/kinder_preschool.go",
+  "backend/internal/modules/parent/kinder.go",
+  "backend/internal/modules/student/preschool.go",
+  "frontend/app/teacher/kinder/daily-logs/page.tsx",
+  "frontend/app/teacher/kinder/meals/page.tsx",
+  "frontend/app/teacher/kinder/naps/page.tsx",
+  "frontend/app/teacher/kinder/diapers/page.tsx",
+  "frontend/app/teacher/kinder/mood/page.tsx",
+  "frontend/app/teacher/kinder/incidents/page.tsx",
+  "frontend/app/teacher/preschool/qualitative-assessments/page.tsx",
+  "frontend/app/teacher/preschool/observations/page.tsx",
+  "frontend/app/teacher/preschool/evidence/page.tsx",
+  "frontend/app/school-admin/kinder/daily-logs/page.tsx",
+  "frontend/app/school-admin/preschool/qualitative-assessments/page.tsx",
+];
+kinderPreschoolFiles.forEach(f => {
+  const label = f.startsWith("frontend/") ? f.replace("frontend/app/", "") : f.replace("backend/internal/modules/", "");
+  check(label, exists(f));
+});
+
+// Migration 018 fixed — must exist and be ENUM-free
+const mig018fixed = "backend/migrations_mysql/018_kinder_preschool_data_tables.hostinger_fixed.sql";
+check("018_kinder_preschool_data_tables.hostinger_fixed.sql exists", exists(mig018fixed));
+if (exists(mig018fixed)) {
+  const mig018content = read(mig018fixed);
+  check("Migration 018 fixed: zero ENUMs", !mig018content.match(/\bENUM\b/i),
+    "ENUM keyword found — breaks Hostinger MariaDB");
+}
+
+// ── 6. QA Scripts ────────────────────────────────────────────────────────────
+console.log("\n6. QA Scripts");
 const qaScripts = [
   "scripts/check-parent-children-portal.js",
   "scripts/check-security-rbac-tenant.js",
@@ -128,16 +160,16 @@ const qaScripts = [
 ];
 qaScripts.forEach(s => check(path.basename(s), exists(s)));
 
-// ── 6. Support mode fix ─────────────────────────────────────────────────────
-console.log("\n6. Support Mode Fix");
+// ── 7. Support mode fix ─────────────────────────────────────────────────────
+console.log("\n7. Support Mode Fix");
 const parentSvc = read("backend/internal/modules/parent/service.go");
 check("GetChildren bifurcated for support mode", parentSvc.includes("isSupportMode bool") && parentSvc.includes("GetAllChildrenByTenant"));
 check("VerifyParentAccess bypasses in support mode", parentSvc.includes("return true, nil"));
 const parentHandlerContent = read("backend/internal/modules/parent/handler.go");
 check("GetChildren handler passes isSupport", parentHandlerContent.includes("isSupport") && parentHandlerContent.includes("GetChildren"));
 
-// ── 7. Notification routing ─────────────────────────────────────────────────
-console.log("\n7. Notification Routing per Role");
+// ── 8. Notification routing ─────────────────────────────────────────────────
+console.log("\n8. Notification Routing per Role");
 const accountPages = read("frontend/components/modules/account/AccountPages.tsx");
 check("AccountNotificationsPage routes by role", accountPages.includes("notificationEndpointForRole") && accountPages.includes("user?.role"));
 check("TEACHER route: /api/v1/teacher/notifications", accountPages.includes("/api/v1/teacher/notifications"));

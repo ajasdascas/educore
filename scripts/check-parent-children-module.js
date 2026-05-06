@@ -110,6 +110,24 @@ if (mig001) {
   check("student_id FK", mig001.includes("fk_parent_student_student"));
 }
 
+// ─── 9. Kinder parent portal endpoints ───────────────────────────────────────
+console.log("\n9. Kinder parent portal endpoints");
+const kinderHandler = read("backend/internal/modules/parent/kinder.go");
+check("parent/kinder.go exists", kinderHandler !== null);
+if (kinderHandler) {
+  const kinderFuncs = [
+    "GetChildDailyLogs",
+    "GetChildMeals",
+    "GetChildNaps",
+    "GetChildDiapers",
+    "GetChildMood",
+    "GetChildIncidents",
+  ];
+  for (const fn of kinderFuncs) {
+    check(`parent/kinder.go contains ${fn}`, kinderHandler.includes(fn));
+  }
+}
+
 // ─── Summary ──────────────────────────────────────────────────────────────────
 console.log("\n" + "═".repeat(60));
 console.log(`Parent Children Module QA: ${passed} passed, ${failed} failed`);

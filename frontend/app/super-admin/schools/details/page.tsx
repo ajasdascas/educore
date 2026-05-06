@@ -23,6 +23,13 @@ import {
   AlertTriangle,
   Globe,
   Eye,
+  LayoutGrid,
+  CreditCard,
+  KeyRound,
+  Receipt,
+  ClipboardList,
+  UserCog,
+  Layers,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authFetch, setSupportContext, type SupportRole } from "@/lib/auth";
@@ -40,6 +47,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const statusColors = {
   active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
   suspended: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
@@ -53,6 +62,18 @@ const statusLabels = {
   pending: "Pendiente",
   trial: "En Prueba",
 };
+
+const severityColors: Record<string, string> = {
+  info: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+  warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+  error: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+  critical: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+  low: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+  medium: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+  high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+};
+
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 
 interface School {
   id: string;
@@ -90,18 +111,126 @@ interface SchoolUser {
   is_active: boolean;
 }
 
+interface SchoolLevel {
+  level_key: string;
+  name: string;
+  enabled: boolean;
+  sort_order: number;
+}
+
+interface Submodule {
+  module_key: string;
+  submodule_key: string;
+  enabled: boolean;
+}
+
+interface PlanEntitlements {
+  plan_name: string;
+  max_students: number;
+  current_students: number;
+  max_teachers: number;
+  current_teachers: number;
+  storage_gb: number;
+  used_storage_gb: number;
+}
+
+interface Credentials {
+  admin_email: string;
+  admin_name: string;
+  is_active: boolean;
+}
+
+interface BillingInfo {
+  total_students: number;
+  new_this_month: number;
+  plan: string;
+  estimated_monthly_mxn: number;
+}
+
+interface AuditEntry {
+  created_at: string;
+  action: string;
+  severity: string;
+  performed_by: string;
+  resource: string;
+}
+
+interface PortalPreview {
+  role: string;
+  label: string;
+  url: string;
+  icon: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function UsageBar({ current, max, label }: { current: number; max: number; label: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((current / max) * 100)) : 0;
+  const color = pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-yellow-500" : "bg-green-500";
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-medium">{current} / {max === 0 ? "∞" : max} ({pct}%)</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted">
+        <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+type TabId =
+  | "general"
+  | "levels"
+  | "modules"
+  | "submodules"
+  | "plan"
+  | "credentials"
+  | "billing"
+  | "portals"
+  | "audit"
+  | "roletest";
+
 function SchoolDetailContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
   const router = useRouter();
   const { toast } = useToast();
+
+  // ── Core state (loaded on mount) ──
   const [school, setSchool] = useState<School | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [users, setUsers] = useState<SchoolUser[]>([]);
-  const [schoolLevels, setSchoolLevels] = useState<{level_key: string; name: string}[]>([]);
+  const [schoolLevels, setSchoolLevels] = useState<SchoolLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
+  // ── Lazy-loaded state (one per new tab) ──
+  const [submodules, setSubmodules] = useState<Submodule[] | null>(null);
+  const [submodulesLoading, setSubmodulesLoading] = useState(false);
+
+  const [entitlements, setEntitlements] = useState<PlanEntitlements | null>(null);
+  const [entitlementsLoading, setEntitlementsLoading] = useState(false);
+
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [credentialsLoading, setCredentialsLoading] = useState(false);
+
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  const [auditLog, setAuditLog] = useState<AuditEntry[] | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+
+  const [portalLinks, setPortalLinks] = useState<PortalPreview[] | null>(null);
+  const [portalLinksLoading, setPortalLinksLoading] = useState(false);
+
+  // ── Active tab ──
+  const [tabActive, setTabActive] = useState<TabId>("general");
+
+  // ── Initial load ──
   useEffect(() => {
     if (id) {
       fetchData();
@@ -110,6 +239,113 @@ function SchoolDetailContent() {
     }
   }, [id]);
 
+  // ── Lazy loaders ──
+  const loadSubmodules = async () => {
+    if (submodules !== null || submodulesLoading) return;
+    setSubmodulesLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${id}/submodules`);
+      if (res.success) {
+        setSubmodules(Array.isArray(res.data?.submodules) ? res.data.submodules : []);
+      } else {
+        setSubmodules([]);
+      }
+    } catch {
+      setSubmodules([]);
+    } finally {
+      setSubmodulesLoading(false);
+    }
+  };
+
+  const loadEntitlements = async () => {
+    if (entitlements !== null || entitlementsLoading) return;
+    setEntitlementsLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${id}/plan-entitlements`);
+      if (res.success) setEntitlements(res.data);
+      else setEntitlements(null);
+    } catch {
+      setEntitlements(null);
+    } finally {
+      setEntitlementsLoading(false);
+    }
+  };
+
+  const loadCredentials = async () => {
+    if (credentials !== null || credentialsLoading) return;
+    setCredentialsLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${id}/credentials`);
+      if (res.success) setCredentials(res.data);
+      else setCredentials(null);
+    } catch {
+      setCredentials(null);
+    } finally {
+      setCredentialsLoading(false);
+    }
+  };
+
+  const loadBilling = async () => {
+    if (billing !== null || billingLoading) return;
+    setBillingLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${id}/student-billing`);
+      if (res.success) setBilling(res.data);
+      else setBilling(null);
+    } catch {
+      setBilling(null);
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  const loadAuditLog = async () => {
+    if (auditLog !== null || auditLoading) return;
+    setAuditLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${id}/audit`);
+      if (res.success) {
+        setAuditLog(Array.isArray(res.data?.entries) ? res.data.entries : []);
+      } else {
+        setAuditLog([]);
+      }
+    } catch {
+      setAuditLog([]);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const loadPortalLinks = async () => {
+    if (portalLinks !== null || portalLinksLoading) return;
+    setPortalLinksLoading(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${id}/portal-preview`);
+      if (res.success) {
+        setPortalLinks(Array.isArray(res.data?.portals) ? res.data.portals : []);
+      } else {
+        setPortalLinks([]);
+      }
+    } catch {
+      setPortalLinks([]);
+    } finally {
+      setPortalLinksLoading(false);
+    }
+  };
+
+  // ── Tab change handler ──
+  const handleTabChange = (value: string) => {
+    const tab = value as TabId;
+    setTabActive(tab);
+    if (tab === "submodules") loadSubmodules();
+    if (tab === "plan") loadEntitlements();
+    if (tab === "credentials") loadCredentials();
+    if (tab === "billing") loadBilling();
+    if (tab === "audit") loadAuditLog();
+    if (tab === "portals") loadPortalLinks();
+  };
+
+  // ── Core fetch (modules + users + levels loaded upfront) ──
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -124,7 +360,7 @@ function SchoolDetailContent() {
       if (modulesRes.success) setModules(Array.isArray(modulesRes.data?.modules) ? modulesRes.data.modules : []);
       if (usersRes.success) setUsers(Array.isArray(usersRes.data?.users) ? usersRes.data.users : []);
       if (levelsRes.success) setSchoolLevels(Array.isArray(levelsRes.data?.levels) ? levelsRes.data.levels : []);
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "No se pudo cargar la información de la escuela",
@@ -135,6 +371,7 @@ function SchoolDetailContent() {
     }
   };
 
+  // ── Status change ──
   const handleStatusChange = async (newStatus: string) => {
     setUpdatingStatus(true);
     try {
@@ -145,10 +382,7 @@ function SchoolDetailContent() {
 
       if (res.success) {
         setSchool(prev => prev ? { ...prev, status: newStatus } : null);
-        toast({
-          title: "Éxito",
-          description: "Estado actualizado correctamente",
-        });
+        toast({ title: "Éxito", description: "Estado actualizado correctamente" });
       } else {
         throw new Error(res.message);
       }
@@ -163,6 +397,7 @@ function SchoolDetailContent() {
     }
   };
 
+  // ── Support mode helpers ──
   const enterSupportMode = (path: string) => {
     if (!school) return;
     setSupportContext(school.id, school.slug, school.name);
@@ -173,22 +408,22 @@ function SchoolDetailContent() {
     if (!school) return;
     const paths: Record<SupportRole, string> = {
       school_admin: "/school-admin/dashboard",
-      teacher:      "/teacher/dashboard",
-      parent:       "/parent/dashboard",
-      student:      "/student/dashboard",
+      teacher: "/teacher/dashboard",
+      parent: "/parent/dashboard",
+      student: "/student/dashboard",
     };
     setSupportContext(school.id, school.slug, school.name, role);
-    // Pass params in URL so the destination layout can hydrate support context even on hard reload
     const dest = paths[role];
     const qp = new URLSearchParams({
       supportTenantId: school.id,
-      supportSlug:     school.slug,
-      supportName:     school.name,
-      supportRole:     role,
+      supportSlug: school.slug,
+      supportName: school.name,
+      supportRole: role,
     });
     router.push(`${dest}?${qp.toString()}`);
   };
 
+  // ── Module toggle ──
   const toggleModule = async (moduleKey: string) => {
     try {
       const module = modules.find((item) => item.key === moduleKey);
@@ -198,23 +433,17 @@ function SchoolDetailContent() {
       });
 
       if (res.success) {
-        setModules(prev => prev.map(m => 
+        setModules(prev => prev.map(m =>
           m.key === moduleKey ? { ...m, is_active: !m.is_active } : m
         ));
-        toast({
-          title: "Éxito",
-          description: "Módulo actualizado",
-        });
+        toast({ title: "Éxito", description: "Módulo actualizado" });
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el módulo",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "No se pudo actualizar el módulo", variant: "destructive" });
     }
   };
 
+  // ── Loading skeleton ──
   if (loading) {
     return (
       <div className="p-6 space-y-6">
@@ -237,8 +466,10 @@ function SchoolDetailContent() {
 
   if (!school) return <div>Escuela no encontrada</div>;
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6">
+      {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <Button variant="outline" size="icon" onClick={() => router.back()}>
@@ -264,8 +495,8 @@ function SchoolDetailContent() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Select 
-            value={school.status} 
+          <Select
+            value={school.status}
             onValueChange={handleStatusChange}
             disabled={updatingStatus}
           >
@@ -286,6 +517,7 @@ function SchoolDetailContent() {
         </div>
       </div>
 
+      {/* ── Stats row ── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -331,16 +563,23 @@ function SchoolDetailContent() {
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">General</TabsTrigger>
+      {/* ── Tabs ── */}
+      <Tabs value={tabActive} onValueChange={handleTabChange} className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="levels">Niveles</TabsTrigger>
           <TabsTrigger value="modules">Módulos</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="submodules">Submódulos</TabsTrigger>
+          <TabsTrigger value="plan">Plan</TabsTrigger>
+          <TabsTrigger value="credentials">Credenciales</TabsTrigger>
+          <TabsTrigger value="billing">Facturación</TabsTrigger>
           <TabsTrigger value="portals">Portales</TabsTrigger>
-          <TabsTrigger value="settings">Configuración</TabsTrigger>
+          <TabsTrigger value="audit">Auditoría</TabsTrigger>
+          <TabsTrigger value="roletest">Pruebas por Rol</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
+        {/* ── Tab 1: General ── */}
+        <TabsContent value="general" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -357,15 +596,34 @@ function SchoolDetailContent() {
                     <p className="font-medium">{school.slug}.onlineu.mx</p>
                   </div>
                   <div>
+                    <Label className="text-muted-foreground">Plan</Label>
+                    <p className="font-medium capitalize">{school.plan}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Estado</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge className={statusColors[school.status as keyof typeof statusColors] || "bg-gray-100"}>
+                        {statusLabels[school.status as keyof typeof statusLabels] || school.status}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">(editable arriba)</span>
+                    </div>
+                  </div>
+                  <div>
                     <Label className="text-muted-foreground">Última Actualización</Label>
                     <p className="font-medium">{new Date(school.updated_at).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Fecha de Registro</Label>
+                    <p className="font-medium">{new Date(school.created_at).toLocaleString()}</p>
                   </div>
                   {schoolLevels.length > 0 && (
                     <div className="col-span-2">
                       <Label className="text-muted-foreground">Niveles Educativos</Label>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {schoolLevels.map((lvl) => (
-                          <Badge key={lvl.level_key} variant="secondary">{lvl.name || lvl.level_key}</Badge>
+                          <Badge key={lvl.level_key} variant="secondary">
+                            {lvl.name || lvl.level_key}
+                          </Badge>
                         ))}
                       </div>
                     </div>
@@ -375,16 +633,80 @@ function SchoolDetailContent() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Métricas de Uso</CardTitle>
+                <CardTitle>Resumen de Población</CardTitle>
               </CardHeader>
-              <CardContent>
-                {/* Aquí irían gráficas o métricas más detalladas */}
-                <p className="text-muted-foreground text-sm">Próximamente: Gráficas de actividad y consumo de recursos.</p>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Alumnos</span>
+                  </div>
+                  <span className="font-bold text-lg">{school.total_students}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Users2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Profesores</span>
+                  </div>
+                  <span className="font-bold text-lg">{school.total_teachers}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">Padres de familia</span>
+                  </div>
+                  <span className="font-bold text-lg">{school.total_parents}</span>
+                </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
+        {/* ── Tab 2: Niveles ── */}
+        <TabsContent value="levels">
+          <Card>
+            <CardHeader>
+              <CardTitle>Niveles Educativos</CardTitle>
+              <CardDescription>Niveles configurados para este tenant. Solo lectura.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {schoolLevels.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay niveles configurados para esta escuela.</p>
+              ) : (
+                <div className="border rounded-md">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="h-12 px-4 text-left font-medium">Clave</th>
+                        <th className="h-12 px-4 text-left font-medium">Nombre</th>
+                        <th className="h-12 px-4 text-left font-medium">Habilitado</th>
+                        <th className="h-12 px-4 text-left font-medium">Orden</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schoolLevels.map((lvl) => (
+                        <tr key={lvl.level_key} className="border-b transition-colors hover:bg-muted/50">
+                          <td className="p-4 font-mono text-xs">{lvl.level_key}</td>
+                          <td className="p-4">{lvl.name || lvl.level_key}</td>
+                          <td className="p-4">
+                            {lvl.enabled ? (
+                              <Badge className="bg-green-100 text-green-800">Activo</Badge>
+                            ) : (
+                              <Badge variant="secondary">Inactivo</Badge>
+                            )}
+                          </td>
+                          <td className="p-4 text-muted-foreground">{lvl.sort_order ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab 3: Módulos ── */}
         <TabsContent value="modules">
           <Card>
             <CardHeader>
@@ -393,20 +715,20 @@ function SchoolDetailContent() {
             </CardHeader>
             <CardContent>
               {(() => {
-                const coreModules = modules.filter(m => m.is_core || m.source === 'core' || !m.level);
-                const levelModules = modules.filter(m => !m.is_core && m.source !== 'core' && m.level);
+                const coreModules = modules.filter(m => m.is_core || m.source === "core" || !m.level);
+                const levelModules = modules.filter(m => !m.is_core && m.source !== "core" && m.level);
                 const levelGroups: Record<string, typeof modules> = {};
                 for (const m of levelModules) {
-                  const key = m.level || 'otro';
+                  const key = m.level || "otro";
                   if (!levelGroups[key]) levelGroups[key] = [];
                   levelGroups[key].push(m);
                 }
                 const levelLabels: Record<string, string> = {
-                  kinder: 'Kinder / Estancia',
-                  preescolar: 'Preescolar',
-                  primaria: 'Primaria',
-                  secundaria: 'Secundaria',
-                  preparatoria: 'Preparatoria',
+                  kinder: "Kinder / Estancia",
+                  preescolar: "Preescolar",
+                  primaria: "Primaria",
+                  secundaria: "Secundaria",
+                  preparatoria: "Preparatoria",
                 };
 
                 const renderModuleRow = (mod: Module) => (
@@ -442,9 +764,7 @@ function SchoolDetailContent() {
                     {coreModules.length > 0 && (
                       <div className="space-y-3">
                         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Módulos Core</h3>
-                        <div className="space-y-3">
-                          {coreModules.map(renderModuleRow)}
-                        </div>
+                        <div className="space-y-3">{coreModules.map(renderModuleRow)}</div>
                       </div>
                     )}
                     {Object.entries(levelGroups).map(([levelKey, mods]) => (
@@ -452,9 +772,7 @@ function SchoolDetailContent() {
                         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                           {levelLabels[levelKey] || levelKey}
                         </h3>
-                        <div className="space-y-3">
-                          {mods.map(renderModuleRow)}
-                        </div>
+                        <div className="space-y-3">{mods.map(renderModuleRow)}</div>
                       </div>
                     ))}
                   </div>
@@ -464,47 +782,212 @@ function SchoolDetailContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="users">
+        {/* ── Tab 4: Submódulos ── */}
+        <TabsContent value="submodules">
           <Card>
             <CardHeader>
-              <CardTitle>Usuarios de la Escuela</CardTitle>
-              <CardDescription>Lista de administradores, profesores y personal registrado.</CardDescription>
+              <CardTitle>Submódulos</CardTitle>
+              <CardDescription>Submódulos habilitados por módulo principal. Solo lectura.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-md">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="h-12 px-4 text-left font-medium">Nombre</th>
-                      <th className="h-12 px-4 text-left font-medium">Email</th>
-                      <th className="h-12 px-4 text-left font-medium">Rol</th>
-                      <th className="h-12 px-4 text-left font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className="border-b transition-colors hover:bg-muted/50">
-                        <td className="p-4">{user.first_name} {user.last_name}</td>
-                        <td className="p-4">{user.email}</td>
-                        <td className="p-4">
-                          <Badge variant="outline">{user.role}</Badge>
-                        </td>
-                        <td className="p-4">
-                          {user.is_active ? (
-                            <Badge className="bg-green-100 text-green-800">Activo</Badge>
-                          ) : (
-                            <Badge variant="secondary">Inactivo</Badge>
-                          )}
-                        </td>
+              {submodulesLoading ? (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : submodules === null ? (
+                <p className="text-sm text-muted-foreground">Haz click en el tab para cargar los submódulos.</p>
+              ) : submodules.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No se encontraron submódulos para esta escuela.</p>
+              ) : (
+                <div className="border rounded-md">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="h-12 px-4 text-left font-medium">Módulo</th>
+                        <th className="h-12 px-4 text-left font-medium">Submódulo</th>
+                        <th className="h-12 px-4 text-left font-medium">Estado</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {submodules.map((sm, i) => (
+                        <tr key={i} className="border-b transition-colors hover:bg-muted/50">
+                          <td className="p-4 font-mono text-xs">{sm.module_key}</td>
+                          <td className="p-4 font-mono text-xs">{sm.submodule_key}</td>
+                          <td className="p-4">
+                            {sm.enabled ? (
+                              <Badge className="bg-green-100 text-green-800">Habilitado</Badge>
+                            ) : (
+                              <Badge variant="secondary">Deshabilitado</Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ── Tab 5: Plan ── */}
+        <TabsContent value="plan">
+          <Card>
+            <CardHeader>
+              <CardTitle>Derechos del Plan</CardTitle>
+              <CardDescription>Límites de uso y consumo actual del tenant según su plan contratado.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {entitlementsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+                </div>
+              ) : entitlements === null ? (
+                <p className="text-sm text-muted-foreground">No se pudo cargar la información del plan.</p>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="rounded-xl border bg-muted/30 p-4 text-center">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan</p>
+                      <p className="text-2xl font-bold mt-1 capitalize">{entitlements.plan_name}</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/30 p-4 text-center">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Alumnos actuales</p>
+                      <p className="text-2xl font-bold mt-1">{entitlements.current_students}</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/30 p-4 text-center">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Profesores actuales</p>
+                      <p className="text-2xl font-bold mt-1">{entitlements.current_teachers}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <UsageBar
+                      current={entitlements.current_students}
+                      max={entitlements.max_students}
+                      label="Alumnos"
+                    />
+                    <UsageBar
+                      current={entitlements.current_teachers}
+                      max={entitlements.max_teachers}
+                      label="Profesores"
+                    />
+                    <UsageBar
+                      current={entitlements.used_storage_gb}
+                      max={entitlements.storage_gb}
+                      label="Almacenamiento (GB)"
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab 6: Credenciales ── */}
+        <TabsContent value="credentials">
+          <Card>
+            <CardHeader>
+              <CardTitle>Credenciales de Administrador</CardTitle>
+              <CardDescription>Datos del administrador principal del tenant.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {credentialsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : credentials === null ? (
+                <p className="text-sm text-muted-foreground">No se encontraron credenciales para esta escuela.</p>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Nombre</p>
+                      <p className="font-semibold mt-1">{credentials.admin_name || "—"}</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Email</p>
+                      <p className="font-semibold mt-1">{credentials.admin_email || "—"}</p>
+                    </div>
+                    <div className="rounded-xl border bg-muted/30 p-4">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Estado</p>
+                      <div className="mt-1">
+                        {credentials.is_active ? (
+                          <Badge className="bg-green-100 text-green-800">Activo</Badge>
+                        ) : (
+                          <Badge variant="secondary">Inactivo</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-3">Acceso rápido por portal:</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {([
+                        { role: "school_admin" as SupportRole, label: "Admin Escolar", icon: "🏫" },
+                        { role: "teacher" as SupportRole, label: "Profesor", icon: "👨‍🏫" },
+                        { role: "parent" as SupportRole, label: "Padre", icon: "👨‍👩‍👧" },
+                        { role: "student" as SupportRole, label: "Alumno", icon: "🎒" },
+                      ] as const).map(({ role, label, icon }) => (
+                        <Button
+                          key={role}
+                          variant="outline"
+                          className="flex flex-col h-auto py-3 gap-1"
+                          onClick={() => router.push(`/login?slug=${school.slug}&role=${role}`)}
+                        >
+                          <span className="text-xl">{icon}</span>
+                          <span className="text-xs">{label}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab 7: Facturación ── */}
+        <TabsContent value="billing">
+          <Card>
+            <CardHeader>
+              <CardTitle>Facturación Estimada</CardTitle>
+              <CardDescription>Resumen del ciclo de facturación actual basado en alumnos activos.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {billingLoading ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
+                </div>
+              ) : billing === null ? (
+                <p className="text-sm text-muted-foreground">No se pudo cargar la información de facturación.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-xl border bg-muted/30 p-5">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan</p>
+                    <p className="text-2xl font-bold mt-1 capitalize">{billing.plan}</p>
+                  </div>
+                  <div className="rounded-xl border bg-muted/30 p-5">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Alumnos</p>
+                    <p className="text-2xl font-bold mt-1">{billing.total_students}</p>
+                  </div>
+                  <div className="rounded-xl border bg-muted/30 p-5">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Nuevos este mes</p>
+                    <p className="text-2xl font-bold mt-1 text-green-600">+{billing.new_this_month}</p>
+                  </div>
+                  <div className="rounded-xl border border-primary/30 bg-primary/5 p-5">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Cobro estimado</p>
+                    <p className="text-2xl font-bold mt-1">
+                      ${billing.estimated_monthly_mxn.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                      <span className="text-sm font-normal text-muted-foreground ml-1">MXN/mes</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab 8: Portales ── */}
         <TabsContent value="portals" className="space-y-4">
           {/* DNS warning banner */}
           <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
@@ -518,6 +1001,42 @@ function SchoolDetailContent() {
               </p>
             </div>
           </div>
+
+          {/* Portal preview from API */}
+          {portalLinksLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            </div>
+          ) : portalLinks && portalLinks.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Vista previa de portales</CardTitle>
+                <CardDescription>URLs disponibles para cada rol, servidas desde el backend.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {portalLinks.map((p) => (
+                    <div
+                      key={p.role}
+                      className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-card p-5 hover:border-primary/40 transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{p.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-sm">{p.label}</span>
+                          <p className="text-xs text-muted-foreground mt-0.5 font-mono break-all">{p.url}</p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="default" onClick={() => router.push(p.url)}>
+                        <Globe className="w-3.5 h-3.5 mr-1.5" />
+                        Ingresar como {p.label}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Portales internos por rol */}
           <Card>
@@ -538,7 +1057,6 @@ function SchoolDetailContent() {
                     roleBadge: "SCHOOL_ADMIN",
                     loginHref: `/login?slug=${school.slug}&role=school_admin`,
                     portalHref: `/escuela/?slug=${school.slug}&role=school_admin`,
-                    available: true,
                   },
                   {
                     key: "teachers",
@@ -548,7 +1066,6 @@ function SchoolDetailContent() {
                     roleBadge: "TEACHER",
                     loginHref: `/login?slug=${school.slug}&role=teacher`,
                     portalHref: `/escuela/?slug=${school.slug}&role=teacher`,
-                    available: true,
                   },
                   {
                     key: "parents",
@@ -558,7 +1075,6 @@ function SchoolDetailContent() {
                     roleBadge: "PARENT",
                     loginHref: `/login?slug=${school.slug}&role=parent`,
                     portalHref: `/escuela/?slug=${school.slug}&role=parent`,
-                    available: true,
                   },
                   {
                     key: "students",
@@ -568,7 +1084,6 @@ function SchoolDetailContent() {
                     roleBadge: "STUDENT",
                     loginHref: `/login?slug=${school.slug}&role=student`,
                     portalHref: `/escuela/?slug=${school.slug}&role=student`,
-                    available: true,
                   },
                 ].map((portal) => (
                   <div
@@ -601,7 +1116,7 @@ function SchoolDetailContent() {
             </CardContent>
           </Card>
 
-          {/* Subdominio experimental — separado y con advertencia clara */}
+          {/* Subdominio experimental */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -625,11 +1140,11 @@ function SchoolDetailContent() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { label: "Probar subdominio",     url: `https://${school.slug}.onlineu.mx` },
-                  { label: "Probar login externo",  url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
+                  { label: "Probar subdominio", url: `https://${school.slug}.onlineu.mx` },
+                  { label: "Probar login externo", url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
                   { label: "Probar login profesor", url: `https://${school.slug}.onlineu.mx/login?role=teacher` },
-                  { label: "Probar login padre",    url: `https://${school.slug}.onlineu.mx/login?role=parent` },
-                  { label: "Probar login alumno",   url: `https://${school.slug}.onlineu.mx/login?role=student` },
+                  { label: "Probar login padre", url: `https://${school.slug}.onlineu.mx/login?role=parent` },
+                  { label: "Probar login alumno", url: `https://${school.slug}.onlineu.mx/login?role=student` },
                 ].map(({ label, url }) => (
                   <a key={url} href={url} target="_blank" rel="noopener noreferrer">
                     <Button variant="ghost" size="sm" className="gap-1 border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/60">
@@ -643,84 +1158,150 @@ function SchoolDetailContent() {
               </p>
             </CardContent>
           </Card>
+        </TabsContent>
 
-          {/* Modo soporte — Ver portales de rol */}
+        {/* ── Tab 9: Auditoría ── */}
+        <TabsContent value="audit">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Eye className="w-4 h-4 text-blue-500" /> Modo Soporte — Ver portales de rol
-              </CardTitle>
-              <CardDescription>
-                Previsualiza cada portal como lo vería el usuario final. Tu JWT no cambia — usas el header <span className="font-mono text-xs">X-Support-Tenant-ID</span>.
-              </CardDescription>
+              <CardTitle>Registro de Auditoría</CardTitle>
+              <CardDescription>Últimas 50 acciones registradas en este tenant.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {auditLoading ? (
+                <div className="space-y-2">
+                  {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : auditLog === null ? (
+                <p className="text-sm text-muted-foreground">Haz click en el tab para cargar el registro.</p>
+              ) : auditLog.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay entradas de auditoría para esta escuela.</p>
+              ) : (
+                <div className="border rounded-md overflow-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="h-12 px-4 text-left font-medium whitespace-nowrap">Fecha</th>
+                        <th className="h-12 px-4 text-left font-medium">Acción</th>
+                        <th className="h-12 px-4 text-left font-medium">Severidad</th>
+                        <th className="h-12 px-4 text-left font-medium whitespace-nowrap">Realizado por</th>
+                        <th className="h-12 px-4 text-left font-medium">Recurso</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLog.slice(0, 50).map((entry, i) => (
+                        <tr key={i} className="border-b transition-colors hover:bg-muted/50">
+                          <td className="p-4 text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(entry.created_at).toLocaleString()}
+                          </td>
+                          <td className="p-4 font-mono text-xs">{entry.action}</td>
+                          <td className="p-4">
+                            <Badge className={severityColors[entry.severity?.toLowerCase()] || "bg-gray-100 text-gray-800"}>
+                              {entry.severity}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-xs">{entry.performed_by || "—"}</td>
+                          <td className="p-4 text-xs text-muted-foreground">{entry.resource || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab 10: Pruebas por Rol ── */}
+        <TabsContent value="roletest">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCog className="h-5 w-5 text-blue-500" />
+                Pruebas por Rol — Modo Soporte
+              </CardTitle>
+              <CardDescription>
+                Entra al sistema como si fueras un usuario de esta escuela. Tu JWT de Super Admin no cambia —
+                el header <span className="font-mono text-xs">X-Support-Tenant-ID</span> activa el modo soporte.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {([
-                  { role: "school_admin" as SupportRole, label: "Ver como Director / Coordinador", icon: "🏫", desc: "Panel completo de school admin con todos sus módulos activos." },
-                  { role: "teacher" as SupportRole,      label: "Ver como Profesor",               icon: "👨‍🏫", desc: "Dashboard docente: grupos, asistencias, calificaciones." },
-                  { role: "parent" as SupportRole,       label: "Ver como Padre de familia",       icon: "👨‍👩‍👧", desc: "Portal de padres: hijos, calificaciones, mensajes, pagos." },
-                  { role: "student" as SupportRole,      label: "Ver como Estudiante",             icon: "🎒", desc: "Portal de alumnos: calificaciones, asistencia, horario." },
-                ] as const).map(({ role, label, icon, desc }) => (
+                  {
+                    role: "school_admin" as SupportRole,
+                    label: "Ingresar como Admin",
+                    sublabel: "SCHOOL_ADMIN",
+                    desc: "Panel completo de school admin: profesores, alumnos, grupos, horarios y reportes.",
+                    icon: "🏫",
+                    color: "hover:border-blue-500/50 hover:bg-blue-500/5",
+                    badge: "bg-blue-100 text-blue-800",
+                  },
+                  {
+                    role: "teacher" as SupportRole,
+                    label: "Ingresar como Maestro",
+                    sublabel: "TEACHER",
+                    desc: "Dashboard docente: grupos asignados, asistencias, calificaciones y comunicaciones.",
+                    icon: "👨‍🏫",
+                    color: "hover:border-green-500/50 hover:bg-green-500/5",
+                    badge: "bg-green-100 text-green-800",
+                  },
+                  {
+                    role: "parent" as SupportRole,
+                    label: "Ingresar como Padre",
+                    sublabel: "PARENT",
+                    desc: "Portal de padres: calificaciones, asistencia, mensajes y pagos de sus hijos.",
+                    icon: "👨‍👩‍👧",
+                    color: "hover:border-orange-500/50 hover:bg-orange-500/5",
+                    badge: "bg-orange-100 text-orange-800",
+                  },
+                  {
+                    role: "student" as SupportRole,
+                    label: "Ingresar como Alumno",
+                    sublabel: "STUDENT",
+                    desc: "Portal de alumnos: calificaciones, asistencia, horario y tareas.",
+                    icon: "🎒",
+                    color: "hover:border-purple-500/50 hover:bg-purple-500/5",
+                    badge: "bg-purple-100 text-purple-800",
+                  },
+                ] as const).map(({ role, label, sublabel, desc, icon, color, badge }) => (
                   <button
                     key={role}
                     onClick={() => enterSupportRoleMode(role)}
-                    className="flex items-start gap-3 rounded-xl border border-slate-700/60 bg-card p-4 text-left hover:border-blue-500/50 hover:bg-blue-500/5 transition-colors group"
+                    className={`flex items-start gap-4 rounded-xl border border-slate-700/60 bg-card p-5 text-left transition-colors group ${color}`}
                   >
-                    <span className="text-xl shrink-0 mt-0.5">{icon}</span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold group-hover:text-blue-400 transition-colors">{label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
+                    <span className="text-3xl shrink-0">{icon}</span>
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold">{label}</p>
+                        <Badge className={`text-[10px] h-4 ${badge}`}>{sublabel}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
                     </div>
                   </button>
                 ))}
               </div>
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Acceso directo a módulos de administración escolar:</p>
+
+              {/* Módulos directos de school admin */}
+              <div className="border-t border-border pt-5">
+                <p className="text-xs text-muted-foreground mb-3 font-medium">Acceso directo a módulos de administración escolar:</p>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: "Dashboard",       path: "/school-admin/dashboard" },
-                    { label: "Estudiantes",     path: "/school-admin/students" },
-                    { label: "Profesores",      path: "/school-admin/teachers" },
-                    { label: "Grupos",          path: "/school-admin/groups" },
-                    { label: "Asistencias",     path: "/school-admin/attendance" },
-                    { label: "Calificaciones",  path: "/school-admin/grades" },
-                    { label: "Boletas",         path: "/school-admin/report-cards" },
-                    { label: "Horarios",        path: "/school-admin/schedule" },
-                    { label: "Comunicaciones",  path: "/school-admin/communications" },
+                    { label: "Dashboard", path: "/school-admin/dashboard" },
+                    { label: "Estudiantes", path: "/school-admin/students" },
+                    { label: "Profesores", path: "/school-admin/teachers" },
+                    { label: "Grupos", path: "/school-admin/groups" },
+                    { label: "Asistencias", path: "/school-admin/attendance" },
+                    { label: "Calificaciones", path: "/school-admin/grades" },
+                    { label: "Boletas", path: "/school-admin/report-cards" },
+                    { label: "Horarios", path: "/school-admin/schedule" },
+                    { label: "Comunicaciones", path: "/school-admin/communications" },
                   ].map(({ label, path }) => (
                     <Button key={path} variant="outline" size="sm" onClick={() => enterSupportMode(path)}>
                       {label}
                     </Button>
                   ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración del Tenant</CardTitle>
-              <CardDescription>Parámetros técnicos y personalización de la escuela.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nombre de la Institución</Label>
-                  <Input defaultValue={school.name} readOnly className="bg-muted" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Subdominio (Slug)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input defaultValue={school.slug} readOnly className="bg-muted flex-1" />
-                    <span className="text-muted-foreground text-sm">.onlineu.mx</span>
-                  </div>
-                </div>
-              </div>
-              <div className="pt-4">
-                <Button disabled>Guardar Cambios (Próximamente)</Button>
               </div>
             </CardContent>
           </Card>

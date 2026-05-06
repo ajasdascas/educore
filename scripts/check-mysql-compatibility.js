@@ -123,6 +123,27 @@ check("Migration has FK to users", migration012.includes("REFERENCES users(id)")
 check("Migration is idempotent (IF NOT EXISTS)", migration012.includes("IF NOT EXISTS"));
 check("Migration uses DATETIME not TIMESTAMPTZ", !migration012.includes("TIMESTAMPTZ"));
 
+// ── 3b. Migration 018 kinder/preschool fixed file ────────────────────────────
+console.log("\n3b. Migration 018 — kinder/preschool hostinger_fixed");
+const mig018fixedPath = "backend/migrations_mysql/018_kinder_preschool_data_tables.hostinger_fixed.sql";
+check("018_kinder_preschool_data_tables.hostinger_fixed.sql exists",
+  fs.existsSync(path.join(ROOT, mig018fixedPath)));
+
+const mig018fixed = read(mig018fixedPath);
+if (mig018fixed.length > 0) {
+  check("Migration 018 fixed: zero ENUMs",
+    !mig018fixed.match(/\bENUM\b/i),
+    mig018fixed.match(/\bENUM\b/i)
+      ? "ENUM keyword found — Hostinger MariaDB may fail; use VARCHAR + CHECK CONSTRAINT instead"
+      : "");
+  check("Migration 018 fixed: uses VARCHAR not ENUM for status columns",
+    mig018fixed.includes("VARCHAR") && !mig018fixed.match(/\bENUM\b/i));
+  check("Migration 018 fixed: idempotent (IF NOT EXISTS)",
+    mig018fixed.includes("IF NOT EXISTS"));
+  check("Migration 018 fixed: uses DATETIME not TIMESTAMPTZ",
+    !mig018fixed.includes("TIMESTAMPTZ"));
+}
+
 // ── 4. Auth handler SQL ────────────────────────────────────────────────────
 console.log("\n4. Auth handler SQL correctness");
 check("ForgotPassword uses Go time.Add(1h) instead of SQL INTERVAL", authFile.includes("time.Now().UTC().Add(time.Hour)"));
