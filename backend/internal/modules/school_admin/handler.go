@@ -142,6 +142,10 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 
 	// Notifications for the school admin user
 	api.Get("/notifications", h.GetNotifications)
+
+	// Kinder & Preschool data capture
+	h.RegisterKinderRoutes(api)
+	h.RegisterPreschoolRoutes(api)
 }
 
 func (h *Handler) GetNotifications(c *fiber.Ctx) error {

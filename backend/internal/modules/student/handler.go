@@ -190,27 +190,3 @@ func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
 	return response.SuccessMessage(c, "Notification marked as read")
 }
 
-// Preescolar handlers — return empty list when feature data not yet stored
-func (h *Handler) getPreescolarData(c *fiber.Ctx, dataKey string) error {
-	tenantID, _ := c.Locals("tenant_id").(string)
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
-	}
-	return response.Success(c, fiber.Map{dataKey: []interface{}{}}, "ok")
-}
-
-func (h *Handler) GetQualitativeAssessments(c *fiber.Ctx) error {
-	return h.getPreescolarData(c, "assessments")
-}
-
-func (h *Handler) GetDevelopmentAreas(c *fiber.Ctx) error {
-	return h.getPreescolarData(c, "development_areas")
-}
-
-func (h *Handler) GetObservations(c *fiber.Ctx) error {
-	return h.getPreescolarData(c, "observations")
-}
-
-func (h *Handler) GetEvidence(c *fiber.Ctx) error {
-	return h.getPreescolarData(c, "evidence")
-}

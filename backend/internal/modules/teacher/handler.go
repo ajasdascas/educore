@@ -29,6 +29,9 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	app.Put("/notifications/:id/read", h.MarkNotificationRead)
 	app.Get("/announcements", h.GetAnnouncements)
 	app.Post("/announcements", h.CreateAnnouncement)
+
+	h.RegisterKinderRoutes(app)
+	h.RegisterPreschoolRoutes(app)
 }
 
 func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
