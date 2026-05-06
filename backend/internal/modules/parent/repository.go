@@ -64,6 +64,7 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		       COALESCE(s.enrollment_number, ''),
 		       COALESCE(g.name, ''),
 		       COALESCE(gl.name, ''),
+		       COALESCE(gl.level, ''),
 		       s.status,
 		       COALESCE(s.photo_url, ''),
 		       s.updated_at,
@@ -117,7 +118,7 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		var child ChildSummaryResponse
 		if err := rows.Scan(
 			&child.ID, &child.FirstName, &child.LastName, &child.EnrollmentID,
-			&child.GroupName, &child.GradeName, &child.Status, &child.ProfilePhoto,
+			&child.GroupName, &child.GradeName, &child.LevelKey, &child.Status, &child.ProfilePhoto,
 			&child.UpdatedAt, &child.AttendanceRate, &child.CurrentGPA,
 			&child.LastAttendance, &child.RecentGrade, &child.NextClass,
 		); err != nil {
@@ -137,6 +138,7 @@ func (r *Repository) GetAllChildrenByTenant(ctx context.Context, tenantID string
 		       COALESCE(s.enrollment_number, ''),
 		       COALESCE(g.name, ''),
 		       COALESCE(gl.name, ''),
+		       COALESCE(gl.level, ''),
 		       s.status,
 		       COALESCE(s.photo_url, ''),
 		       s.updated_at,
@@ -187,7 +189,7 @@ func (r *Repository) GetAllChildrenByTenant(ctx context.Context, tenantID string
 		var child ChildSummaryResponse
 		if err := rows.Scan(
 			&child.ID, &child.FirstName, &child.LastName, &child.EnrollmentID,
-			&child.GroupName, &child.GradeName, &child.Status, &child.ProfilePhoto,
+			&child.GroupName, &child.GradeName, &child.LevelKey, &child.Status, &child.ProfilePhoto,
 			&child.UpdatedAt, &child.AttendanceRate, &child.CurrentGPA,
 			&child.LastAttendance, &child.RecentGrade, &child.NextClass,
 		); err != nil {

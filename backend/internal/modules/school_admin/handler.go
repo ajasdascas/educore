@@ -65,6 +65,9 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	academic.Post("/imports/students/commit", h.CommitStudentImport)
 	academic.Post("/students/:id/portal-access", h.CreateStudentPortalAccess)
 	academic.Post("/students/:id/parent-portal-access", h.CreateParentPortalAccess)
+	academic.Get("/students/:id/parents", h.GetStudentParents)
+	academic.Post("/students/:id/parents", h.LinkParentToStudent)
+	academic.Delete("/students/:id/parents/:parentId", h.UnlinkParentFromStudent)
 
 	academic.Get("/teachers", h.GetTeachers)
 	academic.Post("/teachers", h.CreateTeacher)
