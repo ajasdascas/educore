@@ -119,3 +119,146 @@ func (r *Repository) GetAttendanceSummary(ctx context.Context, studentID, tenant
 	}
 	return &s, nil
 }
+
+// GetMessages returns messages received by the student's user account.
+// Uses parent_messages table (exists in MySQL) scoped to the tenant.
+func (r *Repository) GetMessages(ctx context.Context, userID, tenantID string) ([]MessageSummary, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			pm.id,
+			COALESCE(u.first_name, u.email, 'Sistema') AS sender_name,
+			COALESCE(pm.subject, '') AS subject,
+			COALESCE(pm.content, '') AS preview,
+			TO_CHAR(pm.created_at, 'YYYY-MM-DD HH24:MI') AS sent_at,
+			CASE WHEN pm.read_at IS NOT NULL THEN TRUE ELSE FALSE END AS is_read
+		FROM parent_messages pm
+		LEFT JOIN users u ON u.id = pm.sender_id
+		WHERE pm.recipient_id = $1 AND pm.tenant_id = $2
+		ORDER BY pm.created_at DESC
+		LIMIT 50
+	`), userID, tenantID)
+	if err != nil {
+		return []MessageSummary{}, nil
+	}
+	defer rows.Close()
+
+	var msgs []MessageSummary
+	for rows.Next() {
+		var m MessageSummary
+		if err := rows.Scan(&m.ID, &m.From, &m.Subject, &m.Preview, &m.SentAt, &m.IsRead); err != nil {
+			continue
+		}
+		msgs = append(msgs, m)
+	}
+	if msgs == nil {
+		msgs = []MessageSummary{}
+	}
+	return msgs, nil
+}
+
+// GetAssignments returns assignments for the student's group.
+// Uses student_assignments table (exists in MySQL/PG).
+func (r *Repository) GetAssignments(ctx context.Context, studentID, tenantID string) ([]AssignmentSummary, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			sa.id,
+			COALESCE(sa.title, '') AS title,
+			COALESCE(s.name, '') AS subject_name,
+			COALESCE(sa.description, '') AS description,
+			COALESCE(TO_CHAR(sa.due_date, 'YYYY-MM-DD'), '') AS due_date,
+			COALESCE(sa.status, 'pending') AS status
+		FROM student_assignments sa
+		LEFT JOIN subjects s ON s.id = sa.subject_id
+		WHERE sa.student_id = $1 AND sa.tenant_id = $2
+		ORDER BY sa.due_date ASC, sa.created_at DESC
+		LIMIT 50
+	`), studentID, tenantID)
+	if err != nil {
+		return []AssignmentSummary{}, nil
+	}
+	defer rows.Close()
+
+	var items []AssignmentSummary
+	for rows.Next() {
+		var a AssignmentSummary
+		if err := rows.Scan(&a.ID, &a.Title, &a.SubjectName, &a.Description, &a.DueDate, &a.Status); err != nil {
+			continue
+		}
+		items = append(items, a)
+	}
+	if items == nil {
+		items = []AssignmentSummary{}
+	}
+	return items, nil
+}
+
+// GetNotifications returns school notifications sent to the student's user account.
+func (r *Repository) GetNotifications(ctx context.Context, userID, tenantID string) ([]NotificationSummary, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			n.id,
+			COALESCE(n.title, '') AS title,
+			COALESCE(n.message, n.body, '') AS message,
+			TO_CHAR(n.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
+			CASE WHEN n.read_at IS NOT NULL THEN TRUE ELSE FALSE END AS is_read
+		FROM notifications n
+		WHERE n.recipient_id = $1 AND n.tenant_id = $2
+		ORDER BY n.created_at DESC
+		LIMIT 50
+	`), userID, tenantID)
+	if err != nil {
+		return []NotificationSummary{}, nil
+	}
+	defer rows.Close()
+
+	var items []NotificationSummary
+	for rows.Next() {
+		var n NotificationSummary
+		if err := rows.Scan(&n.ID, &n.Title, &n.Message, &n.CreatedAt, &n.IsRead); err != nil {
+			continue
+		}
+		items = append(items, n)
+	}
+	if items == nil {
+		items = []NotificationSummary{}
+	}
+	return items, nil
+}
+
+// GetSchedule returns the weekly schedule for the student's group.
+func (r *Repository) GetSchedule(ctx context.Context, studentID, tenantID string) ([]ScheduleBlock, error) {
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT
+			csb.id,
+			COALESCE(csb.day, '') AS day,
+			COALESCE(TO_CHAR(csb.start_time, 'HH24:MI'), '') AS start_time,
+			COALESCE(TO_CHAR(csb.end_time, 'HH24:MI'), '') AS end_time,
+			COALESCE(s.name, '') AS subject_name,
+			COALESCE(CONCAT(u.first_name, ' ', u.last_name), '') AS teacher_name,
+			COALESCE(csb.room, '') AS room
+		FROM group_students gs
+		INNER JOIN class_schedule_blocks csb ON csb.group_id = gs.group_id AND csb.tenant_id = $2
+		LEFT JOIN subjects s ON s.id = csb.subject_id
+		LEFT JOIN users u ON u.id = csb.teacher_id
+		WHERE gs.student_id = $1
+		ORDER BY FIELD(csb.day, 'monday','tuesday','wednesday','thursday','friday','saturday'), csb.start_time
+		LIMIT 100
+	`), studentID, tenantID)
+	if err != nil {
+		return []ScheduleBlock{}, nil
+	}
+	defer rows.Close()
+
+	var blocks []ScheduleBlock
+	for rows.Next() {
+		var b ScheduleBlock
+		if err := rows.Scan(&b.ID, &b.Day, &b.StartTime, &b.EndTime, &b.SubjectName, &b.TeacherName, &b.Room); err != nil {
+			continue
+		}
+		blocks = append(blocks, b)
+	}
+	if blocks == nil {
+		blocks = []ScheduleBlock{}
+	}
+	return blocks, nil
+}

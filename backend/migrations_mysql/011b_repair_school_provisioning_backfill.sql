@@ -90,7 +90,7 @@ SELECT UUID(), t.id, 'development', 'Desarrollo Infantil', 'academic', 1, 0, 'ki
 
 -- ─── Register provisioning backfill event ────────────────────────────────────
 -- Uses event_type 'backfill_011b' to distinguish from 011.
-INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, payload, created_at)
+INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, payload_json, created_at)
 SELECT
     UUID(),
     t.id,

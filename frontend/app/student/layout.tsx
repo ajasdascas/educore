@@ -4,7 +4,8 @@ import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  LayoutDashboard, BookOpen, Building2, Calendar, ClipboardCheck, Bell, Settings, Menu, X,
+  LayoutDashboard, BookOpen, Building2, Calendar, ClipboardCheck,
+  Bell, Settings, Menu, X, User, BookMarked, MessageCircle,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -16,12 +17,15 @@ import { isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { href: "/student/dashboard",     label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/student/grades",        label: "Calificaciones", icon: BookOpen },
-  { href: "/student/attendance",    label: "Asistencia",     icon: ClipboardCheck },
-  { href: "/student/schedule",      label: "Horario",        icon: Calendar },
-  { href: "/student/notifications", label: "Notificaciones", icon: Bell },
-  { href: "/student/settings",      label: "Configuración",  icon: Settings },
+  { href: "/student/dashboard",     label: "Dashboard",        icon: LayoutDashboard },
+  { href: "/student/profile",       label: "Mi Perfil",        icon: User },
+  { href: "/student/grades",        label: "Calificaciones",   icon: BookOpen },
+  { href: "/student/attendance",    label: "Asistencia",       icon: ClipboardCheck },
+  { href: "/student/assignments",   label: "Tareas",           icon: BookMarked },
+  { href: "/student/schedule",      label: "Horario",          icon: Calendar },
+  { href: "/student/messages",      label: "Mensajes",         icon: MessageCircle },
+  { href: "/student/notifications", label: "Notificaciones",   icon: Bell },
+  { href: "/student/settings",      label: "Configuración",    icon: Settings },
 ];
 
 export default function StudentLayout({ children }: { children: ReactNode }) {

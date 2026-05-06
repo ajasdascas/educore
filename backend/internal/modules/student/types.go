@@ -38,10 +38,37 @@ type AttendanceSummary struct {
 }
 
 type MessageSummary struct {
+	ID      string `json:"id"`
+	From    string `json:"from"`
+	Subject string `json:"subject"`
+	Preview string `json:"preview"`
+	SentAt  string `json:"sent_at"`
+	IsRead  bool   `json:"is_read"`
+}
+
+type AssignmentSummary struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	SubjectName string `json:"subject_name"`
+	Description string `json:"description"`
+	DueDate     string `json:"due_date"`
+	Status      string `json:"status"`
+}
+
+type ScheduleBlock struct {
+	ID          string `json:"id"`
+	Day         string `json:"day"`
+	StartTime   string `json:"start_time"`
+	EndTime     string `json:"end_time"`
+	SubjectName string `json:"subject_name"`
+	TeacherName string `json:"teacher_name"`
+	Room        string `json:"room"`
+}
+
+type NotificationSummary struct {
 	ID        string `json:"id"`
-	From      string `json:"from"`
-	Subject   string `json:"subject"`
-	Preview   string `json:"preview"`
-	SentAt    string `json:"sent_at"`
+	Title     string `json:"title"`
+	Message   string `json:"message"`
+	CreatedAt string `json:"created_at"`
 	IsRead    bool   `json:"is_read"`
 }

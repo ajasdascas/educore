@@ -288,7 +288,7 @@ function SchoolAdminCommunicationsContent() {
       if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo guardar el comunicado.");
       toast({
         title: formMode === "draft" ? "Borrador guardado" : formMode === "schedule" ? "Comunicado programado" : "Comunicado enviado",
-        description: response.message || "Cambios aplicados en modo demo.",
+        description: response.message || "Comunicado guardado correctamente.",
       });
       setFormOpen(false);
       await loadData();
@@ -332,7 +332,7 @@ function SchoolAdminCommunicationsContent() {
         body: JSON.stringify(payload),
       });
       if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo reenviar.");
-      toast({ title: "Comunicado reenviado", description: "Se creo un nuevo envio en modo demo." });
+      toast({ title: "Comunicado reenviado", description: "Se creó un nuevo envío." });
       await loadData();
     } catch (error) {
       toast({
@@ -352,7 +352,7 @@ function SchoolAdminCommunicationsContent() {
         body: JSON.stringify({ read_count: communication.delivered_count }),
       });
       if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo actualizar.");
-      toast({ title: "Lecturas actualizadas", description: "El comunicado quedo marcado como leido en modo demo." });
+      toast({ title: "Lecturas actualizadas", description: "El comunicado quedó marcado como leído." });
       await loadData();
     } catch (error) {
       toast({

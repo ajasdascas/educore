@@ -250,7 +250,7 @@ export default function SchoolAdminDocumentsPage() {
   };
 
   return (
-    <ModuleGuard moduleKey="students">
+    <ModuleGuard moduleKey="documents" moduleName="Documentos">
       <div className="min-w-0 space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">

@@ -97,7 +97,7 @@ INSERT IGNORE INTO school_modules (
 SELECT UUID(), t.id, 'development', 'Desarrollo Infantil', 'academic', 1, 0, 'kindergarten', 60, '{}', NOW() FROM tenants t WHERE t.status = 'active' AND NOT EXISTS (SELECT 1 FROM school_modules sm WHERE sm.tenant_id = t.id AND sm.module_key = 'development');
 
 -- ─── Register provisioning backfill event (idempotency marker) ───────────────
-INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, payload, created_at)
+INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, payload_json, created_at)
 SELECT
     UUID(),
     t.id,

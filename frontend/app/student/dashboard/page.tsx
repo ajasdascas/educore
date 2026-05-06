@@ -109,7 +109,7 @@ export default function StudentDashboard() {
             <p>1. Ve a <strong>School Admin → Estudiantes</strong></p>
             <p>2. Abre el detalle del alumno</p>
             <p>3. Haz clic en <strong>"Acceso estudiante"</strong></p>
-            <p className="text-amber-500/80 mt-1">Requiere migración <code>006_student_portal_user_id.sql</code> en Hostinger.</p>
+            <p className="text-amber-500/80 mt-1">Contacta al administrador si el acceso no aparece disponible.</p>
           </div>
         </div>
       </div>
