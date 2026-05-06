@@ -25,6 +25,8 @@ func NewRepository(db *database.DB) *Repository {
 	}
 }
 
+func (r *Repository) DB() *database.DB { return r.db }
+
 func defaultStagingPortalPasswordHash() string {
 	if !strings.EqualFold(os.Getenv("APP_ENV"), "staging") && !strings.EqualFold(os.Getenv("EDUCORE_ENABLE_STAGING_PORTAL_PASSWORDS"), "true") {
 		return ""

@@ -231,43 +231,50 @@ type CreateSchoolRequest struct {
 }
 
 var modulesByEducationLevel = map[string][]string{
-	"preescolar":         {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"},
-	"kinder":             {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"},
-	"primaria":           {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
-	"secundaria_general": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
-	"secundaria_tecnica": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
-	"prepa_general":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
-	"prepa_tecnica":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
-	"universidad":        {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"},
+	// Bebés / Guardería
+	"babies":   {"academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"},
+	"daycare":  {"academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"},
+	// Preescolar / Kinder
+	"preescolar": {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"},
+	"kinder":     {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"},
+	// Primaria
+	"primaria": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications", "subjects", "assignments", "exams"},
+	// Secundaria / Prepa / Universidad
+	"secundaria_general": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
+	"secundaria_tecnica": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
+	"prepa_general":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
+	"prepa_tecnica":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
+	"universidad":        {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
 }
 
 func normalizeEducationLevel(level string) string {
-	if strings.EqualFold(strings.TrimSpace(level), "preescolar") {
-		return "preescolar"
-	}
-	switch level {
-	case "Kínder", "Kinder", "KÃ­nder", "kinder", "preescolar":
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "babies", "bebés", "bebes", "guardería", "guarderia", "daycare":
+		return "babies"
+	case "kínder", "kinder", "kindergarten":
 		return "kinder"
-	case "Primaria", "primaria":
+	case "preescolar", "preschool":
+		return "preescolar"
+	case "primaria", "primary":
 		return "primaria"
-	case "Secundaria", "Secundaria General", "secundaria", "secundaria_general":
+	case "secundaria", "secundaria general", "secundaria_general":
 		return "secundaria_general"
-	case "Secundaria Técnica", "Secundaria Tecnica", "secundaria_tecnica":
+	case "secundaria técnica", "secundaria tecnica", "secundaria_tecnica":
 		return "secundaria_tecnica"
-	case "Preparatoria", "Preparatoria General", "prepa", "prepa_general":
+	case "preparatoria", "preparatoria general", "prepa", "prepa_general":
 		return "prepa_general"
-	case "Preparatoria Técnica", "Preparatoria Tecnica", "prepa_tecnica":
+	case "preparatoria técnica", "preparatoria tecnica", "prepa_tecnica":
 		return "prepa_tecnica"
-	case "Universidad", "universidad":
+	case "universidad", "university":
 		return "universidad"
 	default:
-		return level
+		return strings.ToLower(strings.TrimSpace(level))
 	}
 }
 
 func isSupportedEducationLevel(level string) bool {
 	switch normalizeEducationLevel(level) {
-	case "preescolar", "kinder", "primaria":
+	case "babies", "daycare", "preescolar", "kinder", "primaria":
 		return true
 	default:
 		return false

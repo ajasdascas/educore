@@ -66,14 +66,15 @@ const planColors = {
 };
 
 const educationLevelOptions = [
-  { value: "preescolar", label: "Preescolar", supportedNow: true },
-  { value: "kinder", label: "Kinder", supportedNow: true },
-  { value: "primaria", label: "Primaria", supportedNow: true },
-  { value: "secundaria_general", label: "Secundaria", supportedNow: false },
-  { value: "secundaria_tecnica", label: "Secundaria tecnica", supportedNow: false },
-  { value: "prepa_general", label: "Preparatoria", supportedNow: false },
-  { value: "prepa_tecnica", label: "Preparatoria tecnica", supportedNow: false },
-  { value: "universidad", label: "Universidad", supportedNow: false },
+  { value: "babies",             label: "Bebés / Guardería",   supportedNow: true  },
+  { value: "preescolar",         label: "Preescolar",          supportedNow: true  },
+  { value: "kinder",             label: "Kinder",              supportedNow: true  },
+  { value: "primaria",           label: "Primaria",            supportedNow: true  },
+  { value: "secundaria_general", label: "Secundaria",          supportedNow: false },
+  { value: "secundaria_tecnica", label: "Secundaria tecnica",  supportedNow: false },
+  { value: "prepa_general",      label: "Preparatoria",        supportedNow: false },
+  { value: "prepa_tecnica",      label: "Preparatoria tecnica",supportedNow: false },
+  { value: "universidad",        label: "Universidad",         supportedNow: false },
 ];
 
 // Catálogo completo de módulos (sincronizado con migration 016)

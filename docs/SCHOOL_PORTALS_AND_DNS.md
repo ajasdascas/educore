@@ -157,14 +157,69 @@ El botón "Portal interno" en el header de Detalles siempre usa la ruta interna.
 
 ---
 
+## Por qué kinder1.onlineu.mx puede quedar en blanco (Hostinger shared hosting)
+
+### El problema raíz
+
+El build de Next.js usa `basePath: "/educore"`. Eso significa que la app **solo puede servirse desde `https://onlineu.mx/educore/`**, nunca desde la raíz de un subdominio.
+
+Cuando alguien visita `https://kinder1.onlineu.mx`:
+
+1. El DNS resuelve correctamente (wildcard `*.onlineu.mx` existe).
+2. Hostinger recibe la petición HTTP para `kinder1.onlineu.mx/`.
+3. Intenta servir el archivo `index.html` del hosting compartido desde `public_html/`.
+4. Ese `index.html` no existe o es el index vacío del hosting, **no la app de Next.js**.
+5. El browser muestra pantalla en blanco o el error del hosting.
+
+El archivo JS/CSS de la app está alojado en `public_html/educore/` pero el subdominio apunta al `public_html/` raíz. Hostinger shared hosting no permite configurar per-subdomain document root distinto del raíz (a diferencia de un VPS con nginx).
+
+### Por qué el portal interno es la ruta estable
+
+| Característica | Portal interno (`/escuela/?slug=`) | Subdominio (`kinder1.onlineu.mx`) |
+|---|---|---|
+| Funciona en Hostinger shared | ✅ Siempre | ❌ Pantalla en blanco |
+| Requiere DNS wildcard | No | Sí |
+| Funciona offline/local | ✅ | No |
+| basePath `/educore` compatible | ✅ Native | ❌ Conflicto |
+| URL enviable a directores/padres | ✅ Legible | ❌ Rompe en Hostinger |
+
+### Cuándo el subdominio funcionará correctamente
+
+Cuando EduCore se migre a un **VPS propio** (DigitalOcean, Linode, Railway Pro) donde nginx pueda configurarse así:
+
+```nginx
+server {
+  server_name *.onlineu.mx;
+  root /var/www/educore/public_html/educore;   # ← mismo directorio que el build
+  # ...
+}
+```
+
+Hasta entonces, **el subdominio es "experimental"** — útil para testing, no para producción ni para enviar a usuarios.
+
+### Cómo identificar la escuela para los usuarios
+
+Envía siempre la URL interna. Ejemplo para el director de Kinder 1:
+
+```
+https://onlineu.mx/educore/escuela/?slug=kinder1
+```
+
+Desde ahí pueden elegir su rol y hacer login. Esa URL:
+- No requiere DNS especial
+- Funciona desde cualquier browser/dispositivo
+- Muestra el nombre real de la escuela (via API `/public/schools/resolve`)
+
+---
+
 ## Resumen de estado actual de DNS
 
 | Componente | Estado |
 |------------|--------|
-| Wildcard `*.onlineu.mx` | Depende de tu configuración DNS — verifica con `nslookup test.onlineu.mx` |
-| Rutas internas `/escuela/?slug=...` | ✅ Siempre funciona |
-| Botón "Portal interno" en Super Admin | ✅ Usa ruta interna |
-| Links de "Subdominio externo" | Requiere DNS wildcard activo |
+| Wildcard `*.onlineu.mx` DNS | Depende de tu configuración — verifica con `nslookup test.onlineu.mx` |
+| Rutas internas `/escuela/?slug=...` | ✅ Siempre funciona (es la ruta principal) |
+| Botón "Portal interno" en Super Admin | ✅ Usa ruta interna Next.js |
+| Links de "Subdominio experimental" | ⚠️ Pantalla en blanco en Hostinger shared — solo para testing |
 
 ---
 

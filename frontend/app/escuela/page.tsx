@@ -134,8 +134,8 @@ function DirectRoleCard({
 
         <div className="mb-1 text-center">
           {slug && (
-            <p className="mb-1 font-mono text-[10px] tracking-widest text-slate-600">
-              {slug}.onlineu.mx
+            <p className="mb-1 font-mono text-[10px] tracking-widest text-slate-700">
+              onlineu.mx/educore/escuela/?slug={slug}
             </p>
           )}
           <h1 className="text-2xl font-bold text-white">
@@ -237,9 +237,9 @@ function PortalSelector({
             <motion.p
               variants={fadeUp}
               custom={0}
-              className="mb-1 font-mono text-[10px] tracking-widest text-slate-600"
+              className="mb-1 font-mono text-[10px] tracking-widest text-slate-700"
             >
-              {slug}.onlineu.mx
+              onlineu.mx/educore/escuela/?slug={slug}
             </motion.p>
           )}
           <motion.h1
@@ -360,11 +360,11 @@ function EscuelaInner() {
     }
   }, [slug]);
 
-  // Fetch real school name
+  // Fetch real school name via resolve endpoint
   useEffect(() => {
     if (!slug) return;
     setLoadingName(true);
-    fetch(`${API_URL}/api/v1/public/school-info?slug=${encodeURIComponent(slug)}`)
+    fetch(`${API_URL}/api/v1/public/schools/resolve?slug=${encodeURIComponent(slug)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.data?.name) setSchoolName(d.data.name);

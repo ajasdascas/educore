@@ -528,35 +528,45 @@ function SchoolDetailContent() {
             </CardContent>
           </Card>
 
-          {/* Subdominio externo — separado y con advertencia clara */}
+          {/* Subdominio experimental — separado y con advertencia clara */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Subdominio externo</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500" />
+                Subdominio experimental
+              </CardTitle>
               <CardDescription>
-                Solo funciona si el wildcard DNS <span className="font-mono">*.onlineu.mx</span> está configurado.
+                Solo usar para pruebas técnicas. <strong>No es el flujo principal de acceso.</strong>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex items-start gap-3 rounded-lg border border-orange-500/40 bg-orange-500/10 p-3 text-sm">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
+                <div className="space-y-1 text-xs text-orange-200">
+                  <p className="font-semibold text-orange-100">El DNS wildcard existe, pero Hostinger shared hosting no sirve correctamente la app desde la raíz del subdominio.</p>
+                  <p className="text-orange-300/80">El build de Next.js usa <span className="font-mono">basePath /educore</span>, por lo que <span className="font-mono">{school.slug}.onlineu.mx</span> carga pantalla en blanco. Usa los <strong>portales internos de arriba</strong> como flujo principal hasta migrar a un VPS.</p>
+                </div>
+              </div>
               <div className="rounded-md bg-muted/50 px-4 py-3 font-mono text-sm">
                 https://{school.slug}.onlineu.mx
               </div>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { label: "Portal público", url: `https://${school.slug}.onlineu.mx` },
-                  { label: "Login Director", url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
-                  { label: "Login Profesor", url: `https://${school.slug}.onlineu.mx/login?role=teacher` },
-                  { label: "Login Padre",    url: `https://${school.slug}.onlineu.mx/login?role=parent` },
-                  { label: "Login Alumno",   url: `https://${school.slug}.onlineu.mx/login?role=student` },
+                  { label: "Probar subdominio",     url: `https://${school.slug}.onlineu.mx` },
+                  { label: "Probar login externo",  url: `https://${school.slug}.onlineu.mx/login?role=school_admin` },
+                  { label: "Probar login profesor", url: `https://${school.slug}.onlineu.mx/login?role=teacher` },
+                  { label: "Probar login padre",    url: `https://${school.slug}.onlineu.mx/login?role=parent` },
+                  { label: "Probar login alumno",   url: `https://${school.slug}.onlineu.mx/login?role=student` },
                 ].map(({ label, url }) => (
                   <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                    <Button variant="secondary" size="sm" className="gap-1">
+                    <Button variant="ghost" size="sm" className="gap-1 border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-muted-foreground/60">
                       <ExternalLink className="w-3 h-3" /> {label}
                     </Button>
                   </a>
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Si ves DNS_PROBE_FINISHED_NXDOMAIN, el subdominio no existe en DNS. Configura el wildcard o usa los portales internos de arriba.
+                Estos botones son secundarios y solo para pruebas técnicas. No confundirlos con el acceso real.
               </p>
             </CardContent>
           </Card>

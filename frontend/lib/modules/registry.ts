@@ -1,6 +1,8 @@
 import { authFetch } from "@/lib/auth";
 
 export type EducationLevel =
+  | "babies"
+  | "daycare"
   | "preescolar"
   | "kinder"
   | "primaria"
@@ -55,7 +57,7 @@ export type EnabledModule = {
   price_monthly_mxn?: number;
 };
 
-export const ACTIVE_EDUCATION_LEVELS: EducationLevel[] = ["preescolar", "kinder", "primaria"];
+export const ACTIVE_EDUCATION_LEVELS: EducationLevel[] = ["babies", "daycare", "preescolar", "kinder", "primaria"];
 
 export const EDUCATION_LEVEL_CATALOG: Record<EducationLevel, {
   label: string;
@@ -63,14 +65,16 @@ export const EDUCATION_LEVEL_CATALOG: Record<EducationLevel, {
   visible: boolean;
   supported_now: boolean;
 }> = {
-  preescolar: { label: "Preescolar", enabled: true, visible: true, supported_now: true },
-  kinder: { label: "Kinder", enabled: true, visible: true, supported_now: true },
-  primaria: { label: "Primaria", enabled: true, visible: true, supported_now: true },
-  secundaria_general: { label: "Secundaria", enabled: false, visible: false, supported_now: false },
+  babies:             { label: "Bebés / Guardería", enabled: true,  visible: true,  supported_now: true  },
+  daycare:            { label: "Guardería",          enabled: true,  visible: true,  supported_now: true  },
+  preescolar:         { label: "Preescolar",         enabled: true,  visible: true,  supported_now: true  },
+  kinder:             { label: "Kinder",             enabled: true,  visible: true,  supported_now: true  },
+  primaria:           { label: "Primaria",           enabled: true,  visible: true,  supported_now: true  },
+  secundaria_general: { label: "Secundaria",         enabled: false, visible: false, supported_now: false },
   secundaria_tecnica: { label: "Secundaria tecnica", enabled: false, visible: false, supported_now: false },
-  prepa_general: { label: "Preparatoria", enabled: false, visible: false, supported_now: false },
-  prepa_tecnica: { label: "Preparatoria tecnica", enabled: false, visible: false, supported_now: false },
-  universidad: { label: "Universidad", enabled: false, visible: false, supported_now: false },
+  prepa_general:      { label: "Preparatoria",       enabled: false, visible: false, supported_now: false },
+  prepa_tecnica:      { label: "Preparatoria tecnica", enabled: false, visible: false, supported_now: false },
+  universidad:        { label: "Universidad",        enabled: false, visible: false, supported_now: false },
 };
 
 export const CORE_MODULES: EnabledModule[] = [
@@ -119,14 +123,16 @@ export const MODULE_ALIASES: Record<string, string[]> = {
 };
 
 export const MODULES_BY_LEVEL: Record<EducationLevel, ModuleKey[]> = {
-  preescolar: ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"],
-  kinder: ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications"],
-  primaria: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
-  secundaria_general: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
-  secundaria_tecnica: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
-  prepa_general: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
-  prepa_tecnica: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
-  universidad: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "reports", "communications"],
+  babies:             ["academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"],
+  daycare:            ["academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"],
+  preescolar:         ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"],
+  kinder:             ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"],
+  primaria:           ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications", "subjects", "assignments", "exams"],
+  secundaria_general: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
+  secundaria_tecnica: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
+  prepa_general:      ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
+  prepa_tecnica:      ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
+  universidad:        ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
 };
 
 export function normalizeEnabledModules(response: any): EnabledModule[] {

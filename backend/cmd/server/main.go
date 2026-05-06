@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"os"
 	"strings"
@@ -142,6 +143,104 @@ func main() {
 			"name":     name,
 			"slug":     slug,
 			"logo_url": logoURL,
+		}, "ok")
+	})
+
+	// Public schools resolve endpoint (used by portal landing — no auth)
+	// GET /api/v1/public/schools/resolve?slug=kinder1
+	// GET /api/v1/public/schools/resolve?host=kinder1.onlineu.mx
+	api.Get("/public/schools/resolve", func(c *fiber.Ctx) error {
+		slug := c.Query("slug")
+		host := c.Query("host")
+
+		// Derive slug from host (kinder1.onlineu.mx → kinder1)
+		if slug == "" && host != "" {
+			parts := strings.Split(host, ".")
+			if len(parts) >= 3 {
+				slug = parts[0]
+			}
+		}
+		if slug == "" {
+			return response.Error(c, fiber.StatusBadRequest, "slug or host query param required")
+		}
+
+		var tenantID, name, status, plan string
+		var logoURL *string
+		err := db.QueryRow(c.UserContext(),
+			database.RebindPlaceholders(db.Driver(),
+				"SELECT id, name, COALESCE(logo_url, ''), status, COALESCE(plan, 'starter') FROM tenants WHERE slug = $1 LIMIT 1"),
+			slug).Scan(&tenantID, &name, &logoURL, &status, &plan)
+		if err != nil {
+			return response.Error(c, fiber.StatusNotFound, "School not found")
+		}
+		if status == "suspended" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"success": false,
+				"error":   fiber.Map{"code": "TENANT_SUSPENDED", "message": "Esta institución está suspendida."},
+			})
+		}
+
+		logo := ""
+		if logoURL != nil {
+			logo = *logoURL
+		}
+
+		// Fetch enabled modules (public-safe keys only)
+		var enabledModules []string
+		rows, qErr := db.Query(c.UserContext(),
+			database.RebindPlaceholders(db.Driver(),
+				"SELECT module_key FROM tenant_modules WHERE tenant_id = $1 AND is_active = true AND enabled = true"),
+			tenantID)
+		if qErr == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var mk string
+				if rows.Scan(&mk) == nil {
+					// Only expose non-sensitive module keys
+					enabledModules = append(enabledModules, mk)
+				}
+			}
+		}
+		if enabledModules == nil {
+			enabledModules = []string{}
+		}
+
+		// Fetch levels from settings JSON (non-fatal)
+		var levels []string
+		var settingsRaw []byte
+		if sErr := db.QueryRow(c.UserContext(),
+			database.RebindPlaceholders(db.Driver(), "SELECT COALESCE(settings, '{}') FROM tenants WHERE id = $1"),
+			tenantID).Scan(&settingsRaw); sErr == nil {
+			var settingsMap map[string]interface{}
+			if jsonErr := json.Unmarshal(settingsRaw, &settingsMap); jsonErr == nil {
+				if rawLevels, ok := settingsMap["levels"].([]interface{}); ok {
+					for _, l := range rawLevels {
+						if s, ok := l.(string); ok {
+							levels = append(levels, s)
+						}
+					}
+				}
+			}
+		}
+		if levels == nil {
+			levels = []string{}
+		}
+
+		return response.Success(c, fiber.Map{
+			"school_id":               tenantID,
+			"name":                    name,
+			"slug":                    slug,
+			"status":                  status,
+			"plan":                    plan,
+			"logo_url":                logo,
+			"portal_enabled":          true,
+			"levels":                  levels,
+			"enabled_modules_public":  enabledModules,
+			"portal_internal_url":     "https://onlineu.mx/educore/escuela/?slug=" + slug,
+			"portal_subdomain_url":    "https://" + slug + ".onlineu.mx",
+			"dns_status":              "unknown",
+			"hosting_status":          "basepath_conflict",
+			"ssl_status":              "unknown",
 		}, "ok")
 	})
 

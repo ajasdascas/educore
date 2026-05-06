@@ -63,11 +63,14 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	academic.Put("/students/:id", h.UpdateStudent)
 	academic.Delete("/students/:id", h.DeleteStudent)
 	academic.Post("/imports/students/commit", h.CommitStudentImport)
+	academic.Post("/students/:id/portal-access", h.CreateStudentPortalAccess)
+	academic.Post("/students/:id/parent-portal-access", h.CreateParentPortalAccess)
 
 	academic.Get("/teachers", h.GetTeachers)
 	academic.Post("/teachers", h.CreateTeacher)
 	academic.Get("/teachers/:id", h.GetTeacher)
 	academic.Put("/teachers/:id", h.UpdateTeacher)
+	academic.Post("/teachers/:id/portal-access", h.CreateTeacherPortalAccess)
 
 	academic.Get("/groups", h.GetGroups)
 	academic.Post("/groups", h.CreateGroup)

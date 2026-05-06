@@ -67,7 +67,7 @@ function LoginInner() {
   // Fetch the school's real display name from the backend
   useEffect(() => {
     if (!slug) return;
-    fetch(`${API_URL}/api/v1/public/school-info?slug=${encodeURIComponent(slug)}`)
+    fetch(`${API_URL}/api/v1/public/schools/resolve?slug=${encodeURIComponent(slug)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.data?.name) setSchoolName(d.data.name); })
       .catch(() => {});

@@ -6,6 +6,7 @@ import {
   BookOpen,
   CheckCircle2,
   Eye,
+  KeyRound,
   Loader2,
   Pencil,
   Plus,
@@ -149,6 +150,8 @@ function SchoolTeachersContent() {
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [form, setForm] = useState<TeacherFormState>(emptyForm);
+  const [portalAccessLoading, setPortalAccessLoading] = useState(false);
+  const [portalAccessResult, setPortalAccessResult] = useState<{ email: string; password?: string } | null>(null);
 
   const loadTeachers = async () => {
     try {
@@ -169,6 +172,33 @@ function SchoolTeachersContent() {
   useEffect(() => {
     loadTeachers();
   }, []);
+
+  const createTeacherPortalAccess = async (teacher: Teacher) => {
+    setPortalAccessLoading(true);
+    setPortalAccessResult(null);
+    try {
+      const res = await authFetch(`/api/v1/school-admin/academic/teachers/${teacher.id}/portal-access`, {
+        method: "POST",
+      });
+      if (res.success) {
+        setPortalAccessResult({ email: res.data?.email || teacher.email, password: res.data?.password });
+        toast({ title: "Acceso creado", description: `Portal habilitado para ${teacher.email}` });
+        loadTeachers();
+      } else {
+        const msg = res.message || res.error || "No se pudo crear el acceso.";
+        if (msg.includes("ya existe") || msg.includes("already exists")) {
+          setPortalAccessResult({ email: teacher.email });
+          toast({ title: "El acceso ya existe", description: `${teacher.email} ya tiene usuario de portal.` });
+        } else {
+          throw new Error(msg);
+        }
+      }
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" });
+    } finally {
+      setPortalAccessLoading(false);
+    }
+  };
 
   const filteredTeachers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -652,14 +682,33 @@ function SchoolTeachersContent() {
               </div>
             </div>
           )}
+          {/* Portal access result banner */}
+          {portalAccessResult && (
+            <div className="mx-1 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-300">
+              {portalAccessResult.password
+                ? <>Acceso creado — email: <strong>{portalAccessResult.email}</strong> · contraseña temporal: <strong className="font-mono">{portalAccessResult.password}</strong></>
+                : <>El usuario <strong>{portalAccessResult.email}</strong> ya tiene acceso al portal de profesores.</>}
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailOpen(false)}>
+            <Button variant="outline" onClick={() => { setDetailOpen(false); setPortalAccessResult(null); }}>
               Cerrar
             </Button>
             {selectedTeacher && (
               <Button
+                variant="secondary"
+                onClick={() => createTeacherPortalAccess(selectedTeacher)}
+                disabled={portalAccessLoading}
+              >
+                {portalAccessLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                Crear acceso portal profesor
+              </Button>
+            )}
+            {selectedTeacher && (
+              <Button
                 onClick={() => {
                   setDetailOpen(false);
+                  setPortalAccessResult(null);
                   openEdit(selectedTeacher);
                 }}
               >

@@ -8,6 +8,7 @@ import {
   Eye,
   FileSpreadsheet,
   GraduationCap,
+  KeyRound,
   Loader2,
   Pencil,
   Plus,
@@ -398,6 +399,8 @@ function SchoolStudentsContent() {
   const [importOpen, setImportOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [portalAccessLoading, setPortalAccessLoading] = useState<"student" | "parent" | null>(null);
+  const [portalAccessResult, setPortalAccessResult] = useState<{ role: string; email: string; password?: string } | null>(null);
   const [form, setForm] = useState<StudentFormState>(emptyForm);
   const [sheets, setSheets] = useState<Record<string, ImportPreviewRow[]>>({});
   const [activeSheet, setActiveSheet] = useState("");
@@ -531,6 +534,33 @@ function SchoolStudentsContent() {
       }
     } catch {
       setSelectedStudent(enriched);
+    }
+  };
+
+  const createPortalAccess = async (student: Student, role: "student" | "parent") => {
+    setPortalAccessLoading(role);
+    setPortalAccessResult(null);
+    const endpoint = role === "student"
+      ? `/api/v1/school-admin/academic/students/${student.id}/portal-access`
+      : `/api/v1/school-admin/academic/students/${student.id}/parent-portal-access`;
+    try {
+      const res = await authFetch(endpoint, { method: "POST" });
+      if (res.success) {
+        setPortalAccessResult({ role, email: res.data?.email || "", password: res.data?.password });
+        toast({ title: "Acceso creado", description: `Portal ${role === "student" ? "estudiante" : "padre"} habilitado.` });
+      } else {
+        const msg = res.message || res.error || "No se pudo crear el acceso.";
+        if (msg.includes("ya existe") || msg.includes("already exists")) {
+          setPortalAccessResult({ role, email: res.data?.email || "" });
+          toast({ title: "El acceso ya existe", description: msg });
+        } else {
+          throw new Error(msg);
+        }
+      }
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" });
+    } finally {
+      setPortalAccessLoading(null);
     }
   };
 
@@ -1082,9 +1112,37 @@ function SchoolStudentsContent() {
               </TabsContent>
             </Tabs>
           )}
+          {/* Portal access result banner */}
+          {portalAccessResult && (
+            <div className="mx-1 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-xs text-green-300">
+              {portalAccessResult.password
+                ? <>{portalAccessResult.role === "student" ? "Acceso estudiante" : "Acceso padre"} creado — email: <strong>{portalAccessResult.email}</strong> · contraseña: <strong className="font-mono">{portalAccessResult.password}</strong></>
+                : <>{portalAccessResult.role === "student" ? "El estudiante" : "El padre"} <strong>{portalAccessResult.email}</strong> ya tiene acceso al portal.</>}
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailOpen(false)}>Cerrar</Button>
-            {selectedStudent && <Button onClick={() => { setDetailOpen(false); openEdit(selectedStudent); }}><Pencil className="mr-2 h-4 w-4" />Editar</Button>}
+            <Button variant="outline" onClick={() => { setDetailOpen(false); setPortalAccessResult(null); }}>Cerrar</Button>
+            {selectedStudent && (
+              <Button
+                variant="secondary"
+                onClick={() => createPortalAccess(selectedStudent, "parent")}
+                disabled={portalAccessLoading !== null}
+              >
+                {portalAccessLoading === "parent" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                Acceso padre
+              </Button>
+            )}
+            {selectedStudent && (
+              <Button
+                variant="secondary"
+                onClick={() => createPortalAccess(selectedStudent, "student")}
+                disabled={portalAccessLoading !== null}
+              >
+                {portalAccessLoading === "student" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                Acceso estudiante
+              </Button>
+            )}
+            {selectedStudent && <Button onClick={() => { setDetailOpen(false); setPortalAccessResult(null); openEdit(selectedStudent); }}><Pencil className="mr-2 h-4 w-4" />Editar</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
