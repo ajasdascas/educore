@@ -432,17 +432,17 @@ func (r *Repository) GetAnnouncements(ctx context.Context, tenantID, authorID st
 }
 
 // CreateAnnouncement inserts a new announcement authored by the teacher.
+// UUID is generated in Go so no RETURNING clause is needed (MySQL-safe).
 func (r *Repository) CreateAnnouncement(ctx context.Context, tenantID, authorID string, req CreateAnnouncementRequest) (*AnnouncementSummary, error) {
 	priority := req.Priority
 	if priority == "" {
 		priority = "normal"
 	}
-	var id string
-	err := r.db.QueryRow(ctx, database.RebindPlaceholders(r.db.Driver(), `
-		INSERT INTO announcements (tenant_id, author_id, title, content, priority, status)
-		VALUES ($1, $2, $3, $4, $5, 'published')
-		RETURNING id
-	`), tenantID, authorID, req.Title, req.Content, priority).Scan(&id)
+	id := database.NewID()
+	_, err := r.db.Exec(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		INSERT INTO announcements (id, tenant_id, author_id, title, content, priority, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, 'published', NOW(), NOW())
+	`), id, tenantID, authorID, req.Title, req.Content, priority)
 	if err != nil {
 		return nil, err
 	}

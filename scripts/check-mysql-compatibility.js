@@ -143,8 +143,32 @@ check("UpdatePassword guards against NULL hash", accountFile.includes("!currentH
 check("GetSecurity uses sql.NullString for password_hash", accountFile.includes("sql.NullString") && accountFile.includes("HasPassword:"));
 check("GetSecurity does not return password_hash to client", !accountFile.includes("json:\"password_hash\""));
 
-// ── 7. Scan for remaining Postgres patterns in entire backend ────────────
-console.log("\n7. Full scan — remaining PostgreSQL patterns (adapter-handled, informational)");
+// ── 7. New modules: teacher + student notifications/announcements ─────────────
+console.log("\n7. New modules — MySQL-safe SQL (teacher/student notifications, announcements)");
+
+const teacherRepo = read("backend/internal/modules/teacher/repository.go");
+const studentRepo = read("backend/internal/modules/student/repository.go");
+
+// Only check that CreateAnnouncement (new code) doesn't use RETURNING
+const createAnnBlock = teacherRepo.split("func (r *Repository) CreateAnnouncement")[1] || "";
+const nextFn = createAnnBlock.indexOf("\nfunc ");
+const createAnnBody = nextFn > 0 ? createAnnBlock.slice(0, nextFn) : createAnnBlock.slice(0, 600);
+check("teacher CreateAnnouncement: no RETURNING (MySQL-safe)", !createAnnBody.includes("RETURNING"));
+check("teacher/repository.go: no ::jsonb cast",
+  !teacherRepo.includes("::jsonb"));
+check("teacher/repository.go: CreateAnnouncement uses database.NewID()",
+  teacherRepo.includes("database.NewID()"));
+check("teacher/repository.go: CreateAnnouncement uses Exec (not QueryRow+RETURNING)",
+  teacherRepo.includes("r.db.Exec") && teacherRepo.includes("CreateAnnouncement"));
+check("teacher/repository.go: MarkNotificationRead uses Exec",
+  teacherRepo.includes("MarkNotificationRead") && teacherRepo.includes("r.db.Exec"));
+check("student/repository.go: no RETURNING clause",
+  !studentRepo.includes("RETURNING"));
+check("student/repository.go: MarkNotificationRead uses Exec",
+  studentRepo.includes("MarkNotificationRead") && studentRepo.includes("r.db.Exec"));
+
+// ── 8. Scan for remaining Postgres patterns in entire backend ────────────
+console.log("\n8. Full scan — remaining PostgreSQL patterns (adapter-handled, informational)");
 
 const adapterHandled = [
   { pattern: /ILIKE/i, label: "ILIKE" },

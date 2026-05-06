@@ -112,6 +112,17 @@ section("Frontend: parent layout sidebar");
 const pLayout = read("frontend/app/parent/layout.tsx");
 check(pLayout.includes(`"Mi Perfil"`) && pLayout.includes("/parent/profile"), "parent layout includes Mi Perfil link", "parent layout missing Mi Perfil nav item");
 
+// ─── MySQL safety ────────────────────────────────────────────────────────────
+section("MySQL safety: no RETURNING in new notification code");
+
+// Check CreateAnnouncement specifically does not use RETURNING
+const createAnnBlock = tRepo.split("func (r *Repository) CreateAnnouncement")[1] || "";
+const nextFuncAnn = createAnnBlock.indexOf("\nfunc ");
+const createAnnBody = nextFuncAnn > 0 ? createAnnBlock.slice(0, nextFuncAnn) : createAnnBlock.slice(0, 600);
+check(!createAnnBody.includes("RETURNING"),  "CreateAnnouncement does not use RETURNING (MySQL-safe)",  "CreateAnnouncement still uses RETURNING — MySQL-unsafe!");
+check(!sRepo.includes("RETURNING"), "student/repository.go has no RETURNING clause", "student/repository.go uses RETURNING — MySQL-unsafe!");
+check(tRepo.includes("database.NewID()"), "teacher CreateAnnouncement uses database.NewID() to avoid RETURNING", "teacher CreateAnnouncement does not use database.NewID()");
+
 // ─── Summary ──────────────────────────────────────────────────────────────────
 console.log("\n" + "─".repeat(60));
 if (failed === 0) {
