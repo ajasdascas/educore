@@ -1,15 +1,8 @@
--- 011_backfill_school_provisioning.sql
--- Backfill provisioning data for existing active schools.
--- Schema verified against Hostinger production (2026-05-05).
---
--- school_levels  : id, tenant_id, level_key, name, enabled, sort_order, created_at, updated_at
--- school_portals : id, tenant_id, slug, internal_url, subdomain_url,
---                  dns_status, hosting_status, ssl_status, is_primary, created_at, updated_at
--- school_modules : id, tenant_id, module_key, module_name, category,
---                  enabled, required, level_scope, sort_order, config_json, created_at, updated_at
---
--- Idempotent: INSERT IGNORE + NOT EXISTS guards on every block.
--- Apply manually: paste into MySQL console or phpMyAdmin on Hostinger.
+-- 011b_repair_school_provisioning_backfill.sql
+-- Safe re-run after a partial failure of 011.
+-- Identical logic to 011; every block is idempotent.
+-- Use this if 011 failed mid-way and left partial data in Hostinger.
+-- Already-inserted rows are skipped by INSERT IGNORE + NOT EXISTS.
 
 -- ─── school_levels ────────────────────────────────────────────────────────────
 INSERT IGNORE INTO school_levels (id, tenant_id, level_key, name, enabled, sort_order, created_at)
@@ -28,7 +21,6 @@ WHERE t.status = 'active'
   );
 
 -- ─── school_portals ───────────────────────────────────────────────────────────
--- One primary portal per tenant. Use school slug as portal slug.
 INSERT IGNORE INTO school_portals (
     id, tenant_id, slug,
     internal_url, subdomain_url,
@@ -52,7 +44,7 @@ WHERE t.status = 'active'
     SELECT 1 FROM school_portals sp WHERE sp.tenant_id = t.id AND sp.slug = t.slug
   );
 
--- ─── school_modules — core (all levels) ──────────────────────────────────────
+-- ─── school_modules — core ────────────────────────────────────────────────────
 INSERT IGNORE INTO school_modules (
     id, tenant_id, module_key, module_name,
     category, enabled, required, level_scope,
@@ -96,14 +88,15 @@ INSERT IGNORE INTO school_modules (
 )
 SELECT UUID(), t.id, 'development', 'Desarrollo Infantil', 'academic', 1, 0, 'kindergarten', 60, '{}', NOW() FROM tenants t WHERE t.status = 'active' AND NOT EXISTS (SELECT 1 FROM school_modules sm WHERE sm.tenant_id = t.id AND sm.module_key = 'development');
 
--- ─── Register provisioning backfill event (idempotency marker) ───────────────
+-- ─── Register provisioning backfill event ────────────────────────────────────
+-- Uses event_type 'backfill_011b' to distinguish from 011.
 INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, payload, created_at)
 SELECT
     UUID(),
     t.id,
-    'backfill_011',
+    'backfill_011b',
     JSON_OBJECT(
-        'migration', '011_backfill_school_provisioning',
+        'migration', '011b_repair_school_provisioning_backfill',
         'applied_at', NOW()
     ),
     NOW()
@@ -111,5 +104,5 @@ FROM tenants t
 WHERE t.status = 'active'
   AND NOT EXISTS (
     SELECT 1 FROM school_provisioning_events spe
-    WHERE spe.tenant_id = t.id AND spe.event_type = 'backfill_011'
+    WHERE spe.tenant_id = t.id AND spe.event_type = 'backfill_011b'
   );
