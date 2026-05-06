@@ -125,6 +125,9 @@ func main() {
 	// Webhooks (public, signature-verified)
 	webhook.RegisterRoutes(api.Group("/webhooks"), db)
 
+	// Internal deployment events (public route, shared-secret verified).
+	superadmin.RegisterInternalDeploymentRoutes(api.Group("/internal"), db, os.Getenv("EDUCORE_DEPLOY_WEBHOOK_SECRET"))
+
 	// Public school info (used by school landing page — no auth)
 	api.Get("/public/school-info", func(c *fiber.Ctx) error {
 		slug := c.Query("slug")
@@ -253,6 +256,7 @@ func main() {
 	superAdminGroup := api.Group("/super-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SUPER_ADMIN"))
 	superAdminHandler := superadmin.NewHandler(db)
 	superAdminHandler.RegisterRoutes(superAdminGroup)
+	superAdminHandler.RegisterDeploymentRoutes(superAdminGroup)
 
 	// Initialize module repositories, services, and handlers
 
