@@ -60,7 +60,6 @@ func (h *Handler) ListGlobalUsers(c *fiber.Ctx) error {
 
 	offset := (page - 1) * perPage
 
-	// Build query with filters
 	baseQuery := `
 		SELECT id, email, first_name, last_name, role, is_active, created_at, updated_at
 		FROM users
@@ -75,9 +74,8 @@ func (h *Handler) ListGlobalUsers(c *fiber.Ctx) error {
 	var args []interface{}
 	argIndex := 1
 
-	// Add search filter
 	if search != "" {
-		searchFilter := fmt.Sprintf(" AND (first_name ILIKE $%d OR last_name ILIKE $%d OR email ILIKE $%d)", argIndex, argIndex+1, argIndex+2)
+		searchFilter := fmt.Sprintf(" AND (first_name LIKE $%d OR last_name LIKE $%d OR email LIKE $%d)", argIndex, argIndex+1, argIndex+2)
 		baseQuery += searchFilter
 		countQuery += searchFilter
 		searchPattern := "%" + search + "%"
@@ -85,7 +83,6 @@ func (h *Handler) ListGlobalUsers(c *fiber.Ctx) error {
 		argIndex += 3
 	}
 
-	// Add status filter
 	if status == "active" {
 		statusFilter := fmt.Sprintf(" AND is_active = $%d", argIndex)
 		baseQuery += statusFilter
@@ -100,13 +97,11 @@ func (h *Handler) ListGlobalUsers(c *fiber.Ctx) error {
 		argIndex++
 	}
 
-	// Get total count
 	var total int
 	if err := h.db.QueryRow(c.UserContext(), countQuery, args...).Scan(&total); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error counting users")
 	}
 
-	// Get users with pagination
 	finalQuery := baseQuery + fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
 	args = append(args, perPage, offset)
 
@@ -289,7 +284,11 @@ func (h *Handler) UpdateGlobalUser(c *fiber.Ctx) error {
 func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	// Get current status
+	// Cannot deactivate yourself
+	if currentUserID, ok := c.Locals("user_id").(string); ok && currentUserID == id {
+		return response.Error(c, fiber.StatusForbidden, "No puedes desactivar tu propia cuenta")
+	}
+
 	var currentStatus bool
 	err := h.db.QueryRow(c.UserContext(),
 		"SELECT is_active FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
@@ -298,8 +297,18 @@ func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
 	}
 
-	// Toggle status
 	newStatus := !currentStatus
+
+	// Prevent deactivating the last active SUPER_ADMIN
+	if !newStatus {
+		var activeCount int
+		if err := h.db.QueryRow(c.UserContext(),
+			"SELECT COUNT(*) FROM users WHERE tenant_id IS NULL AND role = 'SUPER_ADMIN' AND is_active = true AND deleted_at IS NULL",
+		).Scan(&activeCount); err == nil && activeCount <= 1 {
+			return response.Error(c, fiber.StatusForbidden, "No puedes desactivar al último Super Admin activo")
+		}
+	}
+
 	_, err = h.db.Exec(c.UserContext(),
 		"UPDATE users SET is_active = $1, updated_at = $2 WHERE id = $3 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
 		newStatus, time.Now(), id)
@@ -317,18 +326,23 @@ func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
 func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	// Cannot delete yourself
 	if currentUserID, ok := c.Locals("user_id").(string); ok && currentUserID == id {
 		return response.Error(c, fiber.StatusForbidden, "No puedes eliminar tu propia cuenta")
 	}
 
 	var targetEmail string
-	if err := h.db.QueryRow(c.UserContext(), `
-		SELECT email
-		FROM users
-		WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL
-	`, id).Scan(&targetEmail); err != nil {
+	if err := h.db.QueryRow(c.UserContext(),
+		"SELECT email FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
+		id).Scan(&targetEmail); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Usuario no encontrado")
+	}
+
+	// Prevent deleting the last active SUPER_ADMIN
+	var activeCount int
+	if err := h.db.QueryRow(c.UserContext(),
+		"SELECT COUNT(*) FROM users WHERE tenant_id IS NULL AND role = 'SUPER_ADMIN' AND is_active = true AND deleted_at IS NULL",
+	).Scan(&activeCount); err == nil && activeCount <= 1 {
+		return response.Error(c, fiber.StatusForbidden, "No puedes eliminar al último Super Admin activo")
 	}
 
 	result, err := h.db.Exec(c.UserContext(),
@@ -343,7 +357,6 @@ func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 	}
 
 	h.auditSuperAdmin(c, "user.soft_delete", "users", id, "critical", fiber.Map{"email": targetEmail}, "")
-
 	return response.Success(c, fiber.Map{"id": id}, "Usuario eliminado correctamente")
 }
 

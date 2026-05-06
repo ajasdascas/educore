@@ -169,12 +169,31 @@ check("Restore only updates status to restore_requested (no auto-execute)",
 // ── 12. Route registration ────────────────────────────────────────────────────
 console.log("\n12. Route registration");
 
-check("GET /backups registered",
-  enterprise.includes('router.Get("/backups"'));
-check("POST /backups registered",
-  enterprise.includes('router.Post("/backups"'));
+check("GET /backups registered",          enterprise.includes('router.Get("/backups"'));
+check("POST /backups registered",         enterprise.includes('router.Post("/backups"'));
+check("GET /backups/:id registered",      enterprise.includes('router.Get("/backups/:id"'));
+check("PUT /backups/:id registered",      enterprise.includes('router.Put("/backups/:id"'));
+check("DELETE /backups/:id registered",   enterprise.includes('router.Delete("/backups/:id"'));
+check("GET /backups/:id/download",        enterprise.includes('router.Get("/backups/:id/download"'));
 check("POST /backups/:id/restore registered",
   enterprise.includes('router.Post("/backups/:id/restore"'));
+
+// ── 12b. completed only after upload ─────────────────────────────────────────
+console.log("\n12b. completed = uploaded");
+
+const execBody2 = enterprise.slice(execBackupStart, execBackupStart + 6000);
+const uploadIdx = execBody2.indexOf("uploadToS3(");
+// The file is deleted via defer after uploadToS3, so just verify uploadToS3 exists
+// and that completed is only set after the upload call
+const completedIdx = execBody2.indexOf("status = 'completed'");
+check("uploadToS3 called in executeBackupJob",
+  uploadIdx > 0, `uploadIdx=${uploadIdx}`);
+check("'completed' status set after uploadToS3 call",
+  uploadIdx > 0 && completedIdx > uploadIdx,
+  `uploadIdx=${uploadIdx} completedIdx=${completedIdx}`);
+check("storage_key saved on completed", execBody2.includes("storage_key"));
+check("executeBackupJob does NOT mark completed without storage_key",
+  !execBody2.match(/status.*=.*'completed'[\s\S]{0,200}storage_key.*=.*''/));
 
 // ── 13. Documentation ─────────────────────────────────────────────────────────
 console.log("\n13. Documentation");

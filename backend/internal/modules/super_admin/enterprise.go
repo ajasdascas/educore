@@ -3,13 +3,16 @@ package superadmin
 import (
 	"compress/gzip"
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/response"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -172,6 +175,10 @@ func (h *Handler) RegisterEnterpriseRoutes(router fiber.Router) {
 
 	router.Get("/backups", h.ListBackups)
 	router.Post("/backups", h.CreateBackupJob)
+	router.Get("/backups/:id", h.GetBackupJob)
+	router.Put("/backups/:id", h.UpdateBackupJob)
+	router.Delete("/backups/:id", h.DeleteBackupJob)
+	router.Get("/backups/:id/download", h.DownloadBackupJob)
 	router.Post("/backups/:id/restore", h.RestoreBackupJob)
 
 	router.Get("/version", h.VersionInfo)
@@ -1311,14 +1318,23 @@ func (h *Handler) DeleteFeatureFlag(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ListBackups(c *fiber.Ctx) error {
+	includeDeleted := c.Query("include_deleted") == "true"
+	baseWhere := "WHERE bj.deleted_at IS NULL"
+	if includeDeleted {
+		baseWhere = "WHERE 1=1"
+	}
 	rows, err := h.db.Query(c.UserContext(), database.RebindPlaceholders(h.db.Driver(), `
 		SELECT bj.id, COALESCE(bj.tenant_id, ''), COALESCE(t.name, 'Global'),
 		       bj.type, bj.status,
-		       COALESCE(bj.size_mb, 0),
+		       COALESCE(bj.title, ''), COALESCE(bj.description, ''),
+		       COALESCE(bj.size_mb, 0), COALESCE(bj.size_bytes, 0),
 		       bj.created_at, bj.completed_at,
-		       COALESCE(bj.error, '')
+		       COALESCE(bj.error, ''),
+		       COALESCE(bj.storage_provider, ''), COALESCE(bj.storage_key, ''),
+		       COALESCE(bj.file_name, ''), COALESCE(bj.checksum_sha256, '')
 		FROM backup_jobs bj
 		LEFT JOIN tenants t ON t.id = bj.tenant_id
+		`+baseWhere+`
 		ORDER BY bj.created_at DESC
 		LIMIT 100`))
 	if err != nil {
@@ -1327,24 +1343,202 @@ func (h *Handler) ListBackups(c *fiber.Ctx) error {
 	defer rows.Close()
 	items := []fiber.Map{}
 	for rows.Next() {
-		var id, tenantID, tenant, typ, status, errMsg string
-		var size float64
+		var id, tenantID, tenant, typ, status, title, description, errMsg string
+		var storageProvider, storageKey, fileName, checksum string
+		var sizeMB float64
+		var sizeBytes int64
 		var created, completed interface{}
-		_ = rows.Scan(&id, &tenantID, &tenant, &typ, &status, &size, &created, &completed, &errMsg)
+		_ = rows.Scan(&id, &tenantID, &tenant, &typ, &status, &title, &description,
+			&sizeMB, &sizeBytes, &created, &completed, &errMsg,
+			&storageProvider, &storageKey, &fileName, &checksum)
 		items = append(items, fiber.Map{
 			"id": id, "tenant_id": tenantID, "tenant_name": tenant,
-			"type": typ, "status": status, "size_mb": size,
+			"type": typ, "status": status, "title": title, "description": description,
+			"size_mb": sizeMB, "size_bytes": sizeBytes,
 			"created_at": created, "completed_at": completed, "error": errMsg,
+			"storage_provider": storageProvider,
+			"storage_key":      storageKey,
+			"file_name":        fileName,
+			"checksum_sha256":  checksum,
+			"downloadable":     status == "completed" && storageKey != "",
 		})
 	}
 	return response.Success(c, fiber.Map{"backups": items}, "Backups retrieved")
 }
 
+func (h *Handler) GetBackupJob(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var bj struct {
+		ID              string      `json:"id"`
+		TenantID        string      `json:"tenant_id"`
+		TenantName      string      `json:"tenant_name"`
+		Type            string      `json:"type"`
+		Status          string      `json:"status"`
+		Title           string      `json:"title"`
+		Description     string      `json:"description"`
+		SizeMB          float64     `json:"size_mb"`
+		SizeBytes       int64       `json:"size_bytes"`
+		CreatedAt       interface{} `json:"created_at"`
+		CompletedAt     interface{} `json:"completed_at"`
+		Error           string      `json:"error"`
+		StorageProvider string      `json:"storage_provider"`
+		StorageKey      string      `json:"storage_key"`
+		FileName        string      `json:"file_name"`
+		Checksum        string      `json:"checksum_sha256"`
+		Downloadable    bool        `json:"downloadable"`
+	}
+	err := h.db.QueryRow(c.UserContext(), database.RebindPlaceholders(h.db.Driver(), `
+		SELECT bj.id, COALESCE(bj.tenant_id,''), COALESCE(t.name,'Global'),
+		       bj.type, bj.status,
+		       COALESCE(bj.title,''), COALESCE(bj.description,''),
+		       COALESCE(bj.size_mb,0), COALESCE(bj.size_bytes,0),
+		       bj.created_at, bj.completed_at,
+		       COALESCE(bj.error,''),
+		       COALESCE(bj.storage_provider,''), COALESCE(bj.storage_key,''),
+		       COALESCE(bj.file_name,''), COALESCE(bj.checksum_sha256,'')
+		FROM backup_jobs bj
+		LEFT JOIN tenants t ON t.id = bj.tenant_id
+		WHERE bj.id = $1 AND bj.deleted_at IS NULL`), id).Scan(
+		&bj.ID, &bj.TenantID, &bj.TenantName, &bj.Type, &bj.Status,
+		&bj.Title, &bj.Description, &bj.SizeMB, &bj.SizeBytes,
+		&bj.CreatedAt, &bj.CompletedAt, &bj.Error,
+		&bj.StorageProvider, &bj.StorageKey, &bj.FileName, &bj.Checksum)
+	if err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Backup not found")
+	}
+	bj.Downloadable = bj.Status == "completed" && bj.StorageKey != ""
+	return response.Success(c, bj, "Backup retrieved")
+}
+
+func (h *Handler) UpdateBackupJob(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var req struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
+	}
+	_, err := h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
+		"UPDATE backup_jobs SET title = $1, description = $2, updated_at = NOW() WHERE id = $3 AND deleted_at IS NULL"),
+		req.Title, req.Description, id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not update backup")
+	}
+	return response.Success(c, fiber.Map{"id": id}, "Backup updated")
+}
+
+func (h *Handler) DeleteBackupJob(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	id := c.Params("id")
+	result, err := h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
+		"UPDATE backup_jobs SET deleted_at = NOW(), deleted_by = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL"),
+		userID, id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not delete backup")
+	}
+	if result.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Backup not found")
+	}
+	h.auditSuperAdmin(c, "backup.soft_delete", "backup_jobs", id, "warning", fiber.Map{}, "")
+	return response.Success(c, fiber.Map{"id": id}, "Backup deleted")
+}
+
+func (h *Handler) DownloadBackupJob(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var status, storageKey string
+	if err := h.db.QueryRow(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
+		"SELECT status, COALESCE(storage_key,'') FROM backup_jobs WHERE id = $1 AND deleted_at IS NULL"), id).Scan(&status, &storageKey); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Backup not found")
+	}
+	if status != "completed" {
+		return response.Error(c, fiber.StatusConflict, "Backup is not completed")
+	}
+	if storageKey == "" {
+		return response.Error(c, fiber.StatusConflict, "Backup file is not available — storage_key is empty. This backup was created before storage was configured.")
+	}
+	// Download from S3-compatible storage
+	url, err := h.generatePresignedURL(storageKey)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not generate download URL: "+err.Error())
+	}
+	return c.Redirect(url, fiber.StatusFound)
+}
+
+// generatePresignedURL produces a time-limited signed URL for the given object key.
+// Only BACKUP_STORAGE_PROVIDER=r2|s3 is supported. The URL expires in 15 minutes.
+func (h *Handler) generatePresignedURL(key string) (string, error) {
+	bucket := os.Getenv("BACKUP_S3_BUCKET")
+	endpoint := os.Getenv("BACKUP_S3_ENDPOINT")
+	region := os.Getenv("BACKUP_S3_REGION")
+	accessKey := os.Getenv("BACKUP_S3_ACCESS_KEY_ID")
+	secretKey := os.Getenv("BACKUP_S3_SECRET_ACCESS_KEY")
+
+	if bucket == "" || accessKey == "" || secretKey == "" {
+		return "", fmt.Errorf("S3/R2 credentials not configured (BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY)")
+	}
+	if region == "" {
+		region = "auto"
+	}
+
+	now := time.Now().UTC()
+	expires := 900 // 15 minutes
+	date := now.Format("20060102")
+	datetime := now.Format("20060102T150405Z")
+
+	host := bucket + ".s3." + region + ".amazonaws.com"
+	if endpoint != "" {
+		// Cloudflare R2 or custom endpoint: strip scheme, use path-style
+		host = strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://")
+		key = bucket + "/" + key
+	}
+
+	credScope := fmt.Sprintf("%s/%s/s3/aws4_request", date, region)
+	canonicalQueryString := fmt.Sprintf(
+		"X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=%s%%2F%s&X-Amz-Date=%s&X-Amz-Expires=%d&X-Amz-SignedHeaders=host",
+		accessKey, strings.ReplaceAll(credScope, "/", "%2F"), datetime, expires)
+
+	canonicalRequest := strings.Join([]string{
+		"GET",
+		"/" + key,
+		canonicalQueryString,
+		"host:" + host + "\n",
+		"host",
+		"UNSIGNED-PAYLOAD",
+	}, "\n")
+
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		datetime,
+		credScope,
+		fmt.Sprintf("%x", sha256Hash([]byte(canonicalRequest))),
+	}, "\n")
+
+	signingKey := hmacSign(
+		hmacSign(
+			hmacSign(
+				hmacSign([]byte("AWS4"+secretKey), []byte(date)),
+				[]byte(region)),
+			[]byte("s3")),
+		[]byte("aws4_request"))
+
+	signature := fmt.Sprintf("%x", hmacSign(signingKey, []byte(stringToSign)))
+
+	scheme := "https"
+	if endpoint != "" {
+		scheme = "https"
+	}
+	url := fmt.Sprintf("%s://%s/%s?%s&X-Amz-Signature=%s", scheme, host, key, canonicalQueryString, signature)
+	return url, nil
+}
+
 func (h *Handler) CreateBackupJob(c *fiber.Ctx) error {
 	userID, _ := c.Locals("user_id").(string)
 	var req struct {
-		TenantID string `json:"tenant_id"`
-		Type     string `json:"type"`
+		TenantID    string `json:"tenant_id"`
+		Type        string `json:"type"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
 	}
 	_ = c.BodyParser(&req)
 
@@ -1355,12 +1549,12 @@ func (h *Handler) CreateBackupJob(c *fiber.Ctx) error {
 	var err error
 	if tenantVal == "" {
 		_, err = h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
-			"INSERT INTO backup_jobs (id, type, status, requested_by) VALUES ($1, $2, 'queued', $3)"),
-			id, backupType, userID)
+			"INSERT INTO backup_jobs (id, type, status, title, description, requested_by) VALUES ($1, $2, 'queued', $3, $4, $5)"),
+			id, backupType, req.Title, req.Description, userID)
 	} else {
 		_, err = h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
-			"INSERT INTO backup_jobs (id, tenant_id, type, status, requested_by) VALUES ($1, $2, $3, 'queued', $4)"),
-			id, tenantVal, backupType, userID)
+			"INSERT INTO backup_jobs (id, tenant_id, type, status, title, description, requested_by) VALUES ($1, $2, $3, 'queued', $4, $5, $6)"),
+			id, tenantVal, backupType, req.Title, req.Description, userID)
 	}
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not create backup job")
@@ -1371,9 +1565,8 @@ func (h *Handler) CreateBackupJob(c *fiber.Ctx) error {
 }
 
 // executeBackupJob runs the backup logic asynchronously.
-// Production uses MySQL (Hostinger/Railway). pg_dump is never used for MySQL.
-// If mysqldump is not available or storage is not configured, the job is marked
-// blocked with an actionable error message — never left stuck in queued.
+// Only marks completed after a successful upload to object storage.
+// Never marks completed if storage_key is empty.
 func (h *Handler) executeBackupJob(jobID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -1389,10 +1582,13 @@ func (h *Handler) executeBackupJob(jobID string) {
 
 	isMySQL := database.IsMySQL(h.db.Driver())
 
-	// Check backup storage configuration first
 	storageProvider := os.Getenv("BACKUP_STORAGE_PROVIDER")
 	if storageProvider == "" {
 		markFailed("Backup storage is not configured. Set BACKUP_STORAGE_PROVIDER (r2|s3) and related S3/R2 variables to enable real backups. No data was lost.")
+		return
+	}
+	if os.Getenv("BACKUP_S3_BUCKET") == "" || os.Getenv("BACKUP_S3_ACCESS_KEY_ID") == "" {
+		markFailed("Backup storage credentials missing. Configure BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY.")
 		return
 	}
 
@@ -1402,10 +1598,17 @@ func (h *Handler) executeBackupJob(jobID string) {
 		return
 	}
 
-	outPath := fmt.Sprintf("/tmp/backup_%s.sql.gz", jobID)
+	_, _ = h.db.Exec(ctx, database.RebindPlaceholders(h.db.Driver(),
+		"UPDATE backup_jobs SET status = 'running', started_at = NOW() WHERE id = $1"), jobID)
+
+	sqlPath := fmt.Sprintf("/tmp/backup_%s.sql", jobID)
+	outPath := sqlPath + ".gz"
+	defer func() {
+		_ = os.Remove(sqlPath)
+		_ = os.Remove(outPath)
+	}()
 
 	if isMySQL {
-		// MySQL path: prefer mysqldump, otherwise fail with actionable message
 		mysqldumpPath := os.Getenv("MYSQLDUMP_PATH")
 		if mysqldumpPath == "" {
 			mysqldumpPath = "mysqldump"
@@ -1414,7 +1617,6 @@ func (h *Handler) executeBackupJob(jobID string) {
 			markFailed("mysqldump not available in this runtime. Railway's default Go image does not include the MySQL client. Configure MYSQLDUMP_PATH or migrate to a VPS/custom Docker image with mysql-client installed.")
 			return
 		}
-		// Parse DSN to extract host, user, password, dbname for mysqldump
 		dsn, parseErr := parseMySQLDSN(dbURL)
 		if parseErr != nil {
 			markFailed("Could not parse DATABASE_URL for mysqldump: " + parseErr.Error())
@@ -1423,55 +1625,132 @@ func (h *Handler) executeBackupJob(jobID string) {
 		args := []string{
 			"-h", dsn.host, "-P", dsn.port, "-u", dsn.user,
 			"--single-transaction", "--routines", "--triggers",
-			"--result-file=" + outPath[:len(outPath)-3], // write .sql, gzip after
+			"--result-file=" + sqlPath,
 			dsn.dbname,
 		}
 		cmd := exec.CommandContext(ctx, mysqldumpPath, args...)
 		cmd.Env = append(os.Environ(), "MYSQL_PWD="+dsn.password)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			errMsg := fmt.Sprintf("mysqldump failed: %s — %s", err.Error(), string(out))
-			markFailed(errMsg)
+			markFailed(fmt.Sprintf("mysqldump failed: %s — %s", err.Error(), string(out)))
 			return
 		}
-		// Gzip the output
-		sqlPath := outPath[:len(outPath)-3]
-		if err := gzipFile(sqlPath, outPath); err != nil {
-			markFailed("gzip failed: " + err.Error())
-			_ = os.Remove(sqlPath)
-			return
-		}
-		_ = os.Remove(sqlPath)
 	} else {
-		// PostgreSQL path (dev/staging only)
 		pgDump, err := exec.LookPath("pg_dump")
 		if err != nil {
 			markFailed("pg_dump not available in this runtime.")
 			return
 		}
-		sqlPath := outPath[:len(outPath)-3]
 		cmd := exec.CommandContext(ctx, pgDump, "--no-password", "-f", sqlPath, dbURL)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			errMsg := fmt.Sprintf("pg_dump failed: %s — %s", err.Error(), string(out))
-			markFailed(errMsg)
+			markFailed(fmt.Sprintf("pg_dump failed: %s — %s", err.Error(), string(out)))
 			return
 		}
-		if err := gzipFile(sqlPath, outPath); err != nil {
-			markFailed("gzip failed: " + err.Error())
-			_ = os.Remove(sqlPath)
-			return
-		}
-		_ = os.Remove(sqlPath)
 	}
 
-	var sizeMB float64
-	if info, err := os.Stat(outPath); err == nil {
-		sizeMB = float64(info.Size()) / (1024 * 1024)
+	if err := gzipFile(sqlPath, outPath); err != nil {
+		markFailed("gzip failed: " + err.Error())
+		return
 	}
+	_ = os.Remove(sqlPath)
+
+	info, err := os.Stat(outPath)
+	if err != nil {
+		markFailed("Could not stat gzip file: " + err.Error())
+		return
+	}
+	sizeBytes := info.Size()
+	sizeMB := float64(sizeBytes) / (1024 * 1024)
+
+	now := time.Now().UTC()
+	storageKey := fmt.Sprintf("backups/%d/%02d/%02d/%s.sql.gz", now.Year(), now.Month(), now.Day(), jobID)
+	fileName := fmt.Sprintf("backup_%s.sql.gz", jobID)
+
+	checksum, uploadErr := h.uploadToS3(ctx, outPath, storageKey)
 	_ = os.Remove(outPath)
 
-	_, _ = h.db.Exec(ctx, database.RebindPlaceholders(h.db.Driver(),
-		"UPDATE backup_jobs SET status = 'completed', size_mb = $1, completed_at = NOW() WHERE id = $2"),
-		sizeMB, jobID)
+	if uploadErr != nil {
+		markFailed("Upload to storage failed: " + uploadErr.Error())
+		return
+	}
+
+	_, _ = h.db.Exec(ctx, database.RebindPlaceholders(h.db.Driver(), `
+		UPDATE backup_jobs SET
+			status = 'completed',
+			size_mb = $1,
+			size_bytes = $2,
+			storage_provider = $3,
+			storage_key = $4,
+			file_name = $5,
+			checksum_sha256 = $6,
+			completed_at = NOW()
+		WHERE id = $7`),
+		sizeMB, sizeBytes, storageProvider, storageKey, fileName, checksum, jobID)
+}
+
+// uploadToS3 uploads a local file to S3-compatible storage using a minimal AWS Sig V4 PUT.
+// Returns the SHA-256 hex of the file content and any error.
+func (h *Handler) uploadToS3(ctx context.Context, localPath, key string) (string, error) {
+	data, err := os.ReadFile(localPath)
+	if err != nil {
+		return "", fmt.Errorf("read file: %w", err)
+	}
+
+	payloadHash := fmt.Sprintf("%x", sha256Hash(data))
+
+	bucket := os.Getenv("BACKUP_S3_BUCKET")
+	endpoint := os.Getenv("BACKUP_S3_ENDPOINT")
+	region := os.Getenv("BACKUP_S3_REGION")
+	accessKey := os.Getenv("BACKUP_S3_ACCESS_KEY_ID")
+	secretKey := os.Getenv("BACKUP_S3_SECRET_ACCESS_KEY")
+	if region == "" {
+		region = "auto"
+	}
+
+	now := time.Now().UTC()
+	date := now.Format("20060102")
+	datetime := now.Format("20060102T150405Z")
+
+	var host, urlPath, scheme string
+	if endpoint != "" {
+		host = strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://")
+		urlPath = "/" + bucket + "/" + key
+		scheme = "https"
+	} else {
+		host = bucket + ".s3." + region + ".amazonaws.com"
+		urlPath = "/" + key
+		scheme = "https"
+	}
+
+	canonicalHeaders := "content-type:application/octet-stream\nhost:" + host + "\nx-amz-content-sha256:" + payloadHash + "\nx-amz-date:" + datetime + "\n"
+	signedHeaders := "content-type;host;x-amz-content-sha256;x-amz-date"
+	canonicalRequest := strings.Join([]string{"PUT", urlPath, "", canonicalHeaders, signedHeaders, payloadHash}, "\n")
+	credScope := date + "/" + region + "/s3/aws4_request"
+	stringToSign := strings.Join([]string{"AWS4-HMAC-SHA256", datetime, credScope, fmt.Sprintf("%x", sha256Hash([]byte(canonicalRequest)))}, "\n")
+
+	sigKey := hmacSign(hmacSign(hmacSign(hmacSign([]byte("AWS4"+secretKey), []byte(date)), []byte(region)), []byte("s3")), []byte("aws4_request"))
+	signature := fmt.Sprintf("%x", hmacSign(sigKey, []byte(stringToSign)))
+	authHeader := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s", accessKey, credScope, signedHeaders, signature)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, scheme+"://"+host+urlPath, strings.NewReader(string(data)))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("x-amz-date", datetime)
+	req.Header.Set("x-amz-content-sha256", payloadHash)
+	req.Header.Set("Authorization", authHeader)
+	req.ContentLength = int64(len(data))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("http put: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("storage returned %d: %s", resp.StatusCode, string(body))
+	}
+	return payloadHash, nil
 }
 
 // mysqlDSN holds parsed MySQL connection parameters for CLI tools.
@@ -1548,20 +1827,6 @@ func gzipFile(src, dst string) error {
 		return err
 	}
 	return gz.Close()
-}
-
-func (h *Handler) RestoreBackupJob(c *fiber.Ctx) error {
-	id := c.Params("id")
-	req, ok := requireConfirmation(c, "RESTORE "+id)
-	if !ok {
-		return response.Error(c, fiber.StatusBadRequest, "Confirmation text must be RESTORE "+id)
-	}
-	_, err := h.db.Exec(c.UserContext(), "UPDATE backup_jobs SET status = 'restore_requested' WHERE id = $1", id)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not request restore")
-	}
-	h.auditSuperAdmin(c, "backup.restore_requested", "backup_jobs", id, "critical", fiber.Map{"mode": "job_registered_only"}, req.ConfirmationText)
-	return response.Success(c, fiber.Map{"status": "restore_requested"}, "Restore request registered")
 }
 
 func (h *Handler) VersionInfo(c *fiber.Ctx) error {
@@ -1760,4 +2025,31 @@ func parseLimit(c *fiber.Ctx, fallback int) int {
 		return 500
 	}
 	return limit
+}
+
+func sha256Hash(data []byte) []byte {
+	h := sha256.Sum256(data)
+	return h[:]
+}
+
+func hmacSign(key, data []byte) []byte {
+	mac := hmac.New(sha256.New, key)
+	mac.Write(data)
+	return mac.Sum(nil)
+}
+
+// RestoreBackupJob registers a restore request. Auto-restore is intentionally NOT implemented.
+func (h *Handler) RestoreBackupJob(c *fiber.Ctx) error {
+	id := c.Params("id")
+	req, ok := requireConfirmation(c, "RESTORE "+id)
+	if !ok {
+		return response.Error(c, fiber.StatusBadRequest, "Confirmation text must be RESTORE "+id)
+	}
+	_, err := h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
+		"UPDATE backup_jobs SET status = 'restore_requested' WHERE id = $1"), id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not request restore")
+	}
+	h.auditSuperAdmin(c, "backup.restore_requested", "backup_jobs", id, "critical", fiber.Map{"mode": "job_registered_only"}, req.ConfirmationText)
+	return response.Success(c, fiber.Map{"status": "restore_requested"}, "Restore request registered")
 }

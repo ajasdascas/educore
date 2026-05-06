@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Users,
   Plus,
   Search,
@@ -34,9 +42,10 @@ import {
   Shield,
   KeyRound,
   LogOut,
-  UserCheck
+  UserCheck,
+  Eye,
 } from "lucide-react";
-import { authFetch } from "@/lib/auth";
+import { authFetch, getUser } from "@/lib/auth";
 import { UserFormModal } from "./UserFormModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -62,6 +71,11 @@ interface UsersResponse {
   };
 }
 
+type ConfirmAction =
+  | { type: "deactivate"; user: GlobalUser }
+  | { type: "activate"; user: GlobalUser }
+  | { type: "delete"; user: GlobalUser };
+
 export default function UsersPage() {
   const [users, setUsers] = useState<GlobalUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,10 +85,13 @@ export default function UsersPage() {
   const [meta, setMeta] = useState({ total: 0, pages: 1, per_page: 20 });
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<GlobalUser | null>(null);
+  const [detailUser, setDetailUser] = useState<GlobalUser | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const { toast } = useToast();
+  const currentUser = getUser();
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -90,103 +107,77 @@ export default function UsersPage() {
         setUsers(Array.isArray(response.data) ? response.data : []);
         setMeta(response.meta || { total: 0, pages: 1, per_page: 20 });
       } else {
-        throw new Error(response.message || "Error loading users");
+        throw new Error(response.message || response.error || "Error loading users");
       }
-    } catch (error) {
-      console.error("Error fetching users:", error);
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudieron cargar los usuarios",
+        description: error?.message || "No se pudieron cargar los usuarios",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, searchTerm, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      setPage(1);
-      fetchUsers();
-    }, 300);
-
-    return () => clearTimeout(debounceTimer);
+    const t = setTimeout(() => { setPage(1); }, 300);
+    return () => clearTimeout(t);
   }, [searchTerm, statusFilter]);
 
-  useEffect(() => {
-    fetchUsers();
-  }, [page]);
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
-    setActionLoading(userId);
-    try {
-      const response = await authFetch(`/api/v1/super-admin/users/${userId}/toggle`, {
-        method: "PATCH",
-      });
+  const isSelf = (userId: string) => currentUser?.id === userId;
 
-      if (response.success) {
-        setUsers(prev => prev.map(user =>
-          user.id === userId
-            ? { ...user, is_active: !currentStatus }
-            : user
-        ));
-        toast({
-          title: "Éxito",
-          description: `Usuario ${!currentStatus ? 'activado' : 'desactivado'} correctamente`,
-        });
-      } else {
-        throw new Error(response.message);
-      }
-    } catch (error) {
-      console.error("Error toggling user status:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo cambiar el estado del usuario",
-      });
-    } finally {
-      setActionLoading(null);
+  const handleToggleStatus = async (user: GlobalUser) => {
+    if (isSelf(user.id)) {
+      toast({ variant: "destructive", title: "Error", description: "No puedes modificar tu propia cuenta con esta acción" });
+      return;
     }
+    setConfirmAction(user.is_active ? { type: "deactivate", user } : { type: "activate", user });
   };
 
-  const handleDeleteUser = async (user: GlobalUser) => {
-    const displayName = `${user.first_name} ${user.last_name}`.trim() || user.email;
-    const confirmed = confirm(
-      `¿Eliminar el usuario global "${displayName}"?\n\nEsta acción lo quitará del Manager Maestro y bloqueará su acceso.`
-    );
+  const handleDeleteUser = (user: GlobalUser) => {
+    if (isSelf(user.id)) {
+      toast({ variant: "destructive", title: "Error", description: "No puedes eliminar tu propia cuenta" });
+      return;
+    }
+    setConfirmAction({ type: "delete", user });
+  };
 
-    if (!confirmed) return;
-
+  const executeConfirmedAction = async () => {
+    if (!confirmAction) return;
+    const { user } = confirmAction;
     setActionLoading(user.id);
-    try {
-      const response = await authFetch(`/api/v1/super-admin/users/${user.id}`, {
-        method: "DELETE",
-      });
+    setConfirmAction(null);
 
-      if (response.success) {
-        setUsers(prev => prev.filter(current => current.id !== user.id));
-        setMeta(prev => {
-          const total = Math.max(0, prev.total - 1);
-          return {
-            ...prev,
-            total,
-            pages: Math.max(1, Math.ceil(total / prev.per_page)),
-          };
-        });
-        toast({
-          title: "Éxito",
-          description: "Usuario eliminado correctamente",
-        });
+    try {
+      let response: any;
+
+      if (confirmAction.type === "deactivate" || confirmAction.type === "activate") {
+        response = await authFetch(`/api/v1/super-admin/users/${user.id}/toggle`, { method: "PATCH" });
+        if (response.success) {
+          const newActive = confirmAction.type === "activate";
+          setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: newActive } : u));
+          toast({ title: "Éxito", description: `Usuario ${newActive ? "activado" : "desactivado"} correctamente` });
+        } else {
+          throw new Error(response.message || response.error || "Error al cambiar estado");
+        }
       } else {
-        throw new Error(response.message || "No se pudo eliminar el usuario");
+        response = await authFetch(`/api/v1/super-admin/users/${user.id}`, { method: "DELETE" });
+        if (response.success) {
+          setUsers(prev => prev.filter(u => u.id !== user.id));
+          setMeta(prev => {
+            const total = Math.max(0, prev.total - 1);
+            return { ...prev, total, pages: Math.max(1, Math.ceil(total / prev.per_page)) };
+          });
+          toast({ title: "Éxito", description: "Usuario eliminado correctamente" });
+        } else {
+          throw new Error(response.message || response.error || "No se pudo eliminar");
+        }
       }
     } catch (error: any) {
-      console.error("Error deleting user:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error?.message || "No se pudo eliminar el usuario",
-      });
+      toast({ variant: "destructive", title: "Error", description: error?.message || "No se pudo completar la acción" });
     } finally {
       setActionLoading(null);
     }
@@ -196,38 +187,21 @@ export default function UsersPage() {
     setActionLoading(userId);
     try {
       const endpoint =
-        action === "reset"
-          ? `/api/v1/super-admin/global-users/${userId}/reset-password`
-          : action === "logout"
-            ? `/api/v1/super-admin/global-users/${userId}/force-logout`
-            : "/api/v1/super-admin/impersonation/start";
-      const body = action === "impersonate"
-        ? { target_user_id: userId, reason: "Soporte SuperAdmin desde panel" }
-        : {};
-      const response = await authFetch(endpoint, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || response.error || "Accion no disponible");
-      }
-
+        action === "reset" ? `/api/v1/super-admin/global-users/${userId}/reset-password`
+        : action === "logout" ? `/api/v1/super-admin/global-users/${userId}/force-logout`
+        : "/api/v1/super-admin/impersonation/start";
+      const body = action === "impersonate" ? { target_user_id: userId, reason: "Soporte SuperAdmin desde panel" } : {};
+      const response = await authFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
+      if (!response.success) throw new Error(response.message || response.error || "Acción no disponible");
       toast({
-        title: "Accion registrada",
+        title: "Acción registrada",
         description:
-          action === "reset"
-            ? `Password temporal: ${response.data?.temporary_password || "generado"}`
-            : action === "logout"
-              ? "Sesiones cerradas correctamente"
-              : "Impersonation iniciado con auditoria",
+          action === "reset" ? `Password temporal: ${response.data?.temporary_password || "generado"}`
+          : action === "logout" ? "Sesiones cerradas correctamente"
+          : "Impersonation iniciado con auditoría",
       });
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "No se pudo completar la accion",
-      });
+      toast({ variant: "destructive", title: "Error", description: error.message || "No se pudo completar la acción" });
     } finally {
       setActionLoading(null);
     }
@@ -235,43 +209,38 @@ export default function UsersPage() {
 
   const handleUserSaved = (savedUser: GlobalUser) => {
     if (editingUser) {
-      // Update existing user
-      setUsers(prev => prev.map(user =>
-        user.id === savedUser.id ? savedUser : user
-      ));
+      setUsers(prev => prev.map(u => u.id === savedUser.id ? savedUser : u));
     } else {
-      // Add new user
       setUsers(prev => [savedUser, ...prev]);
+      setMeta(prev => ({ ...prev, total: prev.total + 1 }));
     }
     setEditingUser(null);
     setShowModal(false);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-MX', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("es-MX", {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
     });
-  };
 
-  const LoadingSkeleton = () => (
-    <div className="space-y-4">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="flex items-center space-x-4">
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="space-y-2 flex-1">
-            <Skeleton className="h-4 w-[200px]" />
-            <Skeleton className="h-4 w-[100px]" />
-          </div>
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-8" />
-        </div>
-      ))}
-    </div>
-  );
+  const confirmMessages: Record<string, { title: string; description: string; danger: boolean }> = {
+    deactivate: {
+      title: "Desactivar usuario",
+      description: "Este usuario no podrá iniciar sesión mientras esté inactivo.",
+      danger: false,
+    },
+    activate: {
+      title: "Reactivar usuario",
+      description: "El usuario podrá volver a iniciar sesión.",
+      danger: false,
+    },
+    delete: {
+      title: "Eliminar usuario",
+      description: "Esta acción ocultará el usuario del sistema, pero conservará la auditoría. No se puede deshacer.",
+      danger: true,
+    },
+  };
 
   return (
     <div className="space-y-6">
@@ -287,10 +256,7 @@ export default function UsersPage() {
           </p>
         </div>
         <Button
-          onClick={() => {
-            setEditingUser(null);
-            setShowModal(true);
-          }}
+          onClick={() => { setEditingUser(null); setShowModal(true); }}
           className="bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -313,7 +279,6 @@ export default function UsersPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -322,14 +287,11 @@ export default function UsersPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Activos</p>
-                <p className="text-2xl font-bold">
-                  {users.filter(u => u.is_active).length}
-                </p>
+                <p className="text-2xl font-bold">{users.filter(u => u.is_active).length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
@@ -338,16 +300,14 @@ export default function UsersPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Inactivos</p>
-                <p className="text-2xl font-bold">
-                  {users.filter(u => !u.is_active).length}
-                </p>
+                <p className="text-2xl font-bold">{users.filter(u => !u.is_active).length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle>Usuarios del Sistema</CardTitle>
@@ -355,7 +315,7 @@ export default function UsersPage() {
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Buscar por nombre o email..."
                 value={searchTerm}
@@ -375,9 +335,20 @@ export default function UsersPage() {
             </Select>
           </div>
 
-          {/* Table */}
           {loading ? (
-            <LoadingSkeleton />
+            <div className="space-y-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-4 w-[120px]" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -396,9 +367,7 @@ export default function UsersPage() {
                       <TableCell colSpan={5} className="h-24 text-center">
                         <div className="flex flex-col items-center gap-2">
                           <Users className="h-8 w-8 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            No se encontraron usuarios
-                          </p>
+                          <p className="text-sm text-muted-foreground">No se encontraron usuarios</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -415,6 +384,9 @@ export default function UsersPage() {
                               <p className="text-sm text-muted-foreground flex items-center gap-1">
                                 <Shield className="h-3 w-3" />
                                 {user.role}
+                                {isSelf(user.id) && (
+                                  <span className="ml-1 text-xs text-blue-500">(tú)</span>
+                                )}
                               </p>
                             </div>
                           </div>
@@ -438,35 +410,34 @@ export default function UsersPage() {
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                disabled={actionLoading === user.id}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
+                            <DropdownMenuTrigger
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                              disabled={actionLoading === user.id}
+                              aria-label="Abrir menú de acciones"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setDetailUser(user)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Ver detalles
+                              </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setEditingUser(user);
-                                  setShowModal(true);
-                                }}
+                                onClick={() => { setEditingUser(user); setShowModal(true); }}
                               >
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleToggleStatus(user.id, user.is_active)}
-                              >
-                                {user.is_active ? (
-                                  <ToggleLeft className="h-4 w-4 mr-2" />
-                                ) : (
-                                  <ToggleRight className="h-4 w-4 mr-2" />
-                                )}
-                                {user.is_active ? "Desactivar" : "Activar"}
-                              </DropdownMenuItem>
+                              {!isSelf(user.id) && (
+                                <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
+                                  {user.is_active ? (
+                                    <ToggleLeft className="h-4 w-4 mr-2" />
+                                  ) : (
+                                    <ToggleRight className="h-4 w-4 mr-2" />
+                                  )}
+                                  {user.is_active ? "Desactivar" : "Reactivar"}
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleEnterpriseAction(user.id, "reset")}>
                                 <KeyRound className="h-4 w-4 mr-2" />
                                 Reset password
@@ -479,13 +450,15 @@ export default function UsersPage() {
                                 <UserCheck className="h-4 w-4 mr-2" />
                                 Impersonar
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteUser(user)}
-                                className="text-red-600 focus:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar usuario
-                              </DropdownMenuItem>
+                              {!isSelf(user.id) && (
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteUser(user)}
+                                  variant="destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Eliminar usuario
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -497,27 +470,16 @@ export default function UsersPage() {
             </div>
           )}
 
-          {/* Pagination */}
           {meta.pages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-muted-foreground">
                 Página {page} de {meta.pages} • {meta.total} usuarios total
               </p>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
-                  disabled={page <= 1}
-                >
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>
                   Anterior
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(prev => Math.min(meta.pages, prev + 1))}
-                  disabled={page >= meta.pages}
-                >
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(meta.pages, p + 1))} disabled={page >= meta.pages}>
                   Siguiente
                 </Button>
               </div>
@@ -526,16 +488,73 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      {/* Modal */}
+      {/* User form modal */}
       {showModal && (
         <UserFormModal
           user={editingUser}
-          onClose={() => {
-            setShowModal(false);
-            setEditingUser(null);
-          }}
+          onClose={() => { setShowModal(false); setEditingUser(null); }}
           onSaved={handleUserSaved}
         />
+      )}
+
+      {/* Detail dialog */}
+      {detailUser && (
+        <Dialog open onOpenChange={() => setDetailUser(null)}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle>Detalles del usuario</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <span className="text-muted-foreground">ID</span>
+                <span className="font-mono text-xs break-all">{detailUser.id}</span>
+                <span className="text-muted-foreground">Nombre</span>
+                <span>{detailUser.first_name} {detailUser.last_name}</span>
+                <span className="text-muted-foreground">Email</span>
+                <span className="font-mono">{detailUser.email}</span>
+                <span className="text-muted-foreground">Rol</span>
+                <span>{detailUser.role}</span>
+                <span className="text-muted-foreground">Estado</span>
+                <Badge variant={detailUser.is_active ? "default" : "secondary"} className={detailUser.is_active ? "w-fit bg-green-100 text-green-800" : "w-fit"}>
+                  {detailUser.is_active ? "Activo" : "Inactivo"}
+                </Badge>
+                <span className="text-muted-foreground">Creado</span>
+                <span>{formatDate(detailUser.created_at)}</span>
+                <span className="text-muted-foreground">Actualizado</span>
+                <span>{formatDate(detailUser.updated_at)}</span>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetailUser(null)}>Cerrar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Confirm action dialog */}
+      {confirmAction && (
+        <Dialog open onOpenChange={() => setConfirmAction(null)}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>{confirmMessages[confirmAction.type].title}</DialogTitle>
+              <DialogDescription>
+                {`${confirmAction.user.first_name} ${confirmAction.user.last_name}`.trim() || confirmAction.user.email}
+              </DialogDescription>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {confirmMessages[confirmAction.type].description}
+            </p>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancelar</Button>
+              <Button
+                variant={confirmMessages[confirmAction.type].danger ? "destructive" : "default"}
+                onClick={executeConfirmedAction}
+              >
+                Confirmar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
