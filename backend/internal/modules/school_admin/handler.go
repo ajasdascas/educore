@@ -100,7 +100,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	// Grades management
 	grades := api.Group("/grades")
 	grades.Get("/groups/:groupId/subjects/:subjectId", h.GetGroupGrades)
-	grades.Post("/grades/bulk", h.BulkUpdateGrades)
+	grades.Post("/bulk", h.BulkUpdateGrades)
 	grades.Get("/students/:studentId/report-card", h.GetStudentReportCard)
 	grades.Get("/groups/:groupId/final-grades", h.GetGroupFinalGrades)
 

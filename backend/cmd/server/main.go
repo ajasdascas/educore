@@ -304,9 +304,7 @@ func main() {
 	communicationsGroup := api.Group("/communications", middleware.Protected(cfg.JWTSecret))
 	communicationsHandler.RegisterRoutes(communicationsGroup)
 
-	// Academic module (placeholder)
-	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
-	_ = academicGroup
+	// Academic module — routes are handled under /school-admin/academic/* and /teacher/*
 
 	// 5. Start server
 	log.Printf("EduCore API starting on port %s", cfg.Port)
