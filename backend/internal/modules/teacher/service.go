@@ -77,6 +77,21 @@ func (s *Service) GetNotifications(ctx context.Context, tenantID, userID string)
 	return s.repo.GetNotifications(ctx, tenantID, userID)
 }
 
+func (s *Service) MarkNotificationRead(ctx context.Context, tenantID, userID, notificationID string) error {
+	return s.repo.MarkNotificationRead(ctx, tenantID, userID, notificationID)
+}
+
+func (s *Service) GetAnnouncements(ctx context.Context, tenantID, authorID string, page, perPage int) ([]AnnouncementSummary, error) {
+	return s.repo.GetAnnouncements(ctx, tenantID, authorID, page, perPage)
+}
+
+func (s *Service) CreateAnnouncement(ctx context.Context, tenantID, authorID string, req CreateAnnouncementRequest) (*AnnouncementSummary, error) {
+	if req.Title == "" || req.Content == "" {
+		return nil, fmt.Errorf("title and content are required")
+	}
+	return s.repo.CreateAnnouncement(ctx, tenantID, authorID, req)
+}
+
 func (s *Service) SendMessage(ctx context.Context, tenantID, teacherID string, req SendMessageRequest) (*TeacherMessage, error) {
 	if req.RecipientID == "" || req.Subject == "" || req.Content == "" {
 		return nil, fmt.Errorf("recipient_id, subject and content are required")

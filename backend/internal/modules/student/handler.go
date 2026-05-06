@@ -22,6 +22,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/assignments", h.GetAssignments)
 	router.Get("/schedule", h.GetSchedule)
 	router.Get("/notifications", h.GetNotifications)
+	router.Put("/notifications/:id/read", h.MarkNotificationRead)
 }
 
 func (h *Handler) GetDashboard(c *fiber.Ctx) error {
@@ -156,4 +157,16 @@ func (h *Handler) GetNotifications(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching notifications")
 	}
 	return response.Success(c, fiber.Map{"notifications": notifications}, "ok")
+}
+
+func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	}
+	if err := h.svc.repo.MarkNotificationRead(c.UserContext(), tenantID, userID, c.Params("id")); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Error marking notification as read")
+	}
+	return response.SuccessMessage(c, "Notification marked as read")
 }

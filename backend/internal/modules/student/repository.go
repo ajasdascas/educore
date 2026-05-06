@@ -229,6 +229,15 @@ func (r *Repository) GetNotifications(ctx context.Context, userID, tenantID stri
 	return items, nil
 }
 
+// MarkNotificationRead marks a notification as read for this student.
+func (r *Repository) MarkNotificationRead(ctx context.Context, tenantID, userID, notificationID string) error {
+	_, err := r.db.Exec(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		UPDATE notifications SET is_read = TRUE, read_at = NOW(), status = 'read'
+		WHERE id = $1 AND user_id = $2 AND tenant_id = $3
+	`), notificationID, userID, tenantID)
+	return err
+}
+
 // GetSchedule returns the weekly schedule for the student's group.
 // start_time/end_time are TIME columns — TIME_FORMAT is correct for MySQL.
 // FIELD() for day ordering is MySQL-only; no portable translation needed since

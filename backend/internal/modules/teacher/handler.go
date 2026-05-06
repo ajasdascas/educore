@@ -25,6 +25,9 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	app.Post("/messages", h.SendMessage)
 	app.Get("/schedule", h.GetSchedule)
 	app.Get("/notifications", h.GetNotifications)
+	app.Put("/notifications/:id/read", h.MarkNotificationRead)
+	app.Get("/announcements", h.GetAnnouncements)
+	app.Post("/announcements", h.CreateAnnouncement)
 }
 
 func (h *Handler) GetDashboard(c *fiber.Ctx) error {
@@ -127,4 +130,37 @@ func (h *Handler) SendMessage(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
 	return response.Success(c, message, "Success")
+}
+
+func (h *Handler) MarkNotificationRead(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	userID, _ := c.Locals("user_id").(string)
+	if err := h.service.MarkNotificationRead(c.Context(), tenantID, userID, c.Params("id")); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.SuccessMessage(c, "Notification marked as read")
+}
+
+func (h *Handler) GetAnnouncements(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	userID, _ := c.Locals("user_id").(string)
+	items, err := h.service.GetAnnouncements(c.Context(), tenantID, userID, c.QueryInt("page", 1), c.QueryInt("per_page", 20))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
+	}
+	return response.Success(c, fiber.Map{"announcements": items}, "Success")
+}
+
+func (h *Handler) CreateAnnouncement(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	userID, _ := c.Locals("user_id").(string)
+	var req CreateAnnouncementRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	item, err := h.service.CreateAnnouncement(c.Context(), tenantID, userID, req)
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+	}
+	return response.Success(c, item, "Announcement created")
 }

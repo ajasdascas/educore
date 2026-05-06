@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BookOpen, Building2, Calendar, Clock, FileText, LayoutDashboard, Menu, MessageCircle, Settings, User, X } from "lucide-react";
+import { Bell, BookOpen, Building2, Calendar, Clock, FileText, KeyRound, LayoutDashboard, Megaphone, Menu, MessageCircle, Settings, User, X } from "lucide-react";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -20,8 +20,9 @@ const navItems = [
   { href: "/teacher/attendance",    label: "Asistencia",     icon: Calendar },
   { href: "/teacher/schedule",      label: "Mi Horario",     icon: Clock },
   { href: "/teacher/messages",      label: "Mensajes",       icon: MessageCircle },
-  { href: "/teacher/notifications", label: "Notificaciones", icon: Bell },
+  { href: "/teacher/notifications", label: "Avisos",          icon: Megaphone },
   { href: "/teacher/profile",       label: "Mi Perfil",      icon: User },
+  { href: "/teacher/security",      label: "Seguridad",      icon: KeyRound },
   { href: "/teacher/settings",      label: "Configuración",  icon: Settings },
 ];
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, GraduationCap, Calendar, FileText, MessageCircle,
-  Bell, ClipboardCheck, CreditCard, FolderOpen, Settings, Menu, X, Building2,
+  Bell, ClipboardCheck, CreditCard, FolderOpen, Settings, Menu, User, X, Building2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -26,6 +26,7 @@ const navItems = [
   { href: "/parent/payments",       label: "Pagos",           icon: CreditCard },
   { href: "/parent/consents",       label: "Permisos",        icon: ClipboardCheck },
   { href: "/parent/notifications",  label: "Notificaciones",  icon: Bell },
+  { href: "/parent/profile",        label: "Mi Perfil",       icon: User },
   { href: "/parent/settings",       label: "Configuración",   icon: Settings },
 ];
 

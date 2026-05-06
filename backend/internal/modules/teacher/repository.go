@@ -387,6 +387,75 @@ func (r *Repository) GetNotifications(ctx context.Context, tenantID, userID stri
 	return items, nil
 }
 
+// MarkNotificationRead marks a notification as read for this teacher.
+func (r *Repository) MarkNotificationRead(ctx context.Context, tenantID, userID, notificationID string) error {
+	_, err := r.db.Exec(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		UPDATE notifications SET is_read = TRUE, read_at = NOW(), status = 'read'
+		WHERE id = $1 AND user_id = $2 AND tenant_id = $3
+	`), notificationID, userID, tenantID)
+	return err
+}
+
+// GetAnnouncements returns announcements created by this teacher.
+func (r *Repository) GetAnnouncements(ctx context.Context, tenantID, authorID string, page, perPage int) ([]AnnouncementSummary, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		SELECT id, COALESCE(title,''), COALESCE(content,''), COALESCE(priority,'normal'),
+		       COALESCE(status,'published'), COALESCE(author_id,''),
+		       DATE_FORMAT(created_at,'%Y-%m-%d %H:%i') AS created_at
+		FROM announcements
+		WHERE tenant_id = $1 AND author_id = $2 AND (deleted_at IS NULL OR deleted_at > NOW())
+		ORDER BY created_at DESC
+		LIMIT $3 OFFSET $4
+	`), tenantID, authorID, perPage, (page-1)*perPage)
+	if err != nil {
+		return []AnnouncementSummary{}, nil
+	}
+	defer rows.Close()
+	var items []AnnouncementSummary
+	for rows.Next() {
+		var a AnnouncementSummary
+		if err := rows.Scan(&a.ID, &a.Title, &a.Content, &a.Priority, &a.Status, &a.AuthorID, &a.CreatedAt); err != nil {
+			continue
+		}
+		items = append(items, a)
+	}
+	if items == nil {
+		items = []AnnouncementSummary{}
+	}
+	return items, nil
+}
+
+// CreateAnnouncement inserts a new announcement authored by the teacher.
+func (r *Repository) CreateAnnouncement(ctx context.Context, tenantID, authorID string, req CreateAnnouncementRequest) (*AnnouncementSummary, error) {
+	priority := req.Priority
+	if priority == "" {
+		priority = "normal"
+	}
+	var id string
+	err := r.db.QueryRow(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		INSERT INTO announcements (tenant_id, author_id, title, content, priority, status)
+		VALUES ($1, $2, $3, $4, $5, 'published')
+		RETURNING id
+	`), tenantID, authorID, req.Title, req.Content, priority).Scan(&id)
+	if err != nil {
+		return nil, err
+	}
+	return &AnnouncementSummary{
+		ID:       id,
+		Title:    req.Title,
+		Content:  req.Content,
+		Priority: priority,
+		Status:   "published",
+		AuthorID: authorID,
+	}, nil
+}
+
 // GetSchedule returns the full weekly schedule for a teacher across all their groups.
 func (r *Repository) GetSchedule(ctx context.Context, tenantID, teacherID string) ([]TeacherClass, error) {
 	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
