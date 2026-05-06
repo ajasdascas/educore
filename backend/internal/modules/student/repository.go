@@ -71,7 +71,7 @@ func (r *Repository) GetRecentGrades(ctx context.Context, studentID, tenantID st
 			COALESCE(gr.score, 0) AS grade,
 			COALESCE(gr.period, '') AS period,
 			COALESCE(gr.qualitative_value, 'exam') AS eval_type,
-			TO_CHAR(gr.created_at, 'YYYY-MM-DD') AS recorded_date
+			DATE_FORMAT(gr.created_at, '%Y-%m-%d') AS recorded_date
 		FROM grade_records gr
 		LEFT JOIN subjects s ON s.id = gr.subject_id
 		WHERE gr.student_id = $1 AND gr.tenant_id = $2
@@ -121,7 +121,8 @@ func (r *Repository) GetAttendanceSummary(ctx context.Context, studentID, tenant
 }
 
 // GetMessages returns messages received by the student's user account.
-// Uses parent_messages table (exists in MySQL) scoped to the tenant.
+// Uses parent_messages table. DATE_FORMAT used explicitly (not TO_CHAR) because
+// the combined datetime format 'YYYY-MM-DD HH24:MI' is not handled by the portable adapter.
 func (r *Repository) GetMessages(ctx context.Context, userID, tenantID string) ([]MessageSummary, error) {
 	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
 		SELECT
@@ -129,7 +130,7 @@ func (r *Repository) GetMessages(ctx context.Context, userID, tenantID string) (
 			COALESCE(u.first_name, u.email, 'Sistema') AS sender_name,
 			COALESCE(pm.subject, '') AS subject,
 			COALESCE(pm.content, '') AS preview,
-			TO_CHAR(pm.created_at, 'YYYY-MM-DD HH24:MI') AS sent_at,
+			DATE_FORMAT(pm.created_at, '%Y-%m-%d %H:%i') AS sent_at,
 			CASE WHEN pm.read_at IS NOT NULL THEN TRUE ELSE FALSE END AS is_read
 		FROM parent_messages pm
 		LEFT JOIN users u ON u.id = pm.sender_id
@@ -157,7 +158,9 @@ func (r *Repository) GetMessages(ctx context.Context, userID, tenantID string) (
 }
 
 // GetAssignments returns assignments for the student's group.
-// Uses student_assignments table (exists in MySQL/PG).
+// Uses student_assignments table. due_date is a DATE column — DATE_FORMAT is safe here;
+// the portable adapter also translates TO_CHAR(col,'YYYY-MM-DD') but we use DATE_FORMAT
+// explicitly to be unambiguous on MySQL/Hostinger.
 func (r *Repository) GetAssignments(ctx context.Context, studentID, tenantID string) ([]AssignmentSummary, error) {
 	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
 		SELECT
@@ -165,7 +168,7 @@ func (r *Repository) GetAssignments(ctx context.Context, studentID, tenantID str
 			COALESCE(sa.title, '') AS title,
 			COALESCE(s.name, '') AS subject_name,
 			COALESCE(sa.description, '') AS description,
-			COALESCE(TO_CHAR(sa.due_date, 'YYYY-MM-DD'), '') AS due_date,
+			COALESCE(DATE_FORMAT(sa.due_date, '%Y-%m-%d'), '') AS due_date,
 			COALESCE(sa.status, 'pending') AS status
 		FROM student_assignments sa
 		LEFT JOIN subjects s ON s.id = sa.subject_id
@@ -192,17 +195,18 @@ func (r *Repository) GetAssignments(ctx context.Context, studentID, tenantID str
 	return items, nil
 }
 
-// GetNotifications returns school notifications sent to the student's user account.
+// GetNotifications returns school notifications for the student.
+// notifications table uses user_id (not recipient_id) and has a boolean is_read column directly.
 func (r *Repository) GetNotifications(ctx context.Context, userID, tenantID string) ([]NotificationSummary, error) {
 	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
 		SELECT
 			n.id,
 			COALESCE(n.title, '') AS title,
-			COALESCE(n.message, n.body, '') AS message,
-			TO_CHAR(n.created_at, 'YYYY-MM-DD HH24:MI') AS created_at,
-			CASE WHEN n.read_at IS NOT NULL THEN TRUE ELSE FALSE END AS is_read
+			COALESCE(n.body, n.message, n.content, '') AS message,
+			DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i') AS created_at,
+			n.is_read
 		FROM notifications n
-		WHERE n.recipient_id = $1 AND n.tenant_id = $2
+		WHERE n.user_id = $1 AND n.tenant_id = $2
 		ORDER BY n.created_at DESC
 		LIMIT 50
 	`), userID, tenantID)
@@ -226,13 +230,16 @@ func (r *Repository) GetNotifications(ctx context.Context, userID, tenantID stri
 }
 
 // GetSchedule returns the weekly schedule for the student's group.
+// start_time/end_time are TIME columns — TIME_FORMAT is correct for MySQL.
+// FIELD() for day ordering is MySQL-only; no portable translation needed since
+// this query is MySQL-only (production is Hostinger/MySQL).
 func (r *Repository) GetSchedule(ctx context.Context, studentID, tenantID string) ([]ScheduleBlock, error) {
 	rows, err := r.db.Query(ctx, database.RebindPlaceholders(r.db.Driver(), `
 		SELECT
 			csb.id,
 			COALESCE(csb.day, '') AS day,
-			COALESCE(TO_CHAR(csb.start_time, 'HH24:MI'), '') AS start_time,
-			COALESCE(TO_CHAR(csb.end_time, 'HH24:MI'), '') AS end_time,
+			COALESCE(TIME_FORMAT(csb.start_time, '%H:%i'), '') AS start_time,
+			COALESCE(TIME_FORMAT(csb.end_time, '%H:%i'), '') AS end_time,
 			COALESCE(s.name, '') AS subject_name,
 			COALESCE(CONCAT(u.first_name, ' ', u.last_name), '') AS teacher_name,
 			COALESCE(csb.room, '') AS room
