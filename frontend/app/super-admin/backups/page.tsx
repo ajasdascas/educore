@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, DatabaseBackup, ExternalLink, Loader2, RefreshCw, Rocket } from "lucide-react";
+import { AlertTriangle, Copy, DatabaseBackup, ExternalLink, Info, Loader2, RefreshCw, Rocket } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,7 @@ type BackupJob = {
   size_mb: number;
   created_at: string;
   completed_at?: string;
+  error?: string;
 };
 
 type DeploymentRecord = {
@@ -206,40 +207,86 @@ export default function BackupsPage() {
               No se pudo cargar esta vista.
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Scope</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Tamano MB</TableHead>
-                    <TableHead>Completado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {backups.length === 0 ? (
+            <>
+              {backups.some((b) => b.status === "failed" && b.error?.includes("not configured")) && (
+                <div className="mb-4 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="font-medium text-amber-800 dark:text-amber-300">Backups no configurados</p>
+                    <p className="mt-1 text-amber-700 dark:text-amber-400">
+                      Para habilitar backups reales configura la variable <code className="rounded bg-amber-100 px-1 dark:bg-amber-900">BACKUP_STORAGE_PROVIDER</code> (r2|s3) y las variables de acceso al bucket. Ver <code>docs/BACKUPS_AND_RESTORE.md</code>.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {backups.some((b) => b.status === "failed" && b.error?.includes("mysqldump not available")) && (
+                <div className="mb-4 flex items-start gap-3 rounded-md border border-orange-200 bg-orange-50 p-4 text-sm dark:border-orange-900 dark:bg-orange-950">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" />
+                  <p className="text-orange-700 dark:text-orange-400">
+                    El runtime actual no tiene <code className="rounded bg-orange-100 px-1 dark:bg-orange-900">mysqldump</code>. Configura un worker de backups en VPS o usa almacenamiento R2/S3. Ver <code>docs/BACKUPS_AND_RESTORE.md</code>.
+                  </p>
+                </div>
+              )}
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                        Sin respaldos por mostrar.
-                      </TableCell>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Tamano MB</TableHead>
+                      <TableHead>Completado</TableHead>
+                      <TableHead>Detalle error</TableHead>
                     </TableRow>
-                  ) : (
-                    backups.map((backup) => (
-                      <TableRow key={backup.id}>
-                        <TableCell>{formatDate(backup.created_at)}</TableCell>
-                        <TableCell>{backup.tenant_name || "Global"}</TableCell>
-                        <TableCell><Badge variant="outline">{backup.type}</Badge></TableCell>
-                        <TableCell><Badge variant="outline">{backup.status}</Badge></TableCell>
-                        <TableCell>{Number(backup.size_mb || 0).toFixed(2)}</TableCell>
-                        <TableCell>{formatDate(backup.completed_at)}</TableCell>
+                  </TableHeader>
+                  <TableBody>
+                    {backups.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                          Sin respaldos por mostrar. Presiona "Crear backup" para iniciar el primero.
+                        </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    ) : (
+                      backups.map((backup) => (
+                        <TableRow key={backup.id}>
+                          <TableCell>{formatDate(backup.created_at)}</TableCell>
+                          <TableCell>{backup.tenant_name || "Global"}</TableCell>
+                          <TableCell><Badge variant="outline">{backup.type}</Badge></TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                backup.status === "completed"
+                                  ? "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-200"
+                                  : backup.status === "failed"
+                                  ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+                                  : backup.status === "running"
+                                  ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200"
+                                  : ""
+                              }
+                            >
+                              {backup.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{Number(backup.size_mb || 0).toFixed(2)}</TableCell>
+                          <TableCell>{formatDate(backup.completed_at)}</TableCell>
+                          <TableCell className="max-w-[300px]">
+                            {backup.error ? (
+                              <span className="block truncate text-xs text-destructive" title={backup.error}>
+                                {backup.error}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

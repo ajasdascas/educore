@@ -1,6 +1,7 @@
 package superadmin
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"educore/internal/pkg/database"
@@ -8,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -1309,9 +1311,16 @@ func (h *Handler) DeleteFeatureFlag(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ListBackups(c *fiber.Ctx) error {
-	rows, err := h.db.Query(c.UserContext(),
-		`SELECT bj.id, COALESCE(bj.tenant_id::text, ''), COALESCE(t.name, 'Global'), bj.type, bj.status, bj.size_mb, bj.created_at, bj.completed_at, COALESCE(bj.error, '')
-		 FROM backup_jobs bj LEFT JOIN tenants t ON t.id = bj.tenant_id ORDER BY bj.created_at DESC LIMIT 100`)
+	rows, err := h.db.Query(c.UserContext(), database.RebindPlaceholders(h.db.Driver(), `
+		SELECT bj.id, COALESCE(bj.tenant_id, ''), COALESCE(t.name, 'Global'),
+		       bj.type, bj.status,
+		       COALESCE(bj.size_mb, 0),
+		       bj.created_at, bj.completed_at,
+		       COALESCE(bj.error, '')
+		FROM backup_jobs bj
+		LEFT JOIN tenants t ON t.id = bj.tenant_id
+		ORDER BY bj.created_at DESC
+		LIMIT 100`))
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not fetch backups")
 	}
@@ -1322,7 +1331,11 @@ func (h *Handler) ListBackups(c *fiber.Ctx) error {
 		var size float64
 		var created, completed interface{}
 		_ = rows.Scan(&id, &tenantID, &tenant, &typ, &status, &size, &created, &completed, &errMsg)
-		items = append(items, fiber.Map{"id": id, "tenant_id": tenantID, "tenant_name": tenant, "type": typ, "status": status, "size_mb": size, "created_at": created, "completed_at": completed, "error": errMsg})
+		items = append(items, fiber.Map{
+			"id": id, "tenant_id": tenantID, "tenant_name": tenant,
+			"type": typ, "status": status, "size_mb": size,
+			"created_at": created, "completed_at": completed, "error": errMsg,
+		})
 	}
 	return response.Success(c, fiber.Map{"backups": items}, "Backups retrieved")
 }
@@ -1334,51 +1347,207 @@ func (h *Handler) CreateBackupJob(c *fiber.Ctx) error {
 		Type     string `json:"type"`
 	}
 	_ = c.BodyParser(&req)
-	var id string
-	err := h.db.QueryRow(c.UserContext(), "INSERT INTO backup_jobs (tenant_id, type, status, requested_by) VALUES (NULLIF($1, '')::uuid, $2, 'queued', NULLIF($3, '')::uuid) RETURNING id", req.TenantID, defaultString(req.Type, "full"), userID).Scan(&id)
+
+	id := database.NewID()
+	tenantVal := req.TenantID
+	backupType := defaultString(req.Type, "full")
+
+	var err error
+	if tenantVal == "" {
+		_, err = h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
+			"INSERT INTO backup_jobs (id, type, status, requested_by) VALUES ($1, $2, 'queued', $3)"),
+			id, backupType, userID)
+	} else {
+		_, err = h.db.Exec(c.UserContext(), database.RebindPlaceholders(h.db.Driver(),
+			"INSERT INTO backup_jobs (id, tenant_id, type, status, requested_by) VALUES ($1, $2, $3, 'queued', $4)"),
+			id, tenantVal, backupType, userID)
+	}
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Could not create backup job")
 	}
 	h.auditSuperAdmin(c, "backup.create", "backup_jobs", id, "warning", fiber.Map{"tenant_id": req.TenantID}, "")
-	// Run the actual backup asynchronously
-	go h.executeBackupJob(id, req.TenantID)
+	go h.executeBackupJob(id)
 	return response.Success(c, fiber.Map{"id": id, "status": "queued"}, "Backup job created")
 }
 
-func (h *Handler) executeBackupJob(jobID, tenantID string) {
+// executeBackupJob runs the backup logic asynchronously.
+// Production uses MySQL (Hostinger/Railway). pg_dump is never used for MySQL.
+// If mysqldump is not available or storage is not configured, the job is marked
+// blocked with an actionable error message — never left stuck in queued.
+func (h *Handler) executeBackupJob(jobID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	// Mark as running
-	_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'running', started_at = NOW() WHERE id = $1", jobID)
+	markFailed := func(msg string) {
+		if len(msg) > 500 {
+			msg = msg[:500]
+		}
+		_, _ = h.db.Exec(ctx, database.RebindPlaceholders(h.db.Driver(),
+			"UPDATE backup_jobs SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2"),
+			msg, jobID)
+	}
+
+	isMySQL := database.IsMySQL(h.db.Driver())
+
+	// Check backup storage configuration first
+	storageProvider := os.Getenv("BACKUP_STORAGE_PROVIDER")
+	if storageProvider == "" {
+		markFailed("Backup storage is not configured. Set BACKUP_STORAGE_PROVIDER (r2|s3) and related S3/R2 variables to enable real backups. No data was lost.")
+		return
+	}
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2",
-			"DATABASE_URL not configured", jobID)
+		markFailed("DATABASE_URL not configured")
 		return
 	}
 
-	// Try pg_dump
-	outPath := fmt.Sprintf("/tmp/backup_%s.sql", jobID)
-	cmd := exec.CommandContext(ctx, "pg_dump", "--no-password", "-f", outPath, dbURL)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		errMsg := fmt.Sprintf("pg_dump failed: %s — %s", err.Error(), string(out))
-		if len(errMsg) > 500 {
-			errMsg = errMsg[:500]
+	outPath := fmt.Sprintf("/tmp/backup_%s.sql.gz", jobID)
+
+	if isMySQL {
+		// MySQL path: prefer mysqldump, otherwise fail with actionable message
+		mysqldumpPath := os.Getenv("MYSQLDUMP_PATH")
+		if mysqldumpPath == "" {
+			mysqldumpPath = "mysqldump"
 		}
-		_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2", errMsg, jobID)
-		return
+		if _, err := exec.LookPath(mysqldumpPath); err != nil {
+			markFailed("mysqldump not available in this runtime. Railway's default Go image does not include the MySQL client. Configure MYSQLDUMP_PATH or migrate to a VPS/custom Docker image with mysql-client installed.")
+			return
+		}
+		// Parse DSN to extract host, user, password, dbname for mysqldump
+		dsn, parseErr := parseMySQLDSN(dbURL)
+		if parseErr != nil {
+			markFailed("Could not parse DATABASE_URL for mysqldump: " + parseErr.Error())
+			return
+		}
+		args := []string{
+			"-h", dsn.host, "-P", dsn.port, "-u", dsn.user,
+			"--single-transaction", "--routines", "--triggers",
+			"--result-file=" + outPath[:len(outPath)-3], // write .sql, gzip after
+			dsn.dbname,
+		}
+		cmd := exec.CommandContext(ctx, mysqldumpPath, args...)
+		cmd.Env = append(os.Environ(), "MYSQL_PWD="+dsn.password)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			errMsg := fmt.Sprintf("mysqldump failed: %s — %s", err.Error(), string(out))
+			markFailed(errMsg)
+			return
+		}
+		// Gzip the output
+		sqlPath := outPath[:len(outPath)-3]
+		if err := gzipFile(sqlPath, outPath); err != nil {
+			markFailed("gzip failed: " + err.Error())
+			_ = os.Remove(sqlPath)
+			return
+		}
+		_ = os.Remove(sqlPath)
+	} else {
+		// PostgreSQL path (dev/staging only)
+		pgDump, err := exec.LookPath("pg_dump")
+		if err != nil {
+			markFailed("pg_dump not available in this runtime.")
+			return
+		}
+		sqlPath := outPath[:len(outPath)-3]
+		cmd := exec.CommandContext(ctx, pgDump, "--no-password", "-f", sqlPath, dbURL)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			errMsg := fmt.Sprintf("pg_dump failed: %s — %s", err.Error(), string(out))
+			markFailed(errMsg)
+			return
+		}
+		if err := gzipFile(sqlPath, outPath); err != nil {
+			markFailed("gzip failed: " + err.Error())
+			_ = os.Remove(sqlPath)
+			return
+		}
+		_ = os.Remove(sqlPath)
 	}
 
-	// Get file size
 	var sizeMB float64
 	if info, err := os.Stat(outPath); err == nil {
 		sizeMB = float64(info.Size()) / (1024 * 1024)
 	}
-	_ = os.Remove(outPath) // Clean up
+	_ = os.Remove(outPath)
 
-	_, _ = h.db.Exec(ctx, "UPDATE backup_jobs SET status = 'completed', size_mb = $1, completed_at = NOW() WHERE id = $2", sizeMB, jobID)
+	_, _ = h.db.Exec(ctx, database.RebindPlaceholders(h.db.Driver(),
+		"UPDATE backup_jobs SET status = 'completed', size_mb = $1, completed_at = NOW() WHERE id = $2"),
+		sizeMB, jobID)
+}
+
+// mysqlDSN holds parsed MySQL connection parameters for CLI tools.
+type mysqlDSN struct {
+	host, port, user, password, dbname string
+}
+
+// parseMySQLDSN parses common MySQL URL formats into individual connection params.
+// Supports: mysql://user:pass@host:port/dbname and user:pass@tcp(host:port)/dbname
+func parseMySQLDSN(url string) (mysqlDSN, error) {
+	dsn := mysqlDSN{host: "localhost", port: "3306"}
+	// Strip mysql:// or tcp:// prefix for stdlib DSN
+	s := url
+	if idx := strings.Index(s, "://"); idx != -1 {
+		s = s[idx+3:]
+	}
+	// user:pass@host:port/dbname
+	if at := strings.LastIndex(s, "@"); at != -1 {
+		userInfo := s[:at]
+		rest := s[at+1:]
+		if colon := strings.Index(userInfo, ":"); colon != -1 {
+			dsn.user = userInfo[:colon]
+			dsn.password = userInfo[colon+1:]
+		} else {
+			dsn.user = userInfo
+		}
+		// Strip tcp() wrapper
+		rest = strings.TrimPrefix(rest, "tcp(")
+		if slash := strings.Index(rest, "/"); slash != -1 {
+			hostPort := rest[:slash]
+			hostPort = strings.TrimSuffix(hostPort, ")")
+			dsn.dbname = rest[slash+1:]
+			if strings.Contains(dsn.dbname, "?") {
+				dsn.dbname = dsn.dbname[:strings.Index(dsn.dbname, "?")]
+			}
+			if h, p, err := splitHostPort(hostPort); err == nil {
+				dsn.host = h
+				dsn.port = p
+			} else {
+				dsn.host = hostPort
+			}
+		}
+	}
+	if dsn.dbname == "" {
+		return dsn, fmt.Errorf("could not parse database name from DSN")
+	}
+	return dsn, nil
+}
+
+func splitHostPort(hostPort string) (string, string, error) {
+	if colon := strings.LastIndex(hostPort, ":"); colon != -1 {
+		return hostPort[:colon], hostPort[colon+1:], nil
+	}
+	return hostPort, "3306", nil
+}
+
+// gzipFile compresses src into dst using the compress/gzip package.
+func gzipFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	gz, err := gzip.NewWriterLevel(out, gzip.BestSpeed)
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(gz, in); err != nil {
+		return err
+	}
+	return gz.Close()
 }
 
 func (h *Handler) RestoreBackupJob(c *fiber.Ctx) error {
