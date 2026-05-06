@@ -30,22 +30,30 @@ func (s *Service) GetDashboard(ctx context.Context, tenantID, userID string) (*P
 	return dashboard, nil
 }
 
-func (s *Service) GetChildren(ctx context.Context, tenantID, userID string) ([]ChildSummaryResponse, error) {
+func (s *Service) GetChildren(ctx context.Context, tenantID, userID string, isSupportMode bool) ([]ChildSummaryResponse, error) {
+	if isSupportMode {
+		children, err := s.repo.GetAllChildrenByTenant(ctx, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get all children: %w", err)
+		}
+		return children, nil
+	}
 	children, err := s.repo.GetChildrenByParent(ctx, tenantID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get children: %w", err)
 	}
-
 	return children, nil
 }
 
 // Child information use cases
-func (s *Service) VerifyParentAccess(ctx context.Context, tenantID, userID, childID string) (bool, error) {
+func (s *Service) VerifyParentAccess(ctx context.Context, tenantID, userID, childID string, isSupportMode bool) (bool, error) {
+	if isSupportMode {
+		return true, nil
+	}
 	hasAccess, err := s.repo.VerifyParentChild(ctx, tenantID, userID, childID)
 	if err != nil {
 		return false, fmt.Errorf("failed to verify parent access: %w", err)
 	}
-
 	return hasAccess, nil
 }
 

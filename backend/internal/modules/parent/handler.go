@@ -73,8 +73,9 @@ func (h *Handler) GetDashboard(c *fiber.Ctx) error {
 func (h *Handler) GetChildren(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	children, err := h.service.GetChildren(c.Context(), tenantID, userID)
+	children, err := h.service.GetChildren(c.Context(), tenantID, userID, isSupport)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
@@ -87,9 +88,9 @@ func (h *Handler) GetChildDetails(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify parent has access to this child
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
@@ -109,9 +110,9 @@ func (h *Handler) GetChildGrades(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -131,9 +132,9 @@ func (h *Handler) GetChildAttendance(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -153,9 +154,9 @@ func (h *Handler) GetChildSchedule(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -172,9 +173,9 @@ func (h *Handler) GetChildReportCard(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -193,9 +194,9 @@ func (h *Handler) GetChildTeachers(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -212,9 +213,9 @@ func (h *Handler) GetChildAssignments(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}

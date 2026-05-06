@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { BookOpen, Calendar, GraduationCap, Mail, Phone, UserRound } from "lucide-react";
+import { BookOpen, Calendar, GraduationCap, Mail, Phone, UserRound, Users } from "lucide-react";
 import { authFetch } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -10,16 +10,40 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
+interface ChildSummary {
+  id: string;
+  first_name: string;
+  last_name: string;
+  enrollment_id?: string;
+  grade_name?: string;
+  group_name?: string;
+  status?: string;
+  profile_photo?: string;
+  attendance_rate?: number;
+  current_gpa?: number;
+  last_attendance?: string;
+  recent_grade?: string;
+  next_class?: string;
+}
+
+interface ChildDetail extends ChildSummary {
+  birth_date?: string;
+  teacher_name?: string;
+  teacher_email?: string;
+  address?: string;
+  emergency_info?: { primary_phone?: string };
+}
+
 export default function ParentChildrenPage() {
-  const [children, setChildren] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
+  const [children, setChildren] = useState<ChildSummary[]>([]);
+  const [selected, setSelected] = useState<ChildDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
         const res = await authFetch("/api/v1/parent/children");
-        const list = res.success ? res.data || [] : [];
+        const list: ChildSummary[] = res.success ? (res.data ?? []) : [];
         setChildren(list);
         if (list[0]) {
           const detail = await authFetch(`/api/v1/parent/children/${list[0].id}`);
@@ -32,13 +56,35 @@ export default function ParentChildrenPage() {
     load();
   }, []);
 
-  const selectChild = async (child: any) => {
+  const selectChild = async (child: ChildSummary) => {
     setSelected(child);
     const detail = await authFetch(`/api/v1/parent/children/${child.id}`);
     if (detail.success) setSelected(detail.data);
   };
 
-  if (loading) return <div className="animate-pulse text-muted-foreground">Cargando hijos...</div>;
+  if (loading) {
+    return <div className="animate-pulse text-muted-foreground p-6">Cargando hijos...</div>;
+  }
+
+  if (children.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Mis Hijos</h1>
+          <p className="text-muted-foreground">Expediente academico de tus hijos vinculados.</p>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <Users className="h-12 w-12 text-muted-foreground/40" />
+            <p className="font-medium">No hay alumnos vinculados</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Pide al administrador de tu escuela que vincule los alumnos a tu cuenta.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -70,7 +116,9 @@ export default function ParentChildrenPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{selected ? `${selected.first_name} ${selected.last_name}` : "Selecciona un hijo"}</CardTitle>
+            <CardTitle>
+              {selected ? `${selected.first_name} ${selected.last_name}` : "Selecciona un alumno"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {selected && (
@@ -82,9 +130,9 @@ export default function ParentChildrenPage() {
                 </TabsList>
                 <TabsContent value="summary" className="space-y-4 pt-4">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <Info label="Promedio" value={selected.current_gpa || 0} icon={<BookOpen className="h-4 w-4" />} />
-                    <Info label="Asistencia" value={`${selected.attendance_rate || 0}%`} icon={<Calendar className="h-4 w-4" />} />
-                    <Info label="Estado" value={selected.status || "active"} icon={<UserRound className="h-4 w-4" />} />
+                    <Info label="Promedio" value={selected.current_gpa ?? 0} icon={<BookOpen className="h-4 w-4" />} />
+                    <Info label="Asistencia" value={`${selected.attendance_rate ?? 0}%`} icon={<Calendar className="h-4 w-4" />} />
+                    <Info label="Estado" value={selected.status ?? "active"} icon={<UserRound className="h-4 w-4" />} />
                   </div>
                   <div className="rounded-lg border p-4">
                     <p className="text-sm font-medium">Ultima calificacion</p>
