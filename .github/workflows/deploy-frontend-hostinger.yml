@@ -57,3 +57,66 @@ jobs:
             **/node_modules/**
             **/.DS_Store
             **/Thumbs.db
+
+      - name: Record deployment in EduCore
+        env:
+          EDUCORE_DEPLOY_WEBHOOK_URL: ${{ secrets.EDUCORE_DEPLOY_WEBHOOK_URL }}
+          EDUCORE_DEPLOY_WEBHOOK_SECRET: ${{ secrets.EDUCORE_DEPLOY_WEBHOOK_SECRET }}
+          GITHUB_REF_NAME_VALUE: ${{ github.ref_name }}
+          GITHUB_ACTOR_VALUE: ${{ github.actor }}
+          GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
+          GITHUB_WORKFLOW_VALUE: ${{ github.workflow }}
+          GITHUB_RUN_ID_VALUE: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER_VALUE: ${{ github.run_number }}
+          GITHUB_RUN_ATTEMPT_VALUE: ${{ github.run_attempt }}
+        run: |
+          if [ -z "${EDUCORE_DEPLOY_WEBHOOK_URL}" ] || [ -z "${EDUCORE_DEPLOY_WEBHOOK_SECRET}" ]; then
+            echo "::warning::Deployment history webhook is not configured."
+            exit 0
+          fi
+
+          commit_title="$(git log -1 --pretty=%s)"
+          commit_description="$(git log -1 --pretty=%b)"
+          if [ -z "${commit_description}" ]; then
+            commit_description="Deploy automatico del frontend a Hostinger desde GitHub Actions."
+          fi
+
+          COMMIT_TITLE="${commit_title}" COMMIT_DESCRIPTION="${commit_description}" node <<'NODE'
+          const fs = require("fs");
+          const payload = {
+            environment: "production",
+            service: "frontend",
+            provider: "github_actions",
+            status: "success",
+            title: process.env.COMMIT_TITLE,
+            description: process.env.COMMIT_DESCRIPTION,
+            commit_sha: process.env.GITHUB_SHA,
+            commit_short_sha: (process.env.GITHUB_SHA || "").slice(0, 7),
+            branch: process.env.GITHUB_REF_NAME_VALUE,
+            actor: process.env.GITHUB_ACTOR_VALUE,
+            repository: process.env.GITHUB_REPOSITORY_VALUE,
+            workflow_name: process.env.GITHUB_WORKFLOW_VALUE,
+            run_id: process.env.GITHUB_RUN_ID_VALUE,
+            run_number: process.env.GITHUB_RUN_NUMBER_VALUE,
+            run_attempt: process.env.GITHUB_RUN_ATTEMPT_VALUE,
+            run_url: `https://github.com/${process.env.GITHUB_REPOSITORY_VALUE}/actions/runs/${process.env.GITHUB_RUN_ID_VALUE}`,
+          };
+          fs.writeFileSync("deployment-payload.json", JSON.stringify(payload));
+          NODE
+
+          http_code="$(curl -sS -o /tmp/educore-deployment-record-response.json -w "%{http_code}" \
+            -X POST "${EDUCORE_DEPLOY_WEBHOOK_URL}" \
+            -H "Content-Type: application/json" \
+            -H "X-EduCore-Deploy-Secret: ${EDUCORE_DEPLOY_WEBHOOK_SECRET}" \
+            --data @deployment-payload.json)"
+          curl_status=$?
+
+          if [ "${curl_status}" -ne 0 ]; then
+            echo "::warning::Could not record deployment in EduCore."
+            exit 0
+          fi
+
+          case "${http_code}" in
+            2*) echo "Deployment history recorded in EduCore." ;;
+            *) echo "::warning::EduCore deployment history webhook returned HTTP ${http_code}." ;;
+          esac

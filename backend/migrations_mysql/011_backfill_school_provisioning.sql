@@ -1,29 +1,24 @@
 -- 011_backfill_school_provisioning.sql
 -- Backfill provisioning data for existing schools.
--- Idempotent: all statements use INSERT IGNORE or IF NOT EXISTS.
+-- Compatible with production Hostinger schema: school_settings does NOT have
+-- settings_json. Detected columns: tenant_id, school_year, periods,
+-- grading_scale, primary_color, notification_settings, security_settings,
+-- created_at, updated_at.
+-- Idempotent: all statements use INSERT IGNORE or NOT EXISTS guards.
 -- Apply manually in Hostinger: paste into MySQL console or phpMyAdmin.
 
 -- ─── Backfill school_levels for existing tenants ────────────────────────────
--- Assumes kinder/preescolar unless school_settings already has education_level.
+-- Cannot read education_level from school_settings (no settings_json column).
+-- Default to 'kinder' / 'Kinder' for all existing active tenants.
 INSERT IGNORE INTO school_levels (id, tenant_id, level_code, level_name, is_active, created_at)
 SELECT
     UUID(),
     t.id,
-    COALESCE(
-        JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')),
-        'kinder'
-    ),
-    CASE
-        WHEN JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')) = 'babies'    THEN 'Bebés / Guardería'
-        WHEN JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')) = 'preescolar' THEN 'Preescolar'
-        WHEN JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')) = 'kinder'    THEN 'Kinder'
-        WHEN JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')) = 'primaria'  THEN 'Primaria'
-        ELSE 'Kinder'
-    END,
+    'kinder',
+    'Kinder',
     1,
     NOW()
 FROM tenants t
-LEFT JOIN school_settings ss ON ss.tenant_id = t.id
 WHERE t.status = 'active'
   AND NOT EXISTS (
     SELECT 1 FROM school_levels sl WHERE sl.tenant_id = t.id
@@ -94,7 +89,9 @@ WHERE t.status = 'active'
     WHERE sp.tenant_id = t.id AND sp.portal_type = 'student'
   );
 
--- ─── Backfill school_grading_scales for kinder/preescolar ──────────────────
+-- ─── Backfill school_grading_scales for existing tenants ────────────────────
+-- No settings_json to detect level; default qualitative scale for all
+-- active tenants that have no grading scale yet.
 INSERT IGNORE INTO school_grading_scales (id, tenant_id, scale_name, min_value, max_value, passing_value, scale_type, created_at)
 SELECT
     UUID(),
@@ -106,29 +103,7 @@ SELECT
     'qualitative',
     NOW()
 FROM tenants t
-LEFT JOIN school_settings ss ON ss.tenant_id = t.id
 WHERE t.status = 'active'
-  AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')), 'kinder')
-      IN ('kinder', 'preescolar', 'babies')
-  AND NOT EXISTS (
-    SELECT 1 FROM school_grading_scales sgs WHERE sgs.tenant_id = t.id
-  );
-
-INSERT IGNORE INTO school_grading_scales (id, tenant_id, scale_name, min_value, max_value, passing_value, scale_type, created_at)
-SELECT
-    UUID(),
-    t.id,
-    'Escala numérica 0-10',
-    0,
-    10,
-    6,
-    'numeric',
-    NOW()
-FROM tenants t
-LEFT JOIN school_settings ss ON ss.tenant_id = t.id
-WHERE t.status = 'active'
-  AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(ss.settings_json, '$.education_level')), 'kinder')
-      = 'primaria'
   AND NOT EXISTS (
     SELECT 1 FROM school_grading_scales sgs WHERE sgs.tenant_id = t.id
   );
