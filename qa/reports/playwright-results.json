@@ -1,0 +1,458 @@
+{
+  "config": {
+    "configFile": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\playwright.config.ts",
+    "rootDir": "C:/Users/gioes/OneDrive/Desktop/Educore-codex-full-platform-e2e-audit/qa/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/gioes/OneDrive/Desktop/Educore-codex-full-platform-e2e-audit/qa/traces/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/gioes/OneDrive/Desktop/Educore-codex-full-platform-e2e-audit/qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "qa/reports/playwright-html",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "qa/reports/playwright-results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "00_public_landing.spec.ts",
+      "file": "00_public_landing.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "landing publica: carga, enlaces, demo, tema y responsive",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "59ad245eccd5d9205fed-f4ce1fc47515585fde48",
+          "file": "00_public_landing.spec.ts",
+          "line": 17,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "01_auth_roles.spec.ts",
+      "file": "01_auth_roles.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "auth: login vacio, login invalido, forgot y rutas protegidas",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ca1313b02cb84cb8c296-90d3eb31a327f2fa5cbf",
+          "file": "01_auth_roles.spec.ts",
+          "line": 12,
+          "column": 5
+        },
+        {
+          "title": "auth: login super admin y logout si hay credenciales locales",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "ca1313b02cb84cb8c296-6023c39acdbcb427e8d0",
+          "file": "01_auth_roles.spec.ts",
+          "line": 55,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "02_super_admin_schools.spec.ts",
+      "file": "02_super_admin_schools.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "super admin: navegacion completa read-only",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "265fc0a8704b0579a620-f72c44d915865596605e",
+          "file": "02_super_admin_schools.spec.ts",
+          "line": 22,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "03_school_creation_by_level.spec.ts",
+      "file": "03_school_creation_by_level.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "escuelas QA por nivel: crear o reutilizar solo con gate explicito",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "cf390b30c2b298294433-028a6ebba94f8d983c3b",
+          "file": "03_school_creation_by_level.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "04_school_admin_core.spec.ts",
+      "file": "04_school_admin_core.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "school admin: operacion core por escuela QA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f0a177c4432e9e10a730-3426dae48c0cf8bb38a3",
+          "file": "04_school_admin_core.spec.ts",
+          "line": 20,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "05_teacher_portal.spec.ts",
+      "file": "05_teacher_portal.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "teacher portal: matriz de flujos QA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "a25f493b259627b9aa16-ded80dce1c66c3f1e1b8",
+          "file": "05_teacher_portal.spec.ts",
+          "line": 18,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "06_parent_portal.spec.ts",
+      "file": "06_parent_portal.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "parent portal: matriz de flujos QA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "da0ea5eb3abcd2a22ecf-ca25619ff86e45e52af8",
+          "file": "06_parent_portal.spec.ts",
+          "line": 19,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "07_student_portal.spec.ts",
+      "file": "07_student_portal.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "student portal: matriz de flujos QA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "bd9c3a8774ff10c59f03-9deaedc5a229076da648",
+          "file": "07_student_portal.spec.ts",
+          "line": 21,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "08_billing_credentials.spec.ts",
+      "file": "08_billing_credentials.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "billing y credenciales: flujos seguros sin pagos reales",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "f3b2c0ecd5d39b91063b-63d0b0cfb89cab8418a8",
+          "file": "08_billing_credentials.spec.ts",
+          "line": 19,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "09_backups_deploy_history.spec.ts",
+      "file": "09_backups_deploy_history.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "backups y deploy history: lectura y estados claros",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "092e35ea3b6973711834-7a62289d20e1cc028018",
+          "file": "09_backups_deploy_history.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "10_module_entitlements.spec.ts",
+      "file": "10_module_entitlements.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "module entitlements: matriz por nivel y plan",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "b6c8d9c5ffa3b4765e53-293a880ddb2e2912fd5b",
+          "file": "10_module_entitlements.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "11_security_rbac_tenant.spec.ts",
+      "file": "11_security_rbac_tenant.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "security: APIs sensibles rechazan requests sin token o token invalido",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "7386db919dfc0cacf0f0-84a99d2803118fca08f4",
+          "file": "11_security_rbac_tenant.spec.ts",
+          "line": 13,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "12_responsive_accessibility.spec.ts",
+      "file": "12_responsive_accessibility.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "responsive y UX: landing y login en desktop/tablet/mobile",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [],
+              "status": "skipped"
+            }
+          ],
+          "id": "4408352509bc3b3ecbc5-28b9ebe91441f87a451f",
+          "file": "12_responsive_accessibility.spec.ts",
+          "line": 10,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-05-08T15:19:47.074Z",
+    "duration": 99.97399999999993,
+    "expected": 0,
+    "skipped": 14,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

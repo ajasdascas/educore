@@ -9,3 +9,7 @@ out/
 scripts/staging-smoke-report.json
 full_migration.sql
 .DS_Store
+playwright/.auth/
+qa/traces/test-results/
+qa/reports/playwright-html/
+playwright-report/

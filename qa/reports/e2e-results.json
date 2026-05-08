@@ -1,0 +1,1336 @@
+{
+  "generated_at": "2026-05-08T15:22:01.374Z",
+  "base_url": "https://onlineu.mx/educore",
+  "api_url": "https://educore-production-beef.up.railway.app",
+  "run_id": "20260508152201",
+  "production_mutations": false,
+  "credentials_present": {
+    "super_admin": true,
+    "qa_password": true
+  },
+  "results": [
+    {
+      "area": "Public Landing",
+      "flow": "cargar landing principal",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+      "severity": "P3"
+    },
+    {
+      "area": "Public Landing",
+      "flow": "copy principal visible",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Texto visible: /Educore|gestion escolar|simplificada|plataforma/i",
+      "actual": "EduCore\nSoluciones\nBeneficios\nTestimonios\nBlog\nContacto\nNormal\nIniciar sesión\nSolicitar demo\nPLATAFORMA DE GESTIÓN ESCOLAR INTEGRAL\nAdministra tu institución con inteligencia\n\nEduCore centraliza la gestión académica, administrativa y financ"
+    },
+    {
+      "area": "Public Landing",
+      "flow": "link interno /educore/",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "El link interno no responde 404/5xx.",
+      "actual": "HTTP 200"
+    },
+    {
+      "area": "Public Landing",
+      "flow": "link interno /educore/login/",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "El link interno no responde 404/5xx.",
+      "actual": "HTTP 200"
+    },
+    {
+      "area": "Public Landing",
+      "flow": "selector de tema",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Existe control de tema y responde al click sin recargar.",
+      "actual": "Control de tema accionado."
+    },
+    {
+      "area": "Public Landing",
+      "flow": "CTA solicitar demo",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "CTA de demo es visible y clickeable.",
+      "actual": "CTA accionado sin excepcion Playwright."
+    },
+    {
+      "area": "Public Landing",
+      "flow": "responsive movil 375px",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Auth",
+      "flow": "abrir pagina login",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La pagina carga y muestra contenido.",
+      "actual": "HTTP 200; 236 caracteres visibles."
+    },
+    {
+      "area": "Auth",
+      "flow": "login vacio",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "El formulario vacio no autentica al usuario.",
+      "actual": "URL despues de submit vacio: https://onlineu.mx/educore/login/"
+    },
+    {
+      "area": "Auth",
+      "flow": "login invalido",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Credenciales invalidas no crean sesion.",
+      "actual": "URL despues de credenciales invalidas: https://onlineu.mx/educore/login/"
+    },
+    {
+      "area": "Auth",
+      "flow": "forgot password",
+      "status": "SKIPPED",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Flujo de recuperacion visible o ruta documentada.",
+      "actual": "No se encontro link de recuperacion en login."
+    },
+    {
+      "area": "Auth",
+      "flow": "ruta protegida sin sesion",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/users/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "API Request Error: TypeError: Failed to fetch\n    at a (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:10100)\n    at D (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:2079)\n    at Object.a_ (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72147)\n    at aR (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72301)\n    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139240\n    at sF (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139339)\n    at sM (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139753)\n    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:145896\n    at o4 (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:93336)\n    at iV (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:122701) | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://educore-production-beef.up.railway.app/api/v1/auth/login: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Auth",
+      "flow": "bloqueo ruta protegida sin sesion",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Texto visible: /login|iniciar|no autorizado|unauthorized|Educore/i",
+      "actual": "Educore\n\nPlataforma de administracion escolar\n\nIniciar sesion\n\nBienvenido de vuelta\n\nCorreo electronico\nContrasena\nIniciar sesion\n\nOlvidaste tu contrasena?\n\nEres nuevo? Contacta a tu institucion para activar tu cuenta.\n\nVolver al inicio"
+    },
+    {
+      "area": "Auth",
+      "flow": "abrir login super admin",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La pagina carga y muestra contenido.",
+      "actual": "HTTP 200; 236 caracteres visibles."
+    },
+    {
+      "area": "Auth",
+      "flow": "login super admin",
+      "status": "FAIL",
+      "url": "https://onlineu.mx/educore/login/",
+      "role": "SUPER_ADMIN",
+      "expected": "Super Admin entra a un dashboard protegido.",
+      "actual": "No se detecto dashboard. URL=https://onlineu.mx/educore/login/",
+      "severity": "P1"
+    },
+    {
+      "area": "Auth",
+      "flow": "login super admin via API",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/auth/login",
+      "role": "SUPER_ADMIN",
+      "expected": "API autentica Super Admin con credenciales E2E sin exponer token.",
+      "actual": "API login exitoso; credencial temporal no persistida en repo."
+    },
+    {
+      "area": "Auth",
+      "flow": "sesion Super Admin inyectada desde API para QA",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "role": "SUPER_ADMIN",
+      "expected": "Tras API login, localStorage temporal permite auditar pantallas protegidas.",
+      "actual": "Dashboard protegido cargado con sesion temporal de Playwright."
+    },
+    {
+      "area": "Auth",
+      "flow": "logout super admin",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "role": "SUPER_ADMIN",
+      "expected": "Existe accion de logout y puede accionarse.",
+      "actual": "Logout clickeado."
+    },
+    {
+      "area": "Auth",
+      "flow": "abrir login super admin",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La pagina carga y muestra contenido.",
+      "actual": "HTTP 200; 236 caracteres visibles."
+    },
+    {
+      "area": "Auth",
+      "flow": "login super admin",
+      "status": "FAIL",
+      "url": "https://onlineu.mx/educore/login/",
+      "role": "SUPER_ADMIN",
+      "expected": "Super Admin entra a un dashboard protegido.",
+      "actual": "No se detecto dashboard. URL=https://onlineu.mx/educore/login/",
+      "severity": "P1"
+    },
+    {
+      "area": "Auth",
+      "flow": "login super admin via API",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/auth/login",
+      "role": "SUPER_ADMIN",
+      "expected": "API autentica Super Admin con credenciales E2E sin exponer token.",
+      "actual": "API login exitoso; credencial temporal no persistida en repo."
+    },
+    {
+      "area": "Auth",
+      "flow": "sesion Super Admin inyectada desde API para QA",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "role": "SUPER_ADMIN",
+      "expected": "Tras API login, localStorage temporal permite auditar pantallas protegidas.",
+      "actual": "Dashboard protegido cargado con sesion temporal de Playwright."
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar dashboard",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar modulos",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/modules/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar billing",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/billing/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar analytics",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/analytics/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar health monitor",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/health/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar database admin",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/database/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar auditoria",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/audit/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar soporte",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/support/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar storage",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/storage/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar feature flags",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/feature-flags/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar backups",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/backups/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar versioning",
+      "status": "FAIL",
+      "url": "https://onlineu.mx/educore/super-admin/version/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Failed to load resource: the server responded with a status of 500 () | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | 500 https://educore-production-beef.up.railway.app/api/v1/super-admin/version",
+      "severity": "P1"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar planes",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/plans/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar escuelas",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/schools/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Super Admin",
+      "flow": "navegar usuarios globales",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/users/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "School Creation",
+      "flow": "crear/reutilizar escuelas QA por nivel",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "E2E_ALLOW_PRODUCTION_MUTATIONS no es true; no se crean ni editan datos en produccion.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "dashboard school admin",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "estructura",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "estudiantes crear/editar QA",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "padres/tutores y vinculacion",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "credenciales alumno/padre",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "profesores",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "grupos y asignaciones",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "horarios",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "asistencia",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "calificaciones/boletas si aplica",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "documentos/reportes",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "comunicaciones",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "School Admin",
+      "flow": "configuracion",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "login profesor QA",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "dashboard profesor",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "mis grupos",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "asistencia",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "horario",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "mensajes/notificaciones",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "perfil/configuracion",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "Kinder: reporte diario, alimentacion, siesta, higiene, incidentes",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "Preescolar: observaciones, evaluacion cualitativa, evidencias",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "Primaria: materias, tareas, calificaciones, examenes, materiales",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Teacher Portal",
+      "flow": "RBAC: profesor no entra a Super Admin ni ve otro tenant",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario profesor QA creado por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "login padre QA",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "mis hijos y selector de hijo",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "asistencia",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "calificaciones/avances",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "documentos",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "pagos y estado de cuenta sin pagos reales",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "permisos",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "mensajes/notificaciones",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "Kinder: daily log, meals, naps, diapers, mood, incidents",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "Preescolar: campos formativos, observaciones, evidencias",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "Primaria: tareas, boleta, calificaciones, estado de cuenta",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Parent Portal",
+      "flow": "RBAC: padre solo ve hijos vinculados",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta usuario padre QA vinculado a alumno QA.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "login alumno QA",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "dashboard alumno",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "classroom",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "horario",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "actividades",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "biblioteca",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "examenes",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "boleta/calificaciones",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "encuestas",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "estado de cuenta si aplica",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "mi institucion",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "centro de mensajes/noticias",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "perfil/documentos personalizados",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Student Portal",
+      "flow": "RBAC: alumno solo ve sus datos",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta cuenta de alumno QA creada por flujo mutante seguro.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "credenciales desde Super Admin",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "credenciales desde School Admin",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "reset password temporal",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "usuario inactivo no entra",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "password_hash nunca visible",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "invitaciones con provider not configured si falta Resend",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "conceptos de cobro",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "adeudos y estado de cuenta",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "recibos",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "pagos sin pasarela real",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "becas/descuentos/recargos",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Billing/Credentials",
+      "flow": "vista padre/alumno de facturacion",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Auth",
+      "flow": "abrir login super admin",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La pagina carga y muestra contenido.",
+      "actual": "HTTP 200; 236 caracteres visibles."
+    },
+    {
+      "area": "Auth",
+      "flow": "login super admin",
+      "status": "FAIL",
+      "url": "https://onlineu.mx/educore/login/",
+      "role": "SUPER_ADMIN",
+      "expected": "Super Admin entra a un dashboard protegido.",
+      "actual": "No se detecto dashboard. URL=https://onlineu.mx/educore/login/",
+      "severity": "P1"
+    },
+    {
+      "area": "Auth",
+      "flow": "login super admin via API",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/auth/login",
+      "role": "SUPER_ADMIN",
+      "expected": "API autentica Super Admin con credenciales E2E sin exponer token.",
+      "actual": "API login exitoso; credencial temporal no persistida en repo."
+    },
+    {
+      "area": "Auth",
+      "flow": "sesion Super Admin inyectada desde API para QA",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "role": "SUPER_ADMIN",
+      "expected": "Tras API login, localStorage temporal permite auditar pantallas protegidas.",
+      "actual": "Dashboard protegido cargado con sesion temporal de Playwright."
+    },
+    {
+      "area": "Backups/Deploy",
+      "flow": "abrir backups",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/super-admin/backups/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Backups/Deploy",
+      "flow": "crear backup",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "No se crean backups en produccion desde auditoria automatica sin aprobacion explicita adicional.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Module Entitlements",
+      "flow": "Kinder: modulos activos/bloqueados",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Requiere escuela QA Kinder y rol autenticado. Esperado a validar: Reporte diario, alimentacion, siesta, higiene/panal, estado de animo, incidentes, entrada/salida, autorizados, pagos, credenciales, comunicacion.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Module Entitlements",
+      "flow": "Preescolar: modulos activos/bloqueados",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Requiere escuela QA Preescolar y rol autenticado. Esperado a validar: Campos formativos, evaluacion cualitativa, observaciones, evidencias, actividades, materiales, asistencia, comunicacion, pagos, credenciales.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Module Entitlements",
+      "flow": "Primaria: modulos activos/bloqueados",
+      "status": "SKIPPED",
+      "expected": "Flujo auditado con credenciales/permisos seguros disponibles.",
+      "actual": "Requiere escuela QA Primaria y rol autenticado. Esperado a validar: Materias, horarios, tareas, classroom, examenes, calificaciones, boletas, biblioteca, asistencia, estado de cuenta, pagos, credenciales, documentos, comunicacion.",
+      "recommendation": "Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo."
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "API protegida /api/v1/super-admin/schools",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/super-admin/schools",
+      "role": "SUPER_ADMIN",
+      "expected": "401/403 claro sin password_hash para requests sin token [redacted] con token [redacted]",
+      "actual": "sin token=[redacted]; token [redacted]; password_hash=false"
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "API protegida /api/v1/super-admin/users",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/super-admin/users",
+      "role": "SUPER_ADMIN",
+      "expected": "401/403 claro sin password_hash para requests sin token [redacted] con token [redacted]",
+      "actual": "sin token=[redacted]; token [redacted]; password_hash=false"
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "API protegida /api/v1/school-admin/dashboard",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/school-admin/dashboard",
+      "role": "SCHOOL_ADMIN",
+      "expected": "401/403 claro sin password_hash para requests sin token [redacted] con token [redacted]",
+      "actual": "sin token=[redacted]; token [redacted]; password_hash=false"
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "API protegida /api/v1/teacher/dashboard",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/teacher/dashboard",
+      "role": "TEACHER",
+      "expected": "401/403 claro sin password_hash para requests sin token [redacted] con token [redacted]",
+      "actual": "sin token=[redacted]; token [redacted]; password_hash=false"
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "API protegida /api/v1/parent/dashboard",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/parent/dashboard",
+      "role": "PARENT",
+      "expected": "401/403 claro sin password_hash para requests sin token [redacted] con token [redacted]",
+      "actual": "sin token=[redacted]; token [redacted]; password_hash=false"
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "API protegida /api/v1/student/dashboard",
+      "status": "PASS",
+      "url": "https://educore-production-beef.up.railway.app/api/v1/student/dashboard",
+      "role": "STUDENT",
+      "expected": "401/403 claro sin password_hash para requests sin token [redacted] con token [redacted]",
+      "actual": "sin token=[redacted]; token [redacted]; password_hash=false"
+    },
+    {
+      "area": "Security/RBAC",
+      "flow": "X-Support-Tenant-ID sin Super Admin",
+      "status": "PASS",
+      "role": "ANONYMOUS",
+      "expected": "Header de soporte no concede acceso sin token [redacted] Admin valido.",
+      "actual": "HTTP 401"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "landing desktop-1280",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.",
+      "severity": "P3"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "landing desktop-1280 overflow",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "login desktop-1280",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "login desktop-1280 overflow",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "landing tablet-768",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "landing tablet-768 overflow",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "login tablet-768",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "login tablet-768 overflow",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "landing mobile-375",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "landing mobile-375 overflow",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "login mobile-375",
+      "status": "WARN",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED",
+      "severity": "P3"
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "login mobile-375 overflow",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La vista no genera scroll horizontal accidental.",
+      "actual": "Sin overflow horizontal relevante."
+    },
+    {
+      "area": "Responsive/UX",
+      "flow": "muestreo basico de elementos visibles",
+      "status": "PASS",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "La pagina expone suficientes elementos visibles para revision de contraste manual/visual.",
+      "actual": "22 elementos visibles muestreados."
+    }
+  ],
+  "bugs": [
+    {
+      "id": "E2E-001",
+      "severity": "P3",
+      "area": "Public Landing",
+      "flow": "cargar landing principal",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "id": "E2E-002",
+      "severity": "P3",
+      "area": "Auth",
+      "flow": "ruta protegida sin sesion",
+      "url": "https://onlineu.mx/educore/super-admin/users/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "API Request Error: TypeError: Failed to fetch\n    at a (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:10100)\n    at D (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:2079)\n    at Object.a_ (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72147)\n    at aR (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72301)\n    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139240\n    at sF (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139339)\n    at sM (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139753)\n    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:145896\n    at o4 (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:93336)\n    at iV (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:122701) | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://educore-production-beef.up.railway.app/api/v1/auth/login: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-003",
+      "severity": "P1",
+      "area": "Auth",
+      "flow": "login super admin",
+      "role": "SUPER_ADMIN",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Super Admin entra a un dashboard protegido.",
+      "actual": "No se detecto dashboard. URL=https://onlineu.mx/educore/login/"
+    },
+    {
+      "id": "E2E-004",
+      "severity": "P1",
+      "area": "Auth",
+      "flow": "login super admin",
+      "role": "SUPER_ADMIN",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Super Admin entra a un dashboard protegido.",
+      "actual": "No se detecto dashboard. URL=https://onlineu.mx/educore/login/"
+    },
+    {
+      "id": "E2E-005",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar dashboard",
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-006",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar modulos",
+      "url": "https://onlineu.mx/educore/super-admin/modules/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-007",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar billing",
+      "url": "https://onlineu.mx/educore/super-admin/billing/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-008",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar analytics",
+      "url": "https://onlineu.mx/educore/super-admin/analytics/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-009",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar health monitor",
+      "url": "https://onlineu.mx/educore/super-admin/health/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-010",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar database admin",
+      "url": "https://onlineu.mx/educore/super-admin/database/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-011",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar auditoria",
+      "url": "https://onlineu.mx/educore/super-admin/audit/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-012",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar soporte",
+      "url": "https://onlineu.mx/educore/super-admin/support/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-013",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar storage",
+      "url": "https://onlineu.mx/educore/super-admin/storage/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-014",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar feature flags",
+      "url": "https://onlineu.mx/educore/super-admin/feature-flags/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-015",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar backups",
+      "url": "https://onlineu.mx/educore/super-admin/backups/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-016",
+      "severity": "P1",
+      "area": "Super Admin",
+      "flow": "navegar versioning",
+      "url": "https://onlineu.mx/educore/super-admin/version/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Failed to load resource: the server responded with a status of 500 () | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | 500 https://educore-production-beef.up.railway.app/api/v1/super-admin/version"
+    },
+    {
+      "id": "E2E-017",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar planes",
+      "url": "https://onlineu.mx/educore/super-admin/plans/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-018",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar escuelas",
+      "url": "https://onlineu.mx/educore/super-admin/schools/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-019",
+      "severity": "P3",
+      "area": "Super Admin",
+      "flow": "navegar usuarios globales",
+      "url": "https://onlineu.mx/educore/super-admin/users/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-020",
+      "severity": "P1",
+      "area": "Auth",
+      "flow": "login super admin",
+      "role": "SUPER_ADMIN",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Super Admin entra a un dashboard protegido.",
+      "actual": "No se detecto dashboard. URL=https://onlineu.mx/educore/login/"
+    },
+    {
+      "id": "E2E-021",
+      "severity": "P3",
+      "area": "Backups/Deploy",
+      "flow": "abrir backups",
+      "url": "https://onlineu.mx/educore/super-admin/backups/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-022",
+      "severity": "P3",
+      "area": "Responsive/UX",
+      "flow": "landing desktop-1280",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "id": "E2E-023",
+      "severity": "P3",
+      "area": "Responsive/UX",
+      "flow": "login desktop-1280",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-024",
+      "severity": "P3",
+      "area": "Responsive/UX",
+      "flow": "landing tablet-768",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-025",
+      "severity": "P3",
+      "area": "Responsive/UX",
+      "flow": "login tablet-768",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-026",
+      "severity": "P3",
+      "area": "Responsive/UX",
+      "flow": "landing mobile-375",
+      "url": "https://onlineu.mx/educore/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    },
+    {
+      "id": "E2E-027",
+      "severity": "P3",
+      "area": "Responsive/UX",
+      "flow": "login mobile-375",
+      "url": "https://onlineu.mx/educore/login/",
+      "expected": "Sin errores graves de consola o red durante la carga.",
+      "actual": "https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED"
+    }
+  ]
+}
