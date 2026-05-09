@@ -74,12 +74,10 @@ export const SCHOOL_ADMIN_NAV: NavItem[] = [
   { href: "/school-admin/schedule",     label: "Horarios",             icon: Calendar,        moduleKey: "schedules" },
   { href: "/school-admin/attendance",   label: "Asistencias",          icon: ClipboardCheck,  moduleKey: "attendance" },
 
-  // Módulos Kinder / Guardería / Bebés
+  // Módulos Kinder / Guardería / Bebés (supervisión — operaciones diarias dentro de Registro diario)
+  // NOTA: meals/naps/diapers/mood están como sub-tabs DENTRO de /school-admin/daily-logs.
+  // Las URLs flat /school-admin/{meals,naps,diapers,mood} siguen funcionando como aliases para acceso directo.
   { href: "/school-admin/daily-logs",   label: "Registro diario",      icon: Baby,            moduleKey: "daily_logs" },
-  { href: "/school-admin/meals",        label: "Comidas",              icon: Apple,           moduleKey: "meals" },
-  { href: "/school-admin/naps",         label: "Siestas",              icon: Moon,            moduleKey: "naps" },
-  { href: "/school-admin/diapers",      label: "Higiene",              icon: Droplets,        moduleKey: "diapers" },
-  { href: "/school-admin/mood",         label: "Estado emocional",     icon: Smile,           moduleKey: "mood" },
   { href: "/school-admin/health",       label: "Salud",                icon: Heart,           moduleKey: "health_checks" },
   { href: "/school-admin/incidents",    label: "Incidentes",           icon: AlertTriangle,   moduleKey: "incidents" },
   { href: "/school-admin/pickup",       label: "Autorizaciones",       icon: LogIn,           moduleKey: "pickup_authorizations" },

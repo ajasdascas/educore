@@ -67,6 +67,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	academic.Post("/students/:id/parent-portal-access", h.CreateParentPortalAccess)
 	academic.Get("/students/:id/parents", h.GetStudentParents)
 	academic.Post("/students/:id/parents", h.LinkParentToStudent)
+	academic.Put("/students/:id/parents/:parentId", h.UpdateParentLink)
 	academic.Delete("/students/:id/parents/:parentId", h.UnlinkParentFromStudent)
 
 	academic.Get("/teachers", h.GetTeachers)

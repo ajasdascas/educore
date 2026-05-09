@@ -343,6 +343,99 @@ func (h *Handler) LinkParentToStudent(c *fiber.Ctx) error {
 	return response.Success(c, fiber.Map{"parent_id": parentID, "student_id": studentID}, "Padre vinculado correctamente")
 }
 
+// UpdateParentLink — PUT /api/v1/school-admin/academic/students/:id/parents/:parentId
+// Body: { "relationship": "mother|father|guardian|other", "is_primary": bool,
+//         "pickup_authorized": bool, "payment_responsible": bool,
+//         "phone": "...", "notes": "..." }
+// Edita los campos del vínculo parent_student sin desvincular.
+func (h *Handler) UpdateParentLink(c *fiber.Ctx) error {
+	tenantID, err := getTenantID(c)
+	if err != nil {
+		return response.Error(c, fiber.StatusForbidden, err.Error())
+	}
+	studentID := c.Params("id")
+	parentID := c.Params("parentId")
+	db := h.service.repo.DB()
+
+	var body struct {
+		Relationship        *string `json:"relationship"`
+		IsPrimary           *bool   `json:"is_primary"`
+		PickupAuthorized    *bool   `json:"pickup_authorized"`
+		PaymentResponsible  *bool   `json:"payment_responsible"`
+		Phone               *string `json:"phone"`
+		Notes               *string `json:"notes"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Cuerpo inválido")
+	}
+
+	// Verify the link belongs to this tenant before mutating.
+	var linkCount int
+	_ = db.QueryRow(c.UserContext(),
+		database.RebindPlaceholders(db.Driver(),
+			"SELECT COUNT(*) FROM parent_student WHERE student_id = $1 AND parent_id = $2 AND (tenant_id = $3 OR tenant_id IS NULL)"),
+		studentID, parentID, tenantID).Scan(&linkCount)
+	if linkCount == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Vínculo padre-estudiante no encontrado en esta escuela")
+	}
+
+	// Build dynamic UPDATE based on which fields the client sent (PATCH-like).
+	sets := []string{}
+	args := []interface{}{}
+	if body.Relationship != nil {
+		rel := strings.ToLower(strings.TrimSpace(*body.Relationship))
+		switch rel {
+		case "mother", "father", "guardian", "other":
+			// ok
+		default:
+			return response.Error(c, fiber.StatusBadRequest, "relationship debe ser mother|father|guardian|other")
+		}
+		sets = append(sets, fmt.Sprintf("relationship = $%d", len(args)+1))
+		args = append(args, rel)
+	}
+	if body.IsPrimary != nil {
+		sets = append(sets, fmt.Sprintf("is_primary = $%d", len(args)+1))
+		args = append(args, *body.IsPrimary)
+	}
+	if body.PickupAuthorized != nil {
+		sets = append(sets, fmt.Sprintf("pickup_authorized = $%d", len(args)+1))
+		args = append(args, *body.PickupAuthorized)
+	}
+	if body.PaymentResponsible != nil {
+		sets = append(sets, fmt.Sprintf("payment_responsible = $%d", len(args)+1))
+		args = append(args, *body.PaymentResponsible)
+	}
+	if body.Phone != nil {
+		sets = append(sets, fmt.Sprintf("phone = $%d", len(args)+1))
+		args = append(args, strings.TrimSpace(*body.Phone))
+	}
+	if body.Notes != nil {
+		sets = append(sets, fmt.Sprintf("notes = $%d", len(args)+1))
+		args = append(args, *body.Notes)
+	}
+
+	if len(sets) == 0 {
+		return response.Error(c, fiber.StatusBadRequest, "No hay campos para actualizar")
+	}
+
+	// Append WHERE-clause args
+	args = append(args, studentID, parentID, tenantID)
+	whereStudent := fmt.Sprintf("$%d", len(args)-2)
+	whereParent := fmt.Sprintf("$%d", len(args)-1)
+	whereTenant := fmt.Sprintf("$%d", len(args))
+
+	query := fmt.Sprintf(
+		"UPDATE parent_student SET %s WHERE student_id = %s AND parent_id = %s AND (tenant_id = %s OR tenant_id IS NULL)",
+		strings.Join(sets, ", "), whereStudent, whereParent, whereTenant)
+	query = database.RebindPlaceholders(db.Driver(), query)
+
+	if _, err := db.Exec(c.UserContext(), query, args...); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("Error actualizando vínculo: %v", err))
+	}
+
+	return response.Success(c, fiber.Map{"parent_id": parentID, "student_id": studentID}, "Vínculo actualizado correctamente")
+}
+
 // UnlinkParentFromStudent — DELETE /api/v1/school-admin/academic/students/:id/parents/:parentId
 func (h *Handler) UnlinkParentFromStudent(c *fiber.Ctx) error {
 	tenantID, err := getTenantID(c)

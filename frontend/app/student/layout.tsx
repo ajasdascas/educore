@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, Menu, X } from "lucide-react";
+import { Building2, Menu, X, GraduationCap, Heart } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
@@ -80,6 +80,69 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
     if (enabledModuleKeys === null) return true; // muestra todo mientras carga
     return enabledModuleKeys.has(item.moduleKey);
   });
+
+  // Detectar si el tenant es kinder/guardería (sin módulos académicos).
+  // Si NO tiene grading ni assignments ni qualitative_assessments, el portal de
+  // estudiantes no aplica para este nivel — mostrar pantalla de "desactivado".
+  const ACADEMIC_MODULES = ["grading", "assignments", "exams", "qualitative_assessments", "subjects"];
+  const hasAcademicModule = enabledModuleKeys === null
+    ? true // mientras carga, asumir que sí (mostrar layout normal con skeleton)
+    : ACADEMIC_MODULES.some((k) => enabledModuleKeys.has(k));
+
+  if (!hasAcademicModule) {
+    return (
+      <RoleGuard allowedRoles={["STUDENT"]}>
+        <div className="min-h-screen bg-background flex flex-col">
+          <header className="h-16 bg-card border-b border-border flex items-center justify-between gap-2 px-4 shadow-sm">
+            <div className="flex items-center">
+              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center mr-3">
+                <span className="text-primary-foreground font-bold text-sm">E</span>
+              </div>
+              <h1 className="text-lg font-semibold">Portal de Estudiantes</h1>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <ThemeToggle />
+              <ProfileDropdown userInitials={userInitials} userRole="Estudiante" />
+            </div>
+          </header>
+          <SupportModeBanner />
+          <main className="flex-1 flex items-center justify-center p-6">
+            <div className="max-w-md w-full text-center space-y-6">
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                <GraduationCap className="w-10 h-10 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">Portal no disponible para Kinder</h2>
+                <p className="text-muted-foreground">
+                  El portal de estudiantes está pensado para alumnos de Primaria en adelante,
+                  donde se gestionan calificaciones, tareas y exámenes.
+                </p>
+                <p className="text-muted-foreground">
+                  Para consultar la información de Kinder/Guardería de tu hijo, usa el{" "}
+                  <strong>Portal de Padres</strong>.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/40 p-4 text-left space-y-1.5">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Heart className="h-4 w-4 text-pink-500" />
+                  ¿Qué pueden ver los padres?
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Registro diario (alimentación, siestas, higiene, estado emocional)</li>
+                  <li>Salud, incidentes, autorizaciones de entrega</li>
+                  <li>Hitos de desarrollo, fotos y evidencias</li>
+                </ul>
+              </div>
+              <Button onClick={() => router.push("/login")} variant="outline">
+                Volver al inicio
+              </Button>
+            </div>
+          </main>
+          <Toaster />
+        </div>
+      </RoleGuard>
+    );
+  }
 
   return (
     <RoleGuard allowedRoles={["STUDENT"]}>
