@@ -10,14 +10,18 @@
     "grep": {},
     "grepInvert": null,
     "maxFailures": 0,
-    "metadata": {},
+    "metadata": {
+      "actualWorkers": 1
+    },
     "preserveOutput": "always",
     "projects": [
       {
         "outputDir": "C:/Users/gioes/OneDrive/Desktop/Educore-codex-full-platform-e2e-audit/qa/traces/test-results",
         "repeatEach": 1,
         "retries": 0,
-        "metadata": {},
+        "metadata": {
+          "actualWorkers": 1
+        },
         "id": "chromium",
         "name": "chromium",
         "testDir": "C:/Users/gioes/OneDrive/Desktop/Educore-codex-full-platform-e2e-audit/qa/e2e",
@@ -78,8 +82,33 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8307,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:13.595Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "public-landing-desktop.png",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\qa\\traces\\test-results\\00_public_landing-landing--e08a6-aces-demo-tema-y-responsive-chromium\\attachments\\public-landing-desktop-png-f6309b0fa8e5901d83f00a7aad0558fd95f6c585.png"
+                    },
+                    {
+                      "name": "public-landing-mobile.png",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\qa\\traces\\test-results\\00_public_landing-landing--e08a6-aces-demo-tema-y-responsive-chromium\\attachments\\public-landing-mobile-png-c6d08704492e604a89db0e9918029840853a24ea.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "59ad245eccd5d9205fed-f4ce1fc47515585fde48",
@@ -106,8 +135,28 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12139,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:22.181Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "auth-login-page.png",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\qa\\traces\\test-results\\01_auth_roles-auth-login-v-cd813-o-forgot-y-rutas-protegidas-chromium\\attachments\\auth-login-page-png-fbc5f140149e1322d9b2cca22d3c7d4c925a6f16.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "ca1313b02cb84cb8c296-90d3eb31a327f2fa5cbf",
@@ -126,8 +175,22 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 444,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:34.345Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "ca1313b02cb84cb8c296-6023c39acdbcb427e8d0",
@@ -154,8 +217,22 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 512,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:34.832Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "265fc0a8704b0579a620-f72c44d915865596605e",
@@ -182,13 +259,27 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 407,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:35.374Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "cf390b30c2b298294433-028a6ebba94f8d983c3b",
           "file": "03_school_creation_by_level.spec.ts",
-          "line": 10,
+          "line": 11,
           "column": 5
         }
       ]
@@ -205,18 +296,32 @@
           "tags": [],
           "tests": [
             {
-              "timeout": 60000,
+              "timeout": 180000,
               "annotations": [],
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 429,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:35.819Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "f0a177c4432e9e10a730-3426dae48c0cf8bb38a3",
           "file": "04_school_admin_core.spec.ts",
-          "line": 20,
+          "line": 13,
           "column": 5
         }
       ]
@@ -238,13 +343,27 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 388,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:36.287Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "a25f493b259627b9aa16-ded80dce1c66c3f1e1b8",
           "file": "05_teacher_portal.spec.ts",
-          "line": 18,
+          "line": 15,
           "column": 5
         }
       ]
@@ -266,13 +385,27 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:36.707Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "da0ea5eb3abcd2a22ecf-ca25619ff86e45e52af8",
           "file": "06_parent_portal.spec.ts",
-          "line": 19,
+          "line": 16,
           "column": 5
         }
       ]
@@ -294,13 +427,27 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 367,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:37.134Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "bd9c3a8774ff10c59f03-9deaedc5a229076da648",
           "file": "07_student_portal.spec.ts",
-          "line": 21,
+          "line": 16,
           "column": 5
         }
       ]
@@ -322,8 +469,22 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 73,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:37.531Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "f3b2c0ecd5d39b91063b-63d0b0cfb89cab8418a8",
@@ -350,8 +511,22 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 390,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:37.644Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "092e35ea3b6973711834-7a62289d20e1cc028018",
@@ -378,8 +553,22 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 22,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:38.071Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "b6c8d9c5ffa3b4765e53-293a880ddb2e2912fd5b",
@@ -406,8 +595,22 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4148,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:38.115Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "7386db919dfc0cacf0f0-84a99d2803118fca08f4",
@@ -434,8 +637,38 @@
               "expectedStatus": "passed",
               "projectId": "chromium",
               "projectName": "chromium",
-              "results": [],
-              "status": "skipped"
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11374,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:42.294Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "responsive-landing-desktop-1280.png",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\qa\\traces\\test-results\\12_responsive_accessibilit-088fb-in-en-desktop-tablet-mobile-chromium\\attachments\\responsive-landing-desktop-1280-png-e4687b78eadafb3aa75d5fda989924c3e8feb4bf.png"
+                    },
+                    {
+                      "name": "responsive-landing-tablet-768.png",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\qa\\traces\\test-results\\12_responsive_accessibilit-088fb-in-en-desktop-tablet-mobile-chromium\\attachments\\responsive-landing-tablet-768-png-28eca2c19e7abeec58e81d3627d21671c964fd5f.png"
+                    },
+                    {
+                      "name": "responsive-landing-mobile-375.png",
+                      "contentType": "image/png",
+                      "path": "C:\\Users\\gioes\\OneDrive\\Desktop\\Educore-codex-full-platform-e2e-audit\\qa\\traces\\test-results\\12_responsive_accessibilit-088fb-in-en-desktop-tablet-mobile-chromium\\attachments\\responsive-landing-mobile-375-png-4b48737d4373b144d605317d6b246df869d1d46a.png"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
             }
           ],
           "id": "4408352509bc3b3ecbc5-28b9ebe91441f87a451f",
@@ -444,14 +677,518 @@
           "column": 5
         }
       ]
+    },
+    {
+      "title": "13_parent_primary.spec.ts",
+      "file": "13_parent_primary.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "parent primaria: portal seguro y datos solo de hijos QA",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4794,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:53.703Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "595ae03ead7c670e4b70-12f4b145c530f2a08e49",
+          "file": "13_parent_primary.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "14_student_kinder.spec.ts",
+      "file": "14_student_kinder.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "student kinder: portal apagado o estrictamente limitado",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2819,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:45:58.529Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c011a4d5e8938d52fb60-3423fc299fd0dfd08ca6",
+          "file": "14_student_kinder.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "15_student_preschool.spec.ts",
+      "file": "15_student_preschool.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "student preescolar: portal limitado y sin datos administrativos",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1854,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:01.376Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "0743e28757328e7a3753-3afee4e03b391cd33d30",
+          "file": "15_student_preschool.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "16_student_primary.spec.ts",
+      "file": "16_student_primary.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "student primaria: matriz de rutas protegidas y alcance de portal",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15690,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:03.258Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d18dd8bec83ee7f15f8a-e19c53312e2f085d3b84",
+          "file": "16_student_primary.spec.ts",
+          "line": 17,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "17_backups_real.spec.ts",
+      "file": "17_backups_real.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "backups: vista real, provider y acciones seguras",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 400,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:18.984Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "005b6d42b25fb29d37c7-4288ffcb0bb05ad0946e",
+          "file": "17_backups_real.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "18_billing_student_payments.spec.ts",
+      "file": "18_billing_student_payments.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "billing y pagos: UI real sin pagos reales ni tarjetas",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 404,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:19.437Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d36fe7677029abc30d96-93c22e13e30184584113",
+          "file": "18_billing_student_payments.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "19_credentials_invitations.spec.ts",
+      "file": "19_credentials_invitations.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "credenciales e invitaciones: sin hash visible ni email real",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 368,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:19.871Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "545c1cbde11498d69149-f8f83887ee37aec0cb81",
+          "file": "19_credentials_invitations.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "20_messages_notifications_permissions.spec.ts",
+      "file": "20_messages_notifications_permissions.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "mensajes, notificaciones y permisos: rutas y limites seguros",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5678,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:20.265Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d74a83370262b4be2f66-1d631043a650f586b2be",
+          "file": "20_messages_notifications_permissions.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "21_security_rbac_idor.spec.ts",
+      "file": "21_security_rbac_idor.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "access control seguro: APIs protegidas y limites de alcance",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3412,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:25.971Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "abf2bb67ffdfe8ec221b-59973d08b3add8db4850",
+          "file": "21_security_rbac_idor.spec.ts",
+          "line": 12,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "22_responsive_ux.spec.ts",
+      "file": "22_responsive_ux.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "responsive UX: matriz solicitada en landing/login",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12572,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:29.410Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b5d8cd567d025fe8579c-a41007465d21fb1d12e2",
+          "file": "22_responsive_ux.spec.ts",
+          "line": 11,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "23_production_assets.spec.ts",
+      "file": "23_production_assets.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "produccion: assets, basePath y health basicos",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 869,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:42.008Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "c0f8bad03ff0aa526d26-2ab63fc4e6c9290dbf7e",
+          "file": "23_production_assets.spec.ts",
+          "line": 4,
+          "column": 5
+        }
+      ]
+    },
+    {
+      "title": "99_cleanup_qa_objects.spec.ts",
+      "file": "99_cleanup_qa_objects.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "cleanup: solo objetos QA-CODEX-NIGHTLY creados por esta corrida",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-05-09T05:46:42.901Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a20c2617d4714e4e8fcf-4d80b86af1162052c08d",
+          "file": "99_cleanup_qa_objects.spec.ts",
+          "line": 9,
+          "column": 5
+        }
+      ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-05-08T15:19:47.074Z",
-    "duration": 99.97399999999993,
-    "expected": 0,
-    "skipped": 14,
+    "startTime": "2026-05-09T05:45:11.693Z",
+    "duration": 93068.38900000001,
+    "expected": 26,
+    "skipped": 0,
     "unexpected": 0,
     "flaky": 0
   }

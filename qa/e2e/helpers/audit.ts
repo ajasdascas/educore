@@ -2,7 +2,25 @@ import { APIRequestContext, Page, TestInfo, expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
-export type AuditStatus = 'PASS' | 'FAIL' | 'WARN' | 'SKIPPED';
+export type AuditStatus =
+  | 'PASS'
+  | 'FAIL'
+  | 'WARN'
+  | 'SKIPPED'
+  | 'PASS_REAL'
+  | 'PASS_READ_ONLY'
+  | 'PASS_EMPTY_STATE'
+  | 'PARTIAL'
+  | 'PARTIAL_EMPTY_STATE_ONLY'
+  | 'PARTIAL_WRONG_ROLE'
+  | 'FAIL_404'
+  | 'FAIL_500'
+  | 'FAIL_BUTTON_DEAD'
+  | 'FAIL_SECURITY'
+  | 'SKIPPED_NO_CREDENTIALS'
+  | 'SKIPPED_PROVIDER_NOT_CONFIGURED'
+  | 'SKIPPED_SECURITY_SCOPE'
+  | 'REQUIRES_VPS';
 export type Severity = 'P0' | 'P1' | 'P2' | 'P3';
 
 export type AuditRecord = {
@@ -34,6 +52,32 @@ type AuthSession = {
   user: Record<string, unknown>;
 };
 
+export type QASchoolSpec = {
+  key: 'kinder' | 'preescolar' | 'primaria';
+  name: string;
+  slug: string;
+  level: string;
+  expectedModules: string[];
+};
+
+export type QASchoolState = QASchoolSpec & {
+  id: string;
+  adminEmail: string;
+};
+
+export type QACoreState = {
+  school: QASchoolState;
+  group?: Record<string, any>;
+  teacher?: Record<string, any>;
+  student?: Record<string, any>;
+  subject?: Record<string, any>;
+  portalCredentials?: {
+    teacher?: { email: string; password?: string };
+    parent?: { email: string; password?: string };
+    student?: { email: string; password?: string };
+  };
+};
+
 type PersistedReport = {
   generated_at: string;
   base_url: string;
@@ -53,6 +97,9 @@ const reportsDir = path.join(repoRoot, 'qa', 'reports');
 const screenshotsDir = path.join(repoRoot, 'qa', 'screenshots');
 const reportJsonPath = path.join(reportsDir, 'e2e-results.json');
 const reportMarkdownPath = path.join(reportsDir, 'e2e-summary.md');
+const qaStatePath = path.join(reportsDir, 'qa-state.json');
+const checkpointsDir = path.join(repoRoot, 'qa', 'checkpoints');
+const progressPath = path.join(checkpointsDir, 'PROGRESS.json');
 
 export const e2eBaseURL = trimTrailingSlash(process.env.E2E_BASE_URL ?? 'https://onlineu.mx/educore');
 export const e2eApiURL = trimTrailingSlash(process.env.E2E_API_URL ?? 'https://educore-production-beef.up.railway.app');
@@ -61,21 +108,46 @@ export const hasSuperAdminCredentials = Boolean(process.env.E2E_SUPERADMIN_EMAIL
 export const hasQAPassword = Boolean(process.env.E2E_QA_PASSWORD);
 export const qaRunId = process.env.E2E_RUN_ID ?? new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
 
+export const qaSchoolSpecs: QASchoolSpec[] = [
+  {
+    key: 'kinder',
+    name: 'QA-CODEX-NIGHTLY-KINDER',
+    slug: 'qa-codex-nightly-kinder',
+    level: 'kinder',
+    expectedModules: ['academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'documents', 'reports', 'communications'],
+  },
+  {
+    key: 'preescolar',
+    name: 'QA-CODEX-NIGHTLY-PREESCOLAR',
+    slug: 'qa-codex-nightly-preescolar',
+    level: 'preescolar',
+    expectedModules: ['academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'documents', 'reports', 'communications'],
+  },
+  {
+    key: 'primaria',
+    name: 'QA-CODEX-NIGHTLY-PRIMARIA',
+    slug: 'qa-codex-nightly-primaria',
+    level: 'primaria',
+    expectedModules: ['academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'grades', 'documents', 'reports', 'communications'],
+  },
+];
+
 export function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
 export function qaName(base: string): string {
-  return `QA-CODEX-${base}-${qaRunId}`;
+  return `QA-CODEX-NIGHTLY-${base}-${qaRunId}`;
 }
 
 export function qaEmail(role: string): string {
-  return `qa.codex.${role}.${qaRunId}@example.test`;
+  return `qa.codex.nightly.${role}.${qaRunId}@example.test`;
 }
 
 export function resetAuditReport(): void {
   fs.mkdirSync(reportsDir, { recursive: true });
   fs.mkdirSync(screenshotsDir, { recursive: true });
+  fs.mkdirSync(checkpointsDir, { recursive: true });
   const initial: PersistedReport = {
     generated_at: new Date().toISOString(),
     base_url: e2eBaseURL,
@@ -91,12 +163,13 @@ export function resetAuditReport(): void {
   };
   fs.writeFileSync(reportJsonPath, `${JSON.stringify(initial, null, 2)}\n`, 'utf8');
   writeSummary(initial);
+  updateProgress('bootstrap', 'Audit report initialized.');
 }
 
 export function recordResult(record: AuditRecord): void {
   const report = loadReport();
   report.results.push(sanitizeRecord(record));
-  if (record.status === 'FAIL' || (record.status === 'WARN' && record.severity)) {
+  if (isBugStatus(record.status) || (record.status === 'WARN' && record.severity)) {
     report.bugs.push(toIssue(record, report.bugs.length + 1));
   }
   saveReport(report);
@@ -106,11 +179,25 @@ export function recordSkip(area: string, flow: string, actual: string, url?: str
   recordResult({
     area,
     flow,
-    status: 'SKIPPED',
+    status: actual.toLowerCase().includes('credencial') || actual.toLowerCase().includes('credential')
+      ? 'SKIPPED_NO_CREDENTIALS'
+      : 'SKIPPED',
     url,
     expected: 'Flujo auditado con credenciales/permisos seguros disponibles.',
     actual,
     recommendation: 'Ejecutar de nuevo con variables E2E locales y sin guardar storageState en repo.',
+  });
+}
+
+export function recordSecurityScopeSkip(area: string, flow: string, actual: string, url?: string): void {
+  recordResult({
+    area,
+    flow,
+    status: 'SKIPPED_SECURITY_SCOPE',
+    url,
+    expected: 'La auditoria se mantiene en QA funcional y control de acceso seguro.',
+    actual,
+    recommendation: 'No ejecutar payloads ofensivos, fuzzing, fuerza bruta, evasion ni explotacion.',
   });
 }
 
@@ -126,6 +213,48 @@ export function saveReport(report: PersistedReport): void {
   fs.mkdirSync(reportsDir, { recursive: true });
   fs.writeFileSync(reportJsonPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   writeSummary(report);
+  updateProgress('reporting', `Results=${report.results.length}; Bugs=${report.bugs.length}`);
+}
+
+export function updateProgress(phase: string, nextStep: string, status: 'completed' | 'failed' | 'skipped' = 'completed'): void {
+  fs.mkdirSync(checkpointsDir, { recursive: true });
+  const current = fs.existsSync(progressPath)
+    ? JSON.parse(fs.readFileSync(progressPath, 'utf8'))
+    : {
+        started_at: new Date().toISOString(),
+        last_completed_phase: '',
+        completed: [],
+        failed: [],
+        skipped: [],
+        created_qa_objects: [],
+        deleted_qa_objects: [],
+        next_step: '',
+      };
+  const bucket = status === 'failed' ? 'failed' : status === 'skipped' ? 'skipped' : 'completed';
+  current.last_completed_phase = phase;
+  current[bucket] = Array.from(new Set([...(current[bucket] ?? []), phase]));
+  current.next_step = nextStep;
+  current.updated_at = new Date().toISOString();
+  fs.writeFileSync(progressPath, `${JSON.stringify(current, null, 2)}\n`, 'utf8');
+}
+
+export function appendCreatedQAObject(object: Record<string, unknown>): void {
+  fs.mkdirSync(checkpointsDir, { recursive: true });
+  const current = fs.existsSync(progressPath)
+    ? JSON.parse(fs.readFileSync(progressPath, 'utf8'))
+    : {
+        started_at: new Date().toISOString(),
+        last_completed_phase: '',
+        completed: [],
+        failed: [],
+        skipped: [],
+        created_qa_objects: [],
+        deleted_qa_objects: [],
+        next_step: '',
+      };
+  current.created_qa_objects = [...(current.created_qa_objects ?? []), { ...object, recorded_at: new Date().toISOString() }];
+  current.updated_at = new Date().toISOString();
+  fs.writeFileSync(progressPath, `${JSON.stringify(current, null, 2)}\n`, 'utf8');
 }
 
 export async function attachDiagnostics(page: Page): Promise<{ consoleErrors: string[]; networkErrors: string[] }> {
@@ -268,7 +397,7 @@ export async function loginSuperAdmin(page: Page): Promise<boolean> {
   recordResult({
     area: 'Auth',
     flow: 'login super admin',
-    status: loggedIn ? 'PASS' : 'FAIL',
+    status: loggedIn ? 'PASS_REAL' : 'FAIL',
     url: sanitizeUrl(currentURL),
     role: 'SUPER_ADMIN',
     expected: 'Super Admin entra a un dashboard protegido.',
@@ -297,7 +426,7 @@ export async function apiLoginSuperAdmin(request: APIRequestContext): Promise<Au
   recordResult({
     area: 'Auth',
     flow: 'login super admin via API',
-    status: success ? 'PASS' : 'FAIL',
+    status: success ? 'PASS_REAL' : 'FAIL',
     url: `${e2eApiURL}/api/v1/auth/login`,
     role: 'SUPER_ADMIN',
     expected: 'API autentica Super Admin con credenciales E2E sin exponer token.',
@@ -319,6 +448,19 @@ export async function installAuthSession(page: Page, session: AuthSession): Prom
   }, session);
 }
 
+export async function installSupportSession(page: Page, session: AuthSession, school: QASchoolState, role: SupportRole): Promise<void> {
+  await page.addInitScript((ctx) => {
+    window.localStorage.setItem('access_token', ctx.session.accessToken);
+    window.localStorage.setItem('user', JSON.stringify(ctx.session.user));
+    window.sessionStorage.setItem('support_tenant_id', ctx.school.id);
+    window.sessionStorage.setItem('support_school_slug', ctx.school.slug);
+    window.sessionStorage.setItem('support_school_name', ctx.school.name);
+    window.sessionStorage.setItem('support_role', ctx.role);
+  }, { session, school, role });
+}
+
+export type SupportRole = 'school_admin' | 'teacher' | 'parent' | 'student';
+
 export async function loginSuperAdminWithFallback(page: Page, request: APIRequestContext): Promise<boolean> {
   const uiLoggedIn = await loginSuperAdmin(page);
   if (uiLoggedIn) return true;
@@ -334,7 +476,7 @@ export async function loginSuperAdminWithFallback(page: Page, request: APIReques
   recordResult({
     area: 'Auth',
     flow: 'sesion Super Admin inyectada desde API para QA',
-    status: authenticated ? 'PASS' : 'FAIL',
+    status: authenticated ? 'PASS_REAL' : 'FAIL',
     url: sanitizeUrl(page.url()),
     role: 'SUPER_ADMIN',
     expected: 'Tras API login, localStorage temporal permite auditar pantallas protegidas.',
@@ -363,19 +505,416 @@ export async function probeAPI(
   return { status: response.status(), body };
 }
 
+export async function apiGetJSON(
+  request: APIRequestContext,
+  session: AuthSession,
+  endpoint: string,
+  supportTenantID?: string,
+): Promise<{ ok: boolean; status: number; body: any; text: string }> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${session.accessToken}` };
+  if (supportTenantID) headers['X-Support-Tenant-ID'] = supportTenantID;
+  const response = await request.get(`${e2eApiURL}${endpoint}`, { headers });
+  return parseAPIResponse(response);
+}
+
+export async function apiPostJSON(
+  request: APIRequestContext,
+  session: AuthSession,
+  endpoint: string,
+  data: unknown,
+  supportTenantID?: string,
+): Promise<{ ok: boolean; status: number; body: any; text: string }> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${session.accessToken}` };
+  if (supportTenantID) headers['X-Support-Tenant-ID'] = supportTenantID;
+  const response = await request.post(`${e2eApiURL}${endpoint}`, { headers, data });
+  return parseAPIResponse(response);
+}
+
+export async function apiPutJSON(
+  request: APIRequestContext,
+  session: AuthSession,
+  endpoint: string,
+  data: unknown,
+  supportTenantID?: string,
+): Promise<{ ok: boolean; status: number; body: any; text: string }> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${session.accessToken}` };
+  if (supportTenantID) headers['X-Support-Tenant-ID'] = supportTenantID;
+  const response = await request.put(`${e2eApiURL}${endpoint}`, { headers, data });
+  return parseAPIResponse(response);
+}
+
+export async function ensureQASchool(request: APIRequestContext, session: AuthSession, spec: QASchoolSpec): Promise<QASchoolState | null> {
+  if (!requireMutationGate('School Creation', `crear/reutilizar ${spec.name}`)) return null;
+
+  const existing = await findQASchoolBySlug(request, session, spec.slug);
+  if (existing) {
+    const state = schoolStateFromRecord(spec, existing);
+    saveQASchoolState(state);
+    recordResult({
+      area: 'School Creation',
+      flow: `reutilizar ${spec.name}`,
+      status: 'PASS',
+      school: spec.name,
+      url: `${e2eApiURL}/api/v1/super-admin/schools?search=${spec.slug}`,
+      expected: 'Escuela QA existente con slug esperado.',
+      actual: `Reutilizada tenant_id=${state.id}; slug=${state.slug}.`,
+    });
+    return state;
+  }
+
+  const adminEmail = `qa.codex.nightly.admin.${spec.key}@example.test`;
+  const created = await apiPostJSON(request, session, '/api/v1/super-admin/schools', {
+    name: spec.name,
+    levels: [spec.level],
+    phone: '+52 555 010 0000',
+    contact_email: adminEmail,
+    address: 'QA Codex E2E, Mexico',
+    slug: spec.slug,
+    timezone: 'America/Mexico_City',
+    admin_email: adminEmail,
+    admin_name: `QA Codex ${spec.key}`,
+    plan: 'plan-basic',
+    premium_modules: [],
+    rfc: 'XAXX010101000',
+    razon_social: spec.name,
+    regimen: '601',
+    codigo_postal: '01000',
+    school_year: '2026-2027',
+    eval_scheme: 'standard',
+  });
+
+  if (!created.ok && created.status !== 409) {
+    recordResult({
+      area: 'School Creation',
+      flow: `crear ${spec.name}`,
+      status: 'FAIL',
+      school: spec.name,
+      url: `${e2eApiURL}/api/v1/super-admin/schools`,
+      expected: 'Crear escuela QA sin tocar datos reales.',
+      actual: `HTTP ${created.status}: ${created.text}`,
+      severity: created.status >= 500 ? 'P1' : 'P2',
+      recommendation: 'Revisar CreateSchool en produccion/MySQL antes de continuar portales.',
+    });
+    return null;
+  }
+
+  const afterCreate = await findQASchoolBySlug(request, session, spec.slug);
+  if (!afterCreate) {
+    recordResult({
+      area: 'School Creation',
+      flow: `validar persistencia ${spec.name}`,
+      status: 'FAIL',
+      school: spec.name,
+      expected: 'La escuela creada aparece en listado Super Admin.',
+      actual: `Create returned HTTP ${created.status}, pero no se encontro por slug.`,
+      severity: 'P1',
+    });
+    return null;
+  }
+
+  const state = schoolStateFromRecord(spec, afterCreate);
+  saveQASchoolState(state);
+  appendCreatedQAObject({ type: 'school', id: state.id, name: state.name, slug: state.slug });
+  recordResult({
+    area: 'School Creation',
+    flow: `crear ${spec.name}`,
+    status: 'PASS',
+    school: spec.name,
+    url: `${e2eApiURL}/api/v1/super-admin/schools`,
+    expected: 'Escuela QA creada con prefijo y slug controlado.',
+    actual: `tenant_id=${state.id}; slug=${state.slug}; plan=plan-basic.`,
+  });
+  return state;
+}
+
+export async function ensureAllQASchools(request: APIRequestContext): Promise<{ session: AuthSession | null; schools: QASchoolState[] }> {
+  const session = await apiLoginSuperAdmin(request);
+  if (!session) return { session: null, schools: [] };
+  const schools: QASchoolState[] = [];
+  for (const spec of qaSchoolSpecs) {
+    const school = await ensureQASchool(request, session, spec);
+    if (school) schools.push(school);
+  }
+  return { session, schools };
+}
+
+export async function validateSchoolModules(request: APIRequestContext, session: AuthSession, school: QASchoolState): Promise<void> {
+  const result = await apiGetJSON(request, session, '/api/v1/school-admin/modules/enabled', school.id);
+  const modules = extractArray(result.body, ['modules', 'data']);
+  const keys = modules.map((item) => String(item.key ?? item.module_key ?? '')).filter(Boolean);
+  const missing = school.expectedModules.filter((key) => !keys.includes(key));
+  recordResult({
+    area: 'Module Entitlements',
+    flow: `${school.name}: modulos activos por nivel`,
+    status: result.ok && missing.length === 0 ? 'PASS_REAL' : result.ok ? 'PARTIAL' : 'FAIL',
+    school: school.name,
+    url: `${e2eApiURL}/api/v1/school-admin/modules/enabled`,
+    expected: `Modulos esperados: ${school.expectedModules.join(', ')}`,
+    actual: result.ok ? `Activos=${keys.join(', ')}; faltantes=${missing.join(', ') || 'ninguno'}` : `HTTP ${result.status}: ${result.text}`,
+    severity: result.ok ? (missing.length ? 'P2' : undefined) : 'P1',
+  });
+}
+
+export async function loadQASchoolsFromState(): Promise<QASchoolState[]> {
+  if (!fs.existsSync(qaStatePath)) return [];
+  try {
+    const raw = JSON.parse(fs.readFileSync(qaStatePath, 'utf8')) as { schools?: QASchoolState[] };
+    return raw.schools ?? [];
+  } catch (error) {
+    updateProgress('qa-state-recovery', `Ignored corrupt qa-state.json: ${String((error as Error).message)}`, 'skipped');
+    return [];
+  }
+}
+
+export async function ensureCoreDataForSchool(request: APIRequestContext, session: AuthSession, school: QASchoolState): Promise<QACoreState | null> {
+  const core: QACoreState = { school, portalCredentials: {} };
+  const groups = await apiGetJSON(request, session, '/api/v1/school-admin/academic/groups', school.id);
+  const group = extractArray(groups.body, ['groups', 'data'])[0];
+  recordResult({
+    area: 'School Admin',
+    flow: `${school.name}: grupo base disponible`,
+    status: groups.ok && Boolean(group?.id) ? 'PASS_REAL' : 'FAIL',
+    school: school.name,
+    url: `${e2eApiURL}/api/v1/school-admin/academic/groups`,
+    expected: 'Grupo base disponible para asignaciones QA.',
+    actual: groups.ok ? `groups=${extractArray(groups.body, ['groups', 'data']).length}` : `HTTP ${groups.status}: ${groups.text}`,
+    severity: groups.ok && Boolean(group?.id) ? undefined : 'P1',
+  });
+  if (!groups.ok || !group?.id) return core;
+  core.group = group;
+
+  core.teacher = await ensureQATeacher(request, session, school);
+  core.student = await ensureQAStudent(request, session, school, group.id);
+  const subjects = await apiGetJSON(request, session, '/api/v1/school-admin/academic/subjects', school.id);
+  core.subject = extractArray(subjects.body, ['subjects', 'data'])[0];
+
+  if (core.group && (core.teacher?.id || core.student?.id)) {
+    const updated = await apiPutJSON(request, session, `/api/v1/school-admin/academic/groups/${core.group.id}`, {
+      name: core.group.name ?? 'A',
+      grade_level_id: core.group.grade_level_id ?? core.group.grade_id,
+      school_year_id: core.group.school_year_id,
+      description: core.group.description ?? 'Grupo QA Codex',
+      max_students: core.group.max_students ?? core.group.capacity ?? 30,
+      teacher_ids: core.teacher?.id ? [core.teacher.id] : [],
+      student_ids: core.student?.id ? [core.student.id] : [],
+      status: 'active',
+      room: core.group.room ?? 'Aula QA',
+    }, school.id);
+    recordResult({
+      area: 'School Admin',
+      flow: `${school.name}: asignar profesor/alumno a grupo`,
+      status: updated.ok ? 'PASS_REAL' : 'PARTIAL',
+      school: school.name,
+      url: `${e2eApiURL}/api/v1/school-admin/academic/groups/${core.group.id}`,
+      expected: 'Grupo QA queda con profesor y alumno asignados.',
+      actual: updated.ok ? 'Asignacion enviada correctamente.' : `HTTP ${updated.status}: ${updated.text}`,
+      severity: updated.ok ? undefined : 'P2',
+    });
+  }
+
+  if (core.teacher?.id) {
+    const access = await apiPostJSON(request, session, `/api/v1/school-admin/academic/teachers/${core.teacher.id}/portal-access`, {}, school.id);
+    const data = access.body?.data ?? {};
+    core.portalCredentials!.teacher = { email: data.email ?? core.teacher.email, password: data.password };
+    recordResult({
+      area: 'Billing/Credentials',
+      flow: `${school.name}: credencial profesor`,
+      status: access.ok || access.status === 409 ? 'PASS_REAL' : 'FAIL',
+      school: school.name,
+      url: `${e2eApiURL}/api/v1/school-admin/academic/teachers/${core.teacher.id}/portal-access`,
+      expected: 'Crear o confirmar credencial QA de profesor sin enviar correo.',
+      actual: access.ok ? 'Credencial temporal generada en memoria.' : `HTTP ${access.status}: ${access.text}`,
+      severity: access.ok || access.status === 409 ? undefined : 'P1',
+    });
+  }
+
+  if (core.student?.id) {
+    const studentAccess = await apiPostJSON(request, session, `/api/v1/school-admin/academic/students/${core.student.id}/portal-access`, {}, school.id);
+    const parentAccess = await apiPostJSON(request, session, `/api/v1/school-admin/academic/students/${core.student.id}/parent-portal-access`, {}, school.id);
+    core.portalCredentials!.student = { email: studentAccess.body?.data?.email ?? core.student.email, password: studentAccess.body?.data?.password };
+    core.portalCredentials!.parent = { email: parentAccess.body?.data?.email, password: parentAccess.body?.data?.password };
+    for (const [role, access] of [['student', studentAccess], ['parent', parentAccess]] as const) {
+      recordResult({
+        area: 'Billing/Credentials',
+        flow: `${school.name}: credencial ${role}`,
+        status: access.ok || access.status === 409 ? 'PASS_REAL' : 'FAIL',
+        school: school.name,
+        expected: `Crear o confirmar credencial QA ${role} sin enviar correo.`,
+        actual: access.ok ? 'Credencial temporal generada en memoria.' : `HTTP ${access.status}: ${access.text}`,
+        severity: access.ok || access.status === 409 ? undefined : 'P1',
+      });
+    }
+  }
+
+  return core;
+}
+
+async function parseAPIResponse(response: any): Promise<{ ok: boolean; status: number; body: any; text: string }> {
+  const rawText = await response.text().catch(() => '');
+  let body: any = null;
+  try {
+    body = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    body = null;
+  }
+  return { ok: response.ok(), status: response.status(), body, text: sanitizeText(rawText) };
+}
+
+function extractArray(body: any, keys: string[]): any[] {
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body?.data)) return body.data;
+  for (const key of keys) {
+    if (Array.isArray(body?.[key])) return body[key];
+    if (Array.isArray(body?.data?.[key])) return body.data[key];
+  }
+  return [];
+}
+
+async function findQASchoolBySlug(request: APIRequestContext, session: AuthSession, slug: string): Promise<Record<string, any> | null> {
+  const result = await apiGetJSON(request, session, `/api/v1/super-admin/schools?search=${encodeURIComponent(slug)}&per_page=50`);
+  if (!result.ok) return null;
+  return extractArray(result.body, ['schools', 'tenants', 'data']).find((school) => school.slug === slug) ?? null;
+}
+
+function schoolStateFromRecord(spec: QASchoolSpec, record: Record<string, any>): QASchoolState {
+  return {
+    ...spec,
+    id: String(record.id ?? record.tenant_id ?? record.tenantId ?? ''),
+    adminEmail: `qa.codex.admin.${spec.key}@example.test`,
+  };
+}
+
+function saveQASchoolState(school: QASchoolState): void {
+  fs.mkdirSync(reportsDir, { recursive: true });
+  let existing: { schools?: QASchoolState[] } = { schools: [] };
+  if (fs.existsSync(qaStatePath)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(qaStatePath, 'utf8')) as { schools?: QASchoolState[] };
+    } catch {
+      existing = { schools: [] };
+    }
+  }
+  const schools = [...(existing.schools ?? []).filter((item) => item.slug !== school.slug), school]
+    .sort((a, b) => a.slug.localeCompare(b.slug));
+  fs.writeFileSync(qaStatePath, `${JSON.stringify({ schools }, null, 2)}\n`, 'utf8');
+}
+
+async function ensureQATeacher(request: APIRequestContext, session: AuthSession, school: QASchoolState): Promise<Record<string, any> | undefined> {
+  const email = `qa.codex.nightly.teacher.${school.key}@example.test`;
+  const teachers = await apiGetJSON(request, session, '/api/v1/school-admin/academic/teachers', school.id);
+  const existing = extractArray(teachers.body, ['teachers', 'data']).find((teacher) => teacher.email === email);
+  if (existing) {
+    recordResult({
+      area: 'School Admin',
+      flow: `${school.name}: reutilizar profesor QA`,
+      status: 'PASS_REAL',
+      school: school.name,
+      expected: 'Profesor QA existente por correo example.test.',
+      actual: `teacher_id=${existing.id}`,
+    });
+    return existing;
+  }
+
+  const created = await apiPostJSON(request, session, '/api/v1/school-admin/academic/teachers', {
+    first_name: 'QA Codex',
+    last_name: 'Teacher',
+    email,
+    phone: '+52 555 010 1000',
+    address: 'QA Codex',
+    specialties: ['QA'],
+    employee_id: `QA-CODEX-NIGHTLY-${school.key.toUpperCase()}-T001`,
+    hire_date: '2026-05-08',
+    salary: 0,
+    status: 'active',
+  }, school.id);
+  const teacher = created.body?.data;
+  recordResult({
+    area: 'School Admin',
+    flow: `${school.name}: crear profesor QA`,
+    status: created.ok && teacher?.id ? 'PASS_REAL' : 'FAIL',
+    school: school.name,
+    url: `${e2eApiURL}/api/v1/school-admin/academic/teachers`,
+    expected: 'Crear profesor QA con email example.test.',
+    actual: created.ok ? `teacher_id=${teacher?.id ?? 'missing'}` : `HTTP ${created.status}: ${created.text}`,
+    severity: created.ok && teacher?.id ? undefined : 'P1',
+  });
+  return teacher;
+}
+
+async function ensureQAStudent(request: APIRequestContext, session: AuthSession, school: QASchoolState, groupID: string): Promise<Record<string, any> | undefined> {
+  const enrollmentID = `QA-CODEX-NIGHTLY-${school.key.toUpperCase()}-S001`;
+  const email = `qa.codex.nightly.student.${school.key}@example.test`;
+  const parentEmail = `qa.codex.nightly.parent.${school.key}@example.test`;
+  const students = await apiGetJSON(request, session, `/api/v1/school-admin/academic/students?search=${encodeURIComponent(enrollmentID)}&per_page=50`, school.id);
+  const existing = extractArray(students.body, ['students', 'data']).find((student) => student.enrollment_id === enrollmentID || student.email === email);
+  if (existing) {
+    recordResult({
+      area: 'School Admin',
+      flow: `${school.name}: reutilizar alumno QA`,
+      status: 'PASS_REAL',
+      school: school.name,
+      expected: 'Alumno QA existente por matricula/correo example.test.',
+      actual: `student_id=${existing.id}`,
+    });
+    return existing;
+  }
+
+  const created = await apiPostJSON(request, session, '/api/v1/school-admin/academic/students', {
+    first_name: 'QA Codex',
+    paternal_last_name: 'Student',
+    maternal_last_name: school.key,
+    last_name: `Student ${school.key}`,
+    email,
+    phone: '+52 555 010 2000',
+    birth_date: '2015-05-08',
+    birth_day: '8',
+    birth_month: '5',
+    birth_year: '2015',
+    address: 'QA Codex',
+    group_id: groupID,
+    parent_name: 'QA Codex Parent',
+    parent_email: parentEmail,
+    parent_phone: '+52 555 010 3000',
+    parents: [{
+      first_name: 'QA Codex',
+      paternal_last_name: 'Parent',
+      maternal_last_name: school.key,
+      email: parentEmail,
+      phone: '+52 555 010 3000',
+      relationship: 'tutor',
+      is_primary: true,
+      notes: 'QA-CODEX-NIGHTLY automated parent',
+    }],
+    enrollment_id: enrollmentID,
+    status: 'active',
+  }, school.id);
+  const student = created.body?.data;
+  recordResult({
+    area: 'School Admin',
+    flow: `${school.name}: crear alumno QA`,
+    status: created.ok && student?.id ? 'PASS_REAL' : 'FAIL',
+    school: school.name,
+    url: `${e2eApiURL}/api/v1/school-admin/academic/students`,
+    expected: 'Crear alumno QA con padre primario y email example.test.',
+    actual: created.ok ? `student_id=${student?.id ?? 'missing'}` : `HTTP ${created.status}: ${created.text}`,
+    severity: created.ok && student?.id ? undefined : 'P1',
+  });
+  return student;
+}
+
 export async function expectProtectedAPIRejects(
   request: APIRequestContext,
   endpoint: string,
   role: string,
 ): Promise<void> {
   const noToken = await probeAPI(request, 'GET', endpoint);
-  const badToken = await probeAPI(request, 'GET', endpoint, { token: 'QA-CODEX-invalid-token' });
+  const badToken = await probeAPI(request, 'GET', endpoint, { token: 'QA-CODEX-NIGHTLY-invalid-token' });
   const leakedHash = /password_hash|bcrypt|\$2[aby]\$/i.test(`${noToken.body}\n${badToken.body}`);
   const accepted = noToken.status < 400 || badToken.status < 400;
   recordResult({
     area: 'Security/RBAC',
     flow: `API protegida ${endpoint}`,
-    status: !accepted && !leakedHash ? 'PASS' : 'FAIL',
+    status: !accepted && !leakedHash ? 'PASS_REAL' : 'FAIL_SECURITY',
     url: `${e2eApiURL}${endpoint}`,
     role,
     expected: '401/403 claro sin password_hash para requests sin token o con token invalido.',
@@ -390,7 +929,7 @@ export async function assertNoHorizontalOverflow(page: Page, area: string, flow:
   recordResult({
     area,
     flow,
-    status: overflow ? 'FAIL' : 'PASS',
+    status: overflow ? 'FAIL' : 'PASS_REAL',
     url: sanitizeUrl(page.url()),
     expected: 'La vista no genera scroll horizontal accidental.',
     actual: overflow ? 'documentElement.scrollWidth excede viewport.' : 'Sin overflow horizontal relevante.',
@@ -403,7 +942,7 @@ export async function checkVisibleText(page: Page, area: string, flow: string, p
   recordResult({
     area,
     flow,
-    status: pattern.test(text) ? 'PASS' : 'FAIL',
+    status: pattern.test(text) ? 'PASS_REAL' : 'FAIL',
     url: sanitizeUrl(page.url()),
     expected: `Texto visible: ${pattern}`,
     actual: text.slice(0, 240),
@@ -511,12 +1050,12 @@ function isAllowedStaticMiss(url: string): boolean {
 }
 
 function writeSummary(report: PersistedReport): void {
-  const counts = report.results.reduce<Record<AuditStatus, number>>(
+  const counts = report.results.reduce<Record<string, number>>(
     (acc, result) => {
-      acc[result.status] += 1;
+      acc[result.status] = (acc[result.status] ?? 0) + 1;
       return acc;
     },
-    { PASS: 0, FAIL: 0, WARN: 0, SKIPPED: 0 },
+    {},
   );
 
   const lines = [
@@ -531,10 +1070,7 @@ function writeSummary(report: PersistedReport): void {
     '',
     '| Status | Count |',
     '| --- | ---: |',
-    `| PASS | ${counts.PASS} |`,
-    `| WARN | ${counts.WARN} |`,
-    `| FAIL | ${counts.FAIL} |`,
-    `| SKIPPED | ${counts.SKIPPED} |`,
+    ...Object.keys(counts).sort().map((status) => `| ${status} | ${counts[status]} |`),
     '',
     '## Bugs',
     '',
@@ -554,3 +1090,11 @@ function writeSummary(report: PersistedReport): void {
 }
 
 export { expect };
+
+function isBugStatus(status: AuditStatus): boolean {
+  return status === 'FAIL'
+    || status === 'FAIL_404'
+    || status === 'FAIL_500'
+    || status === 'FAIL_BUTTON_DEAD'
+    || status === 'FAIL_SECURITY';
+}

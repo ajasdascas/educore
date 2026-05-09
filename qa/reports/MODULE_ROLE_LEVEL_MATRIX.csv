@@ -1,0 +1,159 @@
+Rol,Nivel,Modulo,Submodulo,Ruta,Estado,Evidencia,Comentario
+unknown,,Public Landing,cargar landing principal,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+unknown,,Public Landing,copy principal visible,https://onlineu.mx/educore/,PASS_REAL,,"EduCore
+Soluciones
+Beneficios
+Testimonios
+Blog
+Contacto
+Normal
+Iniciar sesión
+Solicitar demo
+PLATAFORMA DE GESTIÓN ESCOLAR INTEGRAL
+Administra tu institución con inteligencia
+
+EduCore centraliza la gestión académica, administrativa y financ"
+unknown,,Public Landing,link interno /educore/,https://onlineu.mx/educore/,PASS_REAL,,HTTP 200
+unknown,,Public Landing,link interno /educore/login/,https://onlineu.mx/educore/login/,PASS_REAL,,HTTP 200
+unknown,,Public Landing,selector de tema,https://onlineu.mx/educore/,PASS_REAL,,Control de tema accionado.
+unknown,,Public Landing,CTA solicitar demo,https://onlineu.mx/educore/,PASS_REAL,,CTA accionado sin excepcion Playwright.
+unknown,,Public Landing,responsive movil 375px,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Auth,abrir pagina login,https://onlineu.mx/educore/login/,PASS_REAL,,HTTP 200; 236 caracteres visibles.
+unknown,,Auth,login vacio,https://onlineu.mx/educore/login/,PASS_REAL,,URL despues de submit vacio: https://onlineu.mx/educore/login/
+unknown,,Auth,login invalido,https://onlineu.mx/educore/login/,PASS_REAL,,URL despues de credenciales invalidas: https://onlineu.mx/educore/login/
+unknown,,Auth,forgot password,https://onlineu.mx/educore/login/,SKIPPED_NO_CREDENTIALS,,No se encontro link de recuperacion en login.
+unknown,,Auth,ruta protegida sin sesion,https://onlineu.mx/educore/super-admin/users/,PARTIAL,,Failed to load resource: the server responded with a status of 401 () | 401 https://educore-production-beef.up.railway.app/api/v1/auth/login | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Auth,bloqueo ruta protegida sin sesion,https://onlineu.mx/educore/login/,PASS_REAL,,"Educore
+
+Plataforma de administracion escolar
+
+Iniciar sesion
+
+Bienvenido de vuelta
+
+Correo electronico
+Contrasena
+Iniciar sesion
+
+Olvidaste tu contrasena?
+
+Eres nuevo? Contacta a tu institucion para activar tu cuenta.
+
+Volver al inicio"
+unknown,,Auth,login super admin,https://onlineu.mx/educore/login/,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Auth,login super admin via API,https://educore-production-beef.up.railway.app/api/v1/auth/login,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Super Admin,navegar dashboard,/super-admin/dashboard/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar modulos,/super-admin/modules/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar billing,/super-admin/billing/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar analytics,/super-admin/analytics/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar health monitor,/super-admin/health/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar database admin,/super-admin/database/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar auditoria,/super-admin/audit/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar soporte,/super-admin/support/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar storage,/super-admin/storage/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar feature flags,/super-admin/feature-flags/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar backups,/super-admin/backups/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar versioning,/super-admin/version/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar planes,/super-admin/plans/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar escuelas,/super-admin/schools/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Super Admin,navegar usuarios globales,/super-admin/users/,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Auth,login super admin via API,https://educore-production-beef.up.railway.app/api/v1/auth/login,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Auth,login super admin via API,https://educore-production-beef.up.railway.app/api/v1/auth/login,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Auth,login super admin via API,https://educore-production-beef.up.railway.app/api/v1/auth/login,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Auth,login super admin via API,https://educore-production-beef.up.railway.app/api/v1/auth/login,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Auth,login super admin via API,https://educore-production-beef.up.railway.app/api/v1/auth/login,SKIPPED_NO_CREDENTIALS,,Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD.
+unknown,,Billing/Credentials,credenciales desde Super Admin,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,credenciales desde School Admin,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,reset password temporal,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,usuario inactivo no entra,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,password_hash nunca visible,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,invitaciones con provider not configured si falta Resend,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,conceptos de cobro,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,adeudos y estado de cuenta,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,recibos,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,pagos sin pasarela real,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,becas/descuentos/recargos,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Billing/Credentials,vista padre/alumno de facturacion,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes.
+unknown,,Backups/Deploy,Super Admin backups,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales para revisar historial y estados sin crear backups.
+unknown,,Backups/Deploy,crear/editar/eliminar backup,,SKIPPED_NO_CREDENTIALS,,Operacion mutante bloqueada sin credenciales y mutation gate.
+unknown,,Module Entitlements,Kinder: modulos activos/bloqueados,,SKIPPED_NO_CREDENTIALS,,"Requiere escuela QA Kinder y rol autenticado. Esperado a validar: Reporte diario, alimentacion, siesta, higiene/panal, estado de animo, incidentes, entrada/salida, autorizados, pagos, credenciales, comunicacion."
+unknown,,Module Entitlements,Preescolar: modulos activos/bloqueados,,SKIPPED_NO_CREDENTIALS,,"Requiere escuela QA Preescolar y rol autenticado. Esperado a validar: Campos formativos, evaluacion cualitativa, observaciones, evidencias, actividades, materiales, asistencia, comunicacion, pagos, credenciales."
+unknown,,Module Entitlements,Primaria: modulos activos/bloqueados,,SKIPPED_NO_CREDENTIALS,,"Requiere escuela QA Primaria y rol autenticado. Esperado a validar: Materias, horarios, tareas, classroom, examenes, calificaciones, boletas, biblioteca, asistencia, estado de cuenta, pagos, credenciales, documentos, comunicacion."
+SUPER_ADMIN,,Security/RBAC,API protegida /api/v1/super-admin/schools,https://educore-production-beef.up.railway.app/api/v1/super-admin/schools,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+SUPER_ADMIN,,Security/RBAC,API protegida /api/v1/super-admin/users,https://educore-production-beef.up.railway.app/api/v1/super-admin/users,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+SCHOOL_ADMIN,,Security/RBAC,API protegida /api/v1/school-admin/dashboard,https://educore-production-beef.up.railway.app/api/v1/school-admin/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+TEACHER,,Security/RBAC,API protegida /api/v1/teacher/dashboard,https://educore-production-beef.up.railway.app/api/v1/teacher/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+PARENT,,Security/RBAC,API protegida /api/v1/parent/dashboard,https://educore-production-beef.up.railway.app/api/v1/parent/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+STUDENT,,Security/RBAC,API protegida /api/v1/student/dashboard,https://educore-production-beef.up.railway.app/api/v1/student/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+ANONYMOUS,,Security/RBAC,X-Support-Tenant-ID sin Super Admin,,PASS_REAL,,HTTP 401
+unknown,,Responsive/UX,landing desktop-1280,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+unknown,,Responsive/UX,landing desktop-1280 overflow,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive/UX,login desktop-1280,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive/UX,login desktop-1280 overflow,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive/UX,landing tablet-768,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive/UX,landing tablet-768 overflow,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive/UX,login tablet-768,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive/UX,login tablet-768 overflow,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive/UX,landing mobile-375,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive/UX,landing mobile-375 overflow,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive/UX,login mobile-375,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive/UX,login mobile-375 overflow,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive/UX,muestreo basico de elementos visibles,https://onlineu.mx/educore/login/,PASS_REAL,,22 elementos visibles muestreados.
+unknown,,Parent,primaria portal completo,,SKIPPED_NO_CREDENTIALS,,No hay escuela/alumno/padre QA-CODEX-NIGHTLY-PRIMARIA en checkpoint.
+unknown,,Parent,ruta protegida parent primaria sin sesion,https://onlineu.mx/educore/parent/primary/grades/,FAIL_404,,HTTP 404; body length 129
+PARENT,,Parent,primaria no captura datos academicos,https://onlineu.mx/educore/parent/primary/grades/,PASS_READ_ONLY,,Sin credencial QA activa se valido solo ruta protegida y se deja el flujo profundo pendiente.
+unknown,,Student,kinder portal limitado,,SKIPPED_NO_CREDENTIALS,,No hay alumno QA-CODEX-NIGHTLY-KINDER con cuenta de portal.
+unknown,,Student,kinder ruta protegida sin sesion,https://onlineu.mx/educore/student/kinder/activities/,FAIL_404,,HTTP 404; body length 129
+STUDENT,,Student,kinder no debe mostrar calificaciones/tareas/examenes por defecto,https://onlineu.mx/educore/student/kinder/activities/,PASS_READ_ONLY,,"Sin credencial QA activa se deja la verificacion autenticada como pendiente, sin marcar PASS falso."
+unknown,,Student,preescolar portal limitado,,SKIPPED_NO_CREDENTIALS,,No hay alumno QA-CODEX-NIGHTLY-PREESCOLAR con cuenta de portal.
+unknown,,Student,preescolar ruta protegida sin sesion,https://onlineu.mx/educore/student/preschool/activities/,FAIL_404,,HTTP 404; body length 129
+STUDENT,,Student,preescolar solo actividades/recursos/evidencias/perfil,https://onlineu.mx/educore/student/preschool/activities/,PASS_READ_ONLY,,Validacion autenticada queda pendiente hasta tener cuenta QA; no se intento evadir autenticacion.
+unknown,,Student,primaria portal completo,,SKIPPED_NO_CREDENTIALS,,No hay alumno QA-CODEX-NIGHTLY-PRIMARIA con cuenta de portal.
+unknown,,Student,primaria /student/dashboard/ sin sesion,https://onlineu.mx/educore/student/dashboard/,PASS_REAL,,HTTP 200; 236 caracteres visibles.
+unknown,,Student,primaria /student/primary/subjects/ sin sesion,https://onlineu.mx/educore/student/primary/subjects/,FAIL_404,,HTTP 404; body length 129
+unknown,,Student,primaria /student/primary/assignments/ sin sesion,https://onlineu.mx/educore/student/primary/assignments/,FAIL_404,,HTTP 404; body length 129
+unknown,,Student,primaria /student/primary/exams/ sin sesion,https://onlineu.mx/educore/student/primary/exams/,FAIL_404,,HTTP 404; body length 129
+unknown,,Student,primaria /student/primary/grades/ sin sesion,https://onlineu.mx/educore/student/primary/grades/,FAIL_404,,HTTP 404; body length 129
+unknown,,Student,primaria /student/attendance/ sin sesion,https://onlineu.mx/educore/student/attendance/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Student,primaria /student/schedule/ sin sesion,https://onlineu.mx/educore/student/schedule/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Student,primaria /student/messages/ sin sesion,https://onlineu.mx/educore/student/messages/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Student,primaria /student/notifications/ sin sesion,https://onlineu.mx/educore/student/notifications/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Student,primaria /student/profile/ sin sesion,https://onlineu.mx/educore/student/profile/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+STUDENT,,Student,primaria no entra a parent/teacher/admin,,PASS_READ_ONLY,,Se cubrio acceso anonimo seguro; wrong-role autenticado queda pendiente con cuenta QA.
+unknown,,Backups,crear/editar/descargar/eliminar backup QA,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E.
+unknown,,Billing,facturacion escolar completa,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E y objetos QA.
+unknown,,Credenciales,crear accesos QA profesor/padre/alumno,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E y objetos QA.
+unknown,,Mensajes,comunicaciones multirol QA,,SKIPPED_NO_CREDENTIALS,,Faltan credenciales Super Admin E2E y usuarios QA vinculados.
+unknown,,Notificaciones,Parent notificaciones sin sesion,https://onlineu.mx/educore/parent/notifications/,PASS_REAL,,HTTP 200; 236 caracteres visibles.
+unknown,,Permisos,Parent permisos sin sesion,https://onlineu.mx/educore/parent/consents/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Mensajes,no cross-tenant ni mensajes a otra escuela,,SKIPPED_NO_CREDENTIALS,,No se intento enviar mensajes entre tenants sin cuentas QA suficientes.
+SUPER_ADMIN,,Security/RBAC,API protegida /api/v1/super-admin/schools,https://educore-production-beef.up.railway.app/api/v1/super-admin/schools,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+SCHOOL_ADMIN,,Security/RBAC,API protegida /api/v1/school-admin/dashboard,https://educore-production-beef.up.railway.app/api/v1/school-admin/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+TEACHER,,Security/RBAC,API protegida /api/v1/teacher/dashboard,https://educore-production-beef.up.railway.app/api/v1/teacher/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+PARENT,,Security/RBAC,API protegida /api/v1/parent/dashboard,https://educore-production-beef.up.railway.app/api/v1/parent/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+STUDENT,,Security/RBAC,API protegida /api/v1/student/dashboard,https://educore-production-beef.up.railway.app/api/v1/student/dashboard,PASS_REAL,,sin token=[redacted]; token [redacted]; password_hash=false
+unknown,,RBAC,IDOR ofensivo con mutacion de IDs,,SKIPPED_SECURITY_SCOPE,,"No se prueban payloads, fuzzing, enumeracion agresiva ni explotacion. Solo se documenta como pendiente seguro con objetos QA conocidos."
+unknown,,Tenant isolation,cross-tenant solo con objetos QA,,SKIPPED_NO_CREDENTIALS,,No hay dos sesiones QA completas en esta corrida; no se hizo probing ofensivo.
+unknown,,Responsive,landing mobile 375x667,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+unknown,,Responsive,landing overflow mobile 375x667,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,login mobile 375x667,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,login overflow mobile 375x667,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,landing tablet 768x1024,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,landing overflow tablet 768x1024,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,login tablet 768x1024,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,login overflow tablet 768x1024,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,landing desktop 1366x768,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,landing overflow desktop 1366x768,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,login desktop 1366x768,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,login overflow desktop 1366x768,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,landing desktop 1920x1080,https://onlineu.mx/educore/,PARTIAL,,Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,landing overflow desktop 1920x1080,https://onlineu.mx/educore/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,login desktop 1920x1080,https://onlineu.mx/educore/login/,PARTIAL,,https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED
+unknown,,Responsive,login overflow desktop 1920x1080,https://onlineu.mx/educore/login/,PASS_REAL,,Sin overflow horizontal relevante.
+unknown,,Responsive,roles autenticados responsive,,SKIPPED_NO_CREDENTIALS,,La matriz autenticada queda pendiente hasta contar con sesiones QA por rol.
+unknown,,Deploy/static export,landing production basePath,https://onlineu.mx/educore/,PASS_REAL,,HTTP 200; basePathAssets=true; bytes=78192
+unknown,,Deploy/static export,deep route refresh /login/,https://onlineu.mx/educore/login/,PASS_READ_ONLY,,HTTP 200
+unknown,,Deploy/static export,deep route refresh /escuela/,https://onlineu.mx/educore/escuela/,PASS_READ_ONLY,,HTTP 200
+unknown,,Deploy/static export,deep route refresh /super-admin/dashboard/,https://onlineu.mx/educore/super-admin/dashboard/,PASS_READ_ONLY,,HTTP 200
+unknown,,Deploy/static export,API health no localhost,https://educore-production-beef.up.railway.app/api/v1/health,PASS_REAL,,HTTP 200; localhost=false
+unknown,,Cleanup,eliminar/archivar objetos QA,,SKIPPED_NO_CREDENTIALS,,E2E_CLEANUP_QA_OBJECTS no es true; no se ejecuta cleanup destructivo/archivado.

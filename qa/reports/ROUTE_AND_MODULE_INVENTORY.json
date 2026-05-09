@@ -1,0 +1,2201 @@
+{
+  "generated_at": "2026-05-09T05:47:22.524Z",
+  "frontend_routes": [
+    "/",
+    "/escuela",
+    "/login",
+    "/parent/attendance",
+    "/parent/children",
+    "/parent/consents",
+    "/parent/dashboard",
+    "/parent/documents",
+    "/parent/grades",
+    "/parent/messages",
+    "/parent/notifications",
+    "/parent/payments",
+    "/parent/profile",
+    "/parent/security",
+    "/parent/settings",
+    "/reset-password",
+    "/school-admin/academic",
+    "/school-admin/attendance",
+    "/school-admin/communications",
+    "/school-admin/dashboard",
+    "/school-admin/database",
+    "/school-admin/documents",
+    "/school-admin/grades",
+    "/school-admin/groups",
+    "/school-admin/notifications",
+    "/school-admin/payments",
+    "/school-admin/profile",
+    "/school-admin/report-cards",
+    "/school-admin/reports",
+    "/school-admin/schedule",
+    "/school-admin/security",
+    "/school-admin/settings",
+    "/school-admin/students",
+    "/school-admin/teachers",
+    "/school-portal",
+    "/school-portal/parents",
+    "/school-portal/school-admin",
+    "/school-portal/students",
+    "/school-portal/teachers",
+    "/school/dashboard",
+    "/student/assignments",
+    "/student/attendance",
+    "/student/dashboard",
+    "/student/grades",
+    "/student/messages",
+    "/student/notifications",
+    "/student/profile",
+    "/student/schedule",
+    "/student/settings",
+    "/super-admin",
+    "/super-admin/analytics",
+    "/super-admin/audit",
+    "/super-admin/backups",
+    "/super-admin/billing",
+    "/super-admin/dashboard",
+    "/super-admin/database",
+    "/super-admin/feature-flags",
+    "/super-admin/health",
+    "/super-admin/lab",
+    "/super-admin/modules",
+    "/super-admin/notifications",
+    "/super-admin/plans",
+    "/super-admin/profile",
+    "/super-admin/schools",
+    "/super-admin/schools/details",
+    "/super-admin/security",
+    "/super-admin/settings",
+    "/super-admin/storage",
+    "/super-admin/support",
+    "/super-admin/users",
+    "/super-admin/version",
+    "/teacher/attendance",
+    "/teacher/classes",
+    "/teacher/dashboard",
+    "/teacher/grades",
+    "/teacher/messages",
+    "/teacher/notifications",
+    "/teacher/profile",
+    "/teacher/schedule",
+    "/teacher/security",
+    "/teacher/settings"
+  ],
+  "sidebar_hrefs": [
+    "/",
+    "/login",
+    "/parent/attendance",
+    "/parent/children",
+    "/parent/grades",
+    "/parent/messages",
+    "/parent/notifications",
+    "/reset-password",
+    "/school-admin/attendance",
+    "/school-admin/communications",
+    "/school-admin/students",
+    "/school-admin/teachers",
+    "/school-portal",
+    "/super-admin/schools",
+    "/teacher/attendance",
+    "/teacher/classes",
+    "/teacher/grades",
+    "/teacher/messages"
+  ],
+  "modules_detected": [
+    "academic_core",
+    "action",
+    "activities",
+    "address",
+    "analytics",
+    "attendance",
+    "auth",
+    "birth_day",
+    "birth_month",
+    "birth_year",
+    "blue",
+    "communications",
+    "created_at",
+    "credentials",
+    "daily_logs",
+    "dark",
+    "development_areas",
+    "documents",
+    "enrollment_id",
+    "error_rate",
+    "file_count",
+    "first_name",
+    "global_enabled",
+    "grading",
+    "group_name",
+    "health_checks",
+    "history_absences",
+    "history_attendance_rate",
+    "history_average_grade",
+    "history_grade_name",
+    "history_group_name",
+    "incidents",
+    "ip_address",
+    "key",
+    "latency_ms",
+    "light",
+    "maternal_last_name",
+    "meals",
+    "message",
+    "milestones",
+    "module_key",
+    "name",
+    "naps",
+    "nombre",
+    "observations",
+    "parent1_email",
+    "parent1_first_name",
+    "parent1_maternal_last_name",
+    "parent1_paternal_last_name",
+    "parent1_phone",
+    "parent2_email",
+    "parent2_first_name",
+    "parent2_maternal_last_name",
+    "parent2_paternal_last_name",
+    "parent2_phone",
+    "parent_portal",
+    "parents",
+    "paternal_last_name",
+    "payments",
+    "photos_evidence",
+    "pickup_authorizations",
+    "preschool_report_cards",
+    "price_monthly_mxn",
+    "priority",
+    "qr_access",
+    "qualitative_assessments",
+    "report_cards",
+    "reports",
+    "required_level",
+    "resolved_at",
+    "resource",
+    "schedules",
+    "school-admin",
+    "school_year",
+    "security",
+    "severity",
+    "status",
+    "storage_limit_mb",
+    "students",
+    "teacher_portal",
+    "teachers",
+    "tenant_name",
+    "title",
+    "used_mb",
+    "user",
+    "users",
+    "version",
+    "workshops"
+  ],
+  "module_hints": [
+    {
+      "file": "frontend/app/school-admin/database/page.tsx",
+      "module": "nombre"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "academic_core"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "users"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "users"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "academic_core"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "schedules"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "attendance"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "daily_logs"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "meals"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "naps"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "health_checks"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "incidents"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "pickup_authorizations"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "milestones"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "photos_evidence"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "qualitative_assessments"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "development_areas"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "observations"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "activities"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "preschool_report_cards"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "grading"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "report_cards"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "documents"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "payments"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "reports"
+    },
+    {
+      "file": "frontend/app/school-admin/layout.tsx",
+      "module": "communications"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "first_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "paternal_last_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "maternal_last_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "enrollment_id"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "birth_day"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "birth_month"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "birth_year"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "group_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "address"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent1_first_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent1_paternal_last_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent1_maternal_last_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent1_email"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent1_phone"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent2_first_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent2_paternal_last_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent2_maternal_last_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent2_email"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "parent2_phone"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "school_year"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "history_grade_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "history_group_name"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "history_average_grade"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "history_attendance_rate"
+    },
+    {
+      "file": "frontend/app/school-admin/students/page.tsx",
+      "module": "history_absences"
+    },
+    {
+      "file": "frontend/app/school-portal/layout.tsx",
+      "module": "school-admin"
+    },
+    {
+      "file": "frontend/app/school-portal/layout.tsx",
+      "module": "teachers"
+    },
+    {
+      "file": "frontend/app/school-portal/layout.tsx",
+      "module": "parents"
+    },
+    {
+      "file": "frontend/app/school-portal/layout.tsx",
+      "module": "students"
+    },
+    {
+      "file": "frontend/app/school-portal/page.tsx",
+      "module": "school-admin"
+    },
+    {
+      "file": "frontend/app/school-portal/page.tsx",
+      "module": "teachers"
+    },
+    {
+      "file": "frontend/app/school-portal/page.tsx",
+      "module": "parents"
+    },
+    {
+      "file": "frontend/app/school-portal/page.tsx",
+      "module": "students"
+    },
+    {
+      "file": "frontend/app/super-admin/audit/page.tsx",
+      "module": "created_at"
+    },
+    {
+      "file": "frontend/app/super-admin/audit/page.tsx",
+      "module": "user"
+    },
+    {
+      "file": "frontend/app/super-admin/audit/page.tsx",
+      "module": "action"
+    },
+    {
+      "file": "frontend/app/super-admin/audit/page.tsx",
+      "module": "resource"
+    },
+    {
+      "file": "frontend/app/super-admin/audit/page.tsx",
+      "module": "severity"
+    },
+    {
+      "file": "frontend/app/super-admin/audit/page.tsx",
+      "module": "ip_address"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "module_key"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "tenant_name"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "status"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "severity"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "error_rate"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "latency_ms"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "message"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "created_at"
+    },
+    {
+      "file": "frontend/app/super-admin/health/page.tsx",
+      "module": "reports"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "name"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "key"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "status"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "version"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "required_level"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "global_enabled"
+    },
+    {
+      "file": "frontend/app/super-admin/modules/page.tsx",
+      "module": "price_monthly_mxn"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/details/page.tsx",
+      "module": "school-admin"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/details/page.tsx",
+      "module": "teachers"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/details/page.tsx",
+      "module": "parents"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/details/page.tsx",
+      "module": "students"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "schedules"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "attendance"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "documents"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "report_cards"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "communications"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "parent_portal"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "teacher_portal"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "payments"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "qr_access"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "credentials"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "workshops"
+    },
+    {
+      "file": "frontend/app/super-admin/schools/page.tsx",
+      "module": "analytics"
+    },
+    {
+      "file": "frontend/app/super-admin/security/page.tsx",
+      "module": "security"
+    },
+    {
+      "file": "frontend/app/super-admin/storage/page.tsx",
+      "module": "tenant_name"
+    },
+    {
+      "file": "frontend/app/super-admin/storage/page.tsx",
+      "module": "used_mb"
+    },
+    {
+      "file": "frontend/app/super-admin/storage/page.tsx",
+      "module": "storage_limit_mb"
+    },
+    {
+      "file": "frontend/app/super-admin/storage/page.tsx",
+      "module": "file_count"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "title"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "tenant_name"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "status"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "priority"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "module_key"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "created_at"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "resolved_at"
+    },
+    {
+      "file": "frontend/app/super-admin/support/page.tsx",
+      "module": "school-admin"
+    },
+    {
+      "file": "frontend/components/ui/theme-toggle/ThemeToggle.tsx",
+      "module": "blue"
+    },
+    {
+      "file": "frontend/components/ui/theme-toggle/ThemeToggle.tsx",
+      "module": "light"
+    },
+    {
+      "file": "frontend/components/ui/theme-toggle/ThemeToggle.tsx",
+      "module": "dark"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "auth"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "academic_core"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "users"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "grading"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "schedules"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "attendance"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "documents"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "report_cards"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "reports"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "communications"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "parent_portal"
+    },
+    {
+      "file": "frontend/lib/modules/registry.ts",
+      "module": "teacher_portal"
+    }
+  ],
+  "endpoints_found": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "file": "backend/cmd/server/main.go"
+    },
+    {
+      "method": "GET",
+      "path": "/public/school-info",
+      "file": "backend/cmd/server/main.go"
+    },
+    {
+      "method": "GET",
+      "path": "/public/schools/resolve",
+      "file": "backend/cmd/server/main.go"
+    },
+    {
+      "method": "GET",
+      "path": "Authorization",
+      "file": "backend/internal/middleware/auth.go"
+    },
+    {
+      "method": "GET",
+      "path": "X-Support-Tenant-ID",
+      "file": "backend/internal/middleware/auth.go"
+    },
+    {
+      "method": "POST",
+      "path": "/login",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/refresh",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/logout",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/forgot-password",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/reset-password",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/accept-invitation",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/change-password",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "X-Forwarded-Proto",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "X-Forwarded-Proto",
+      "file": "backend/internal/modules/auth/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/:id/read",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/:id",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/bulk/mark",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/bulk/send",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/bulk/:jobId/status",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id/messages",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/:id/read",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/mark-all-read",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/stats",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/activity/recent",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/unread-counts",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/messages/:id/thread",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "file": "backend/internal/modules/communications/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/children",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/grades",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/attendance",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schedule",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/report-card",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/teachers",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/assignments",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/notifications/:id/read",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/messages",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/messages",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/documents",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/payments",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/consents",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/consents/:id",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/summary",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/calendar",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/events",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/profile",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/profile",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/password",
+      "file": "backend/internal/modules/parent/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/generate",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/attendance",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/grades",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/financial",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/academic-summary",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/templates",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/templates",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/analytics",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/metrics",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/:id",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/export",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/schedule",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/attendance/today",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/grades/week",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id/status",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id/download",
+      "file": "backend/internal/modules/reports/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/tables",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "GET",
+      "path": "/tables/:table/schema",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "GET",
+      "path": "/tables/:table/rows",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "POST",
+      "path": "/tables/:table/rows",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/tables/:table/rows/:id",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/tables/:table/rows/:id",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "POST",
+      "path": "/custom-fields",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "POST",
+      "path": "/custom-tables",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "GET",
+      "path": "/export/table/:table",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "GET",
+      "path": "/export/all",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "POST",
+      "path": "/import/validate",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "POST",
+      "path": "/import/commit",
+      "file": "backend/internal/modules/school_admin/database_explorer.go"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/stats",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/settings",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/settings",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/modules/enabled",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/school-years",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/school-years",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/school-years/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/students",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/students",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/students/:id/history",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/students/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/students/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/students/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/imports/students/commit",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/students/:id/portal-access",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/students/:id/parent-portal-access",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/teachers",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/teachers",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/teachers/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/teachers/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/teachers/:id/portal-access",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/groups",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/groups",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/groups/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/groups/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/groups/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/subjects",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/subjects",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/subjects/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/subjects/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schedule",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/students/:id/schedule",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/schedule",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schedule/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/schedule/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/schedule/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/groups/:groupId/today",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/groups/:groupId/bulk",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/students/:studentId/history",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/reports/monthly",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/groups/:groupId/subjects/:subjectId",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/grades/bulk",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/students/:studentId/report-card",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/groups/:groupId/final-grades",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/documents",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/documents/:studentId",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/documents/:documentId",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/documents/:documentId/verify",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/documents/:documentId",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/report-cards/generate",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/charges",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/record-payment",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/card-checkout-session",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id/receipt",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/stats",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/send",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/generate",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/export",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/:id",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications",
+      "file": "backend/internal/modules/school_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/profile",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/grades",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/attendance",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/messages",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/assignments",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schedule",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications",
+      "file": "backend/internal/modules/student/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/database/tables",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "GET",
+      "path": "/database/tables/:table/schema",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "GET",
+      "path": "/database/tables/:table/rows",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "POST",
+      "path": "/database/tables/:table/rows",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/database/tables/:table/rows/:id",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/database/tables/:table/rows/:id",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "POST",
+      "path": "/database/tables",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/database/tables/:table/structure",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/database/tables/:table/soft-delete",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "GET",
+      "path": "/database/export/full",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "GET",
+      "path": "/database/export/tables/:tables",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "POST",
+      "path": "/database/import/validate",
+      "file": "backend/internal/modules/super_admin/database_admin.go"
+    },
+    {
+      "method": "POST",
+      "path": "/deployments/record",
+      "file": "backend/internal/modules/super_admin/deployments.go"
+    },
+    {
+      "method": "GET",
+      "path": "/deployments",
+      "file": "backend/internal/modules/super_admin/deployments.go"
+    },
+    {
+      "method": "GET",
+      "path": "/deployments/:id",
+      "file": "backend/internal/modules/super_admin/deployments.go"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/overview",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/dashboard/overview",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/modules",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/modules",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/modules/:key/global",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/schools/:id/modules/:key",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/modules/usage",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/schools/:id/clone-config",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/schools/:id/reset-data",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/schools/:id",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/global-users",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/global-users",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/global-users/:id",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/global-users/:id/status",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/global-users/:id/reset-password",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/global-users/:id/force-logout",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/impersonation/start",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/impersonation/stop",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/impersonation/audit",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/billing/plans",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/billing/plans",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/billing/plans/:id",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/billing/subscriptions",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/billing/subscriptions",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/billing/subscriptions/:id",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/billing/invoices",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/billing/invoices/generate",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/billing/invoices/:id/mark-paid",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/billing/payments/manual",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/billing/reminders",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/billing/reports/monthly",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/kpis",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/growth",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/churn-risk",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/analytics/module-usage",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/settings",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/system/settings",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/security",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/system/security",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/security/sessions",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/system/security/sessions/revoke-others",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/notifications",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/system/notifications/mark-all-read",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/email",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/system/email",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/api",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/system/api",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/system/integrations",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/system/integrations",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/logs/audit",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/logs/errors",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/logs/activity",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/support/tickets",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/support/tickets",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/support/tickets/:id",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/storage/usage",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/storage/institutions/:id/limit",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/storage/archive",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/feature-flags",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/feature-flags",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/feature-flags/:key",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/feature-flags/:key",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/feature-flags/:key/scope",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/backups",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/backups",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/backups/:id/restore",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/version",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/version/deploy",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/version/rollback",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/health/modules",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/health/system",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "POST",
+      "path": "/health/events",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "User-Agent",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "X-Request-ID",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "User-Agent",
+      "file": "backend/internal/modules/super_admin/enterprise.go"
+    },
+    {
+      "method": "GET",
+      "path": "/stats",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schools",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/schools",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schools/:id",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/schools/:id/status",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schools/:id/users",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schools/:id/modules",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/schools/:id/modules/toggle",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/modules-catalog",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/upload",
+      "file": "backend/internal/modules/super_admin/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/plans",
+      "file": "backend/internal/modules/super_admin/plans.go"
+    },
+    {
+      "method": "POST",
+      "path": "/plans",
+      "file": "backend/internal/modules/super_admin/plans.go"
+    },
+    {
+      "method": "GET",
+      "path": "/plans/:id",
+      "file": "backend/internal/modules/super_admin/plans.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/plans/:id",
+      "file": "backend/internal/modules/super_admin/plans.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/plans/:id",
+      "file": "backend/internal/modules/super_admin/plans.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/plans/:id/toggle",
+      "file": "backend/internal/modules/super_admin/plans.go"
+    },
+    {
+      "method": "GET",
+      "path": "/users",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "POST",
+      "path": "/users",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "PUT",
+      "path": "/users/:id",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/:id/toggle",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "DELETE",
+      "path": "/users/:id",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id/activity",
+      "file": "backend/internal/modules/super_admin/users.go"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/classes",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/classes/:id/students",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/attendance",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/attendance",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/grades",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/grades",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/messages",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/messages",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/schedule",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/notifications",
+      "file": "backend/internal/modules/teacher/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "file": "backend/internal/modules/tenants/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/",
+      "file": "backend/internal/modules/tenants/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "file": "backend/internal/modules/tenants/handler.go"
+    },
+    {
+      "method": "PATCH",
+      "path": "/:id",
+      "file": "backend/internal/modules/tenants/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/suspend",
+      "file": "backend/internal/modules/tenants/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/:id/activate",
+      "file": "backend/internal/modules/tenants/handler.go"
+    },
+    {
+      "method": "POST",
+      "path": "/github",
+      "file": "backend/internal/modules/webhook/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "X-Hub-Signature-256",
+      "file": "backend/internal/modules/webhook/handler.go"
+    },
+    {
+      "method": "GET",
+      "path": "X-GitHub-Event",
+      "file": "backend/internal/modules/webhook/handler.go"
+    }
+  ],
+  "endpoints_expected": [
+    "/api/v1/auth/login",
+    "/api/v1/super-admin/*",
+    "/api/v1/school-admin/*",
+    "/api/v1/teacher/*",
+    "/api/v1/parent/*",
+    "/api/v1/student/*"
+  ],
+  "routes_that_do_not_exist": [],
+  "routes_that_exist_but_are_not_in_menu": [],
+  "visible_routes_returning_404": []
+}

@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-05-09T05:47:18.289Z",
+  "base_url": "https://onlineu.mx/educore",
+  "api_url": "https://educore-production-beef.up.railway.app",
+  "landing": {
+    "status": 200,
+    "ok": true,
+    "bytes": 78192
+  },
+  "assets_checked": 19,
+  "asset_failures": [],
+  "routes_checked": [
+    {
+      "url": "https://onlineu.mx/educore/",
+      "status": 200,
+      "ok": true,
+      "ms": 69
+    },
+    {
+      "url": "https://onlineu.mx/educore/login/",
+      "status": 200,
+      "ok": true,
+      "ms": 75
+    },
+    {
+      "url": "https://onlineu.mx/educore/escuela/",
+      "status": 200,
+      "ok": true,
+      "ms": 64
+    },
+    {
+      "url": "https://onlineu.mx/educore/super-admin/dashboard/",
+      "status": 200,
+      "ok": true,
+      "ms": 77
+    },
+    {
+      "url": "https://onlineu.mx/educore/school-admin/dashboard/",
+      "status": 200,
+      "ok": true,
+      "ms": 106
+    },
+    {
+      "url": "https://onlineu.mx/educore/teacher/dashboard/",
+      "status": 200,
+      "ok": true,
+      "ms": 110
+    },
+    {
+      "url": "https://onlineu.mx/educore/parent/dashboard/",
+      "status": 200,
+      "ok": true,
+      "ms": 67
+    },
+    {
+      "url": "https://onlineu.mx/educore/student/dashboard/",
+      "status": 200,
+      "ok": true,
+      "ms": 65
+    }
+  ],
+  "api_health": {
+    "url": "https://educore-production-beef.up.railway.app/api/v1/health",
+    "status": 200,
+    "ok": true,
+    "ms": 523
+  },
+  "notes": [
+    "Safe production asset audit only. No authenticated crawling, no fuzzing, no mass scan.",
+    "Protected routes may redirect or render login; only 404/5xx are production asset/deep route failures."
+  ]
+}

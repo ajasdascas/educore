@@ -10,6 +10,15 @@ scripts/staging-smoke-report.json
 full_migration.sql
 .DS_Store
 playwright/.auth/
-qa/traces/test-results/
+qa/storage-state/
+qa/traces/*
+!qa/traces/.gitkeep
+qa/screenshots/*
+!qa/screenshots/.gitkeep
+qa/videos/
+qa/test-results/
+test-results/
+*.trace.zip
+*.har
 qa/reports/playwright-html/
 playwright-report/

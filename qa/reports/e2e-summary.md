@@ -1,67 +1,63 @@
 # EduCore E2E Audit Summary
 
-Generated: 2026-05-08T15:22:01.374Z
+Generated: 2026-05-09T05:45:13.631Z
 Base URL: https://onlineu.mx/educore
 API URL: https://educore-production-beef.up.railway.app
-Run ID: 20260508152201
-Production mutations enabled: false
-Super Admin credentials present: true
+Run ID: 20260509054513
+Production mutations enabled: true
+Super Admin credentials present: false
 
 | Status | Count |
 | --- | ---: |
-| PASS | 34 |
-| WARN | 23 |
-| FAIL | 4 |
-| SKIPPED | 68 |
+| FAIL | 7 |
+| PASS | 11 |
+| PASS_READ_ONLY | 7 |
+| PASS_REAL | 30 |
+| SKIPPED | 13 |
+| SKIPPED_NO_CREDENTIALS | 39 |
+| SKIPPED_SECURITY_SCOPE | 1 |
+| WARN | 22 |
 
 ## Bugs
 
 | ID | Severity | Area | Flow | URL | Actual |
 | --- | --- | --- | --- | --- | --- |
 | E2E-001 | P3 | Public Landing | cargar landing principal | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
-| E2E-002 | P3 | Auth | ruta protegida sin sesion | https://onlineu.mx/educore/super-admin/users/ | API Request Error: TypeError: Failed to fetch
-    at a (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:10100)
-    at D (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:2079)
-    at Object.a_ (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72147)
-    at aR (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72301)
-    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139240
-    at sF (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139339)
-    at sM (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139753)
-    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:145896
-    at o4 (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:93336)
-    at iV (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:122701) / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://educore-production-beef.up.railway.app/api/v1/auth/login: net::ERR_ABORTED |
-| E2E-003 | P1 | Auth | login super admin | https://onlineu.mx/educore/login/ | No se detecto dashboard. URL=https://onlineu.mx/educore/login/ |
-| E2E-004 | P1 | Auth | login super admin | https://onlineu.mx/educore/login/ | No se detecto dashboard. URL=https://onlineu.mx/educore/login/ |
-| E2E-005 | P3 | Super Admin | navegar dashboard | https://onlineu.mx/educore/super-admin/dashboard/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-006 | P3 | Super Admin | navegar modulos | https://onlineu.mx/educore/super-admin/modules/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-007 | P3 | Super Admin | navegar billing | https://onlineu.mx/educore/super-admin/billing/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-008 | P3 | Super Admin | navegar analytics | https://onlineu.mx/educore/super-admin/analytics/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-009 | P3 | Super Admin | navegar health monitor | https://onlineu.mx/educore/super-admin/health/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-010 | P3 | Super Admin | navegar database admin | https://onlineu.mx/educore/super-admin/database/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-011 | P3 | Super Admin | navegar auditoria | https://onlineu.mx/educore/super-admin/audit/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-012 | P3 | Super Admin | navegar soporte | https://onlineu.mx/educore/super-admin/support/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-013 | P3 | Super Admin | navegar storage | https://onlineu.mx/educore/super-admin/storage/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-014 | P3 | Super Admin | navegar feature flags | https://onlineu.mx/educore/super-admin/feature-flags/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-015 | P3 | Super Admin | navegar backups | https://onlineu.mx/educore/super-admin/backups/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-016 | P1 | Super Admin | navegar versioning | https://onlineu.mx/educore/super-admin/version/ | Failed to load resource: the server responded with a status of 500 () / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / 500 https://educore-production-beef.up.railway.app/api/v1/super-admin/version |
-| E2E-017 | P3 | Super Admin | navegar planes | https://onlineu.mx/educore/super-admin/plans/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-018 | P3 | Super Admin | navegar escuelas | https://onlineu.mx/educore/super-admin/schools/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-019 | P3 | Super Admin | navegar usuarios globales | https://onlineu.mx/educore/super-admin/users/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-020 | P1 | Auth | login super admin | https://onlineu.mx/educore/login/ | No se detecto dashboard. URL=https://onlineu.mx/educore/login/ |
-| E2E-021 | P3 | Backups/Deploy | abrir backups | https://onlineu.mx/educore/super-admin/backups/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-022 | P3 | Responsive/UX | landing desktop-1280 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
-| E2E-023 | P3 | Responsive/UX | login desktop-1280 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-024 | P3 | Responsive/UX | landing tablet-768 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-025 | P3 | Responsive/UX | login tablet-768 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-026 | P3 | Responsive/UX | landing mobile-375 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| E2E-027 | P3 | Responsive/UX | login mobile-375 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-002 | P3 | Auth | ruta protegida sin sesion | https://onlineu.mx/educore/super-admin/users/ | Failed to load resource: the server responded with a status of 401 () / 401 https://educore-production-beef.up.railway.app/api/v1/auth/login / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-003 | P3 | Responsive/UX | landing desktop-1280 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
+| E2E-004 | P3 | Responsive/UX | login desktop-1280 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-005 | P3 | Responsive/UX | landing tablet-768 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-006 | P3 | Responsive/UX | login tablet-768 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-007 | P3 | Responsive/UX | landing mobile-375 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-008 | P3 | Responsive/UX | login mobile-375 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-009 | P1 | Parent | ruta protegida parent primaria sin sesion | https://onlineu.mx/educore/parent/primary/grades/ | HTTP 404; body length 129 |
+| E2E-010 | P1 | Student | kinder ruta protegida sin sesion | https://onlineu.mx/educore/student/kinder/activities/ | HTTP 404; body length 129 |
+| E2E-011 | P1 | Student | preescolar ruta protegida sin sesion | https://onlineu.mx/educore/student/preschool/activities/ | HTTP 404; body length 129 |
+| E2E-012 | P1 | Student | primaria /student/primary/subjects/ sin sesion | https://onlineu.mx/educore/student/primary/subjects/ | HTTP 404; body length 129 |
+| E2E-013 | P1 | Student | primaria /student/primary/assignments/ sin sesion | https://onlineu.mx/educore/student/primary/assignments/ | HTTP 404; body length 129 |
+| E2E-014 | P1 | Student | primaria /student/primary/exams/ sin sesion | https://onlineu.mx/educore/student/primary/exams/ | HTTP 404; body length 129 |
+| E2E-015 | P1 | Student | primaria /student/primary/grades/ sin sesion | https://onlineu.mx/educore/student/primary/grades/ | HTTP 404; body length 129 |
+| E2E-016 | P3 | Student | primaria /student/attendance/ sin sesion | https://onlineu.mx/educore/student/attendance/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-017 | P3 | Student | primaria /student/schedule/ sin sesion | https://onlineu.mx/educore/student/schedule/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-018 | P3 | Student | primaria /student/messages/ sin sesion | https://onlineu.mx/educore/student/messages/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-019 | P3 | Student | primaria /student/notifications/ sin sesion | https://onlineu.mx/educore/student/notifications/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-020 | P3 | Student | primaria /student/profile/ sin sesion | https://onlineu.mx/educore/student/profile/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-021 | P3 | Permisos | Parent permisos sin sesion | https://onlineu.mx/educore/parent/consents/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-022 | P3 | Responsive | landing mobile 375x667 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
+| E2E-023 | P3 | Responsive | login mobile 375x667 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-024 | P3 | Responsive | landing tablet 768x1024 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-025 | P3 | Responsive | login tablet 768x1024 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-026 | P3 | Responsive | landing desktop 1366x768 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-027 | P3 | Responsive | login desktop 1366x768 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-028 | P3 | Responsive | landing desktop 1920x1080 | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| E2E-029 | P3 | Responsive | login desktop 1920x1080 | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
 
 ## Results
 
 | Area | Flow | Status | URL | Actual |
 | --- | --- | --- | --- | --- |
 | Public Landing | cargar landing principal | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
-| Public Landing | copy principal visible | PASS | https://onlineu.mx/educore/ | EduCore
+| Public Landing | copy principal visible | PASS_REAL | https://onlineu.mx/educore/ | EduCore
 Soluciones
 Beneficios
 Testimonios
@@ -78,23 +74,13 @@ EduCore centraliza la gestión académica, administrativa y financ |
 | Public Landing | link interno /educore/login/ | PASS | https://onlineu.mx/educore/login/ | HTTP 200 |
 | Public Landing | selector de tema | PASS | https://onlineu.mx/educore/ | Control de tema accionado. |
 | Public Landing | CTA solicitar demo | PASS | https://onlineu.mx/educore/ | CTA accionado sin excepcion Playwright. |
-| Public Landing | responsive movil 375px | PASS | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Public Landing | responsive movil 375px | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
 | Auth | abrir pagina login | PASS | https://onlineu.mx/educore/login/ | HTTP 200; 236 caracteres visibles. |
 | Auth | login vacio | PASS | https://onlineu.mx/educore/login/ | URL despues de submit vacio: https://onlineu.mx/educore/login/ |
 | Auth | login invalido | PASS | https://onlineu.mx/educore/login/ | URL despues de credenciales invalidas: https://onlineu.mx/educore/login/ |
 | Auth | forgot password | SKIPPED | https://onlineu.mx/educore/login/ | No se encontro link de recuperacion en login. |
-| Auth | ruta protegida sin sesion | WARN | https://onlineu.mx/educore/super-admin/users/ | API Request Error: TypeError: Failed to fetch
-    at a (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:10100)
-    at D (https://onlineu.mx/educore/_next/static/chunks/app/login/page-20dfe846afaa250f.js:1:2079)
-    at Object.a_ (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72147)
-    at aR (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:72301)
-    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139240
-    at sF (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139339)
-    at sM (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:139753)
-    at https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:145896
-    at o4 (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:93336)
-    at iV (https://onlineu.mx/educore/_next/static/chunks/fd9d1056-1550ff390953c04a.js:1:122701) / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://educore-production-beef.up.railway.app/api/v1/auth/login: net::ERR_ABORTED |
-| Auth | bloqueo ruta protegida sin sesion | PASS | https://onlineu.mx/educore/login/ | Educore
+| Auth | ruta protegida sin sesion | WARN | https://onlineu.mx/educore/super-admin/users/ | Failed to load resource: the server responded with a status of 401 () / 401 https://educore-production-beef.up.railway.app/api/v1/auth/login / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Auth | bloqueo ruta protegida sin sesion | PASS_REAL | https://onlineu.mx/educore/login/ | Educore
 
 Plataforma de administracion escolar
 
@@ -111,120 +97,121 @@ Olvidaste tu contrasena?
 Eres nuevo? Contacta a tu institucion para activar tu cuenta.
 
 Volver al inicio |
-| Auth | abrir login super admin | PASS | https://onlineu.mx/educore/login/ | HTTP 200; 236 caracteres visibles. |
-| Auth | login super admin | FAIL | https://onlineu.mx/educore/login/ | No se detecto dashboard. URL=https://onlineu.mx/educore/login/ |
-| Auth | login super admin via API | PASS | https://educore-production-beef.up.railway.app/api/v1/auth/login | API login exitoso; credencial temporal no persistida en repo. |
-| Auth | sesion Super Admin inyectada desde API para QA | PASS | https://onlineu.mx/educore/super-admin/dashboard/ | Dashboard protegido cargado con sesion temporal de Playwright. |
-| Auth | logout super admin | PASS | https://onlineu.mx/educore/super-admin/dashboard/ | Logout clickeado. |
-| Auth | abrir login super admin | PASS | https://onlineu.mx/educore/login/ | HTTP 200; 236 caracteres visibles. |
-| Auth | login super admin | FAIL | https://onlineu.mx/educore/login/ | No se detecto dashboard. URL=https://onlineu.mx/educore/login/ |
-| Auth | login super admin via API | PASS | https://educore-production-beef.up.railway.app/api/v1/auth/login | API login exitoso; credencial temporal no persistida en repo. |
-| Auth | sesion Super Admin inyectada desde API para QA | PASS | https://onlineu.mx/educore/super-admin/dashboard/ | Dashboard protegido cargado con sesion temporal de Playwright. |
-| Super Admin | navegar dashboard | WARN | https://onlineu.mx/educore/super-admin/dashboard/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar modulos | WARN | https://onlineu.mx/educore/super-admin/modules/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar billing | WARN | https://onlineu.mx/educore/super-admin/billing/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar analytics | WARN | https://onlineu.mx/educore/super-admin/analytics/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar health monitor | WARN | https://onlineu.mx/educore/super-admin/health/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar database admin | WARN | https://onlineu.mx/educore/super-admin/database/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar auditoria | WARN | https://onlineu.mx/educore/super-admin/audit/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar soporte | WARN | https://onlineu.mx/educore/super-admin/support/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar storage | WARN | https://onlineu.mx/educore/super-admin/storage/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar feature flags | WARN | https://onlineu.mx/educore/super-admin/feature-flags/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar backups | WARN | https://onlineu.mx/educore/super-admin/backups/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar versioning | FAIL | https://onlineu.mx/educore/super-admin/version/ | Failed to load resource: the server responded with a status of 500 () / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / 500 https://educore-production-beef.up.railway.app/api/v1/super-admin/version |
-| Super Admin | navegar planes | WARN | https://onlineu.mx/educore/super-admin/plans/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar escuelas | WARN | https://onlineu.mx/educore/super-admin/schools/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Super Admin | navegar usuarios globales | WARN | https://onlineu.mx/educore/super-admin/users/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| School Creation | crear/reutilizar escuelas QA por nivel | SKIPPED |  | E2E_ALLOW_PRODUCTION_MUTATIONS no es true; no se crean ni editan datos en produccion. |
-| School Admin | dashboard school admin | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | estructura | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | estudiantes crear/editar QA | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | padres/tutores y vinculacion | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | credenciales alumno/padre | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | profesores | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | grupos y asignaciones | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | horarios | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | asistencia | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | calificaciones/boletas si aplica | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | documentos/reportes | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | comunicaciones | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| School Admin | configuracion | SKIPPED |  | Falta escuela QA provisionada y/o modo soporte confirmado para ejecutar este flujo sin tocar datos reales. |
-| Teacher Portal | login profesor QA | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | dashboard profesor | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | mis grupos | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | asistencia | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | horario | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | mensajes/notificaciones | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | perfil/configuracion | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | Kinder: reporte diario, alimentacion, siesta, higiene, incidentes | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | Preescolar: observaciones, evaluacion cualitativa, evidencias | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | Primaria: materias, tareas, calificaciones, examenes, materiales | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Teacher Portal | RBAC: profesor no entra a Super Admin ni ve otro tenant | SKIPPED |  | Falta usuario profesor QA creado por flujo mutante seguro. |
-| Parent Portal | login padre QA | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | mis hijos y selector de hijo | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | asistencia | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | calificaciones/avances | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | documentos | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | pagos y estado de cuenta sin pagos reales | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | permisos | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | mensajes/notificaciones | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | Kinder: daily log, meals, naps, diapers, mood, incidents | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | Preescolar: campos formativos, observaciones, evidencias | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | Primaria: tareas, boleta, calificaciones, estado de cuenta | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Parent Portal | RBAC: padre solo ve hijos vinculados | SKIPPED |  | Falta usuario padre QA vinculado a alumno QA. |
-| Student Portal | login alumno QA | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | dashboard alumno | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | classroom | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | horario | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | actividades | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | biblioteca | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | examenes | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | boleta/calificaciones | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | encuestas | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | estado de cuenta si aplica | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | mi institucion | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | centro de mensajes/noticias | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | perfil/documentos personalizados | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Student Portal | RBAC: alumno solo ve sus datos | SKIPPED |  | Falta cuenta de alumno QA creada por flujo mutante seguro. |
-| Billing/Credentials | credenciales desde Super Admin | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | credenciales desde School Admin | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | reset password temporal | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | usuario inactivo no entra | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | password_hash nunca visible | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | invitaciones con provider not configured si falta Resend | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | conceptos de cobro | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | adeudos y estado de cuenta | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | recibos | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | pagos sin pasarela real | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | becas/descuentos/recargos | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Billing/Credentials | vista padre/alumno de facturacion | SKIPPED |  | Falta escuela/usuarios QA creados y E2E_ALLOW_PRODUCTION_MUTATIONS=true; no se ejecutan pagos ni correos reales. |
-| Auth | abrir login super admin | PASS | https://onlineu.mx/educore/login/ | HTTP 200; 236 caracteres visibles. |
-| Auth | login super admin | FAIL | https://onlineu.mx/educore/login/ | No se detecto dashboard. URL=https://onlineu.mx/educore/login/ |
-| Auth | login super admin via API | PASS | https://educore-production-beef.up.railway.app/api/v1/auth/login | API login exitoso; credencial temporal no persistida en repo. |
-| Auth | sesion Super Admin inyectada desde API para QA | PASS | https://onlineu.mx/educore/super-admin/dashboard/ | Dashboard protegido cargado con sesion temporal de Playwright. |
-| Backups/Deploy | abrir backups | WARN | https://onlineu.mx/educore/super-admin/backups/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Backups/Deploy | crear backup | SKIPPED |  | No se crean backups en produccion desde auditoria automatica sin aprobacion explicita adicional. |
-| Module Entitlements | Kinder: modulos activos/bloqueados | SKIPPED |  | Requiere escuela QA Kinder y rol autenticado. Esperado a validar: Reporte diario, alimentacion, siesta, higiene/panal, estado de animo, incidentes, entrada/salida, autorizados, pagos, credenciales, comunicacion. |
-| Module Entitlements | Preescolar: modulos activos/bloqueados | SKIPPED |  | Requiere escuela QA Preescolar y rol autenticado. Esperado a validar: Campos formativos, evaluacion cualitativa, observaciones, evidencias, actividades, materiales, asistencia, comunicacion, pagos, credenciales. |
-| Module Entitlements | Primaria: modulos activos/bloqueados | SKIPPED |  | Requiere escuela QA Primaria y rol autenticado. Esperado a validar: Materias, horarios, tareas, classroom, examenes, calificaciones, boletas, biblioteca, asistencia, estado de cuenta, pagos, credenciales, documentos, comunicacion. |
-| Security/RBAC | API protegida /api/v1/super-admin/schools | PASS | https://educore-production-beef.up.railway.app/api/v1/super-admin/schools | sin token=[redacted]; token [redacted]; password_hash=false |
-| Security/RBAC | API protegida /api/v1/super-admin/users | PASS | https://educore-production-beef.up.railway.app/api/v1/super-admin/users | sin token=[redacted]; token [redacted]; password_hash=false |
-| Security/RBAC | API protegida /api/v1/school-admin/dashboard | PASS | https://educore-production-beef.up.railway.app/api/v1/school-admin/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
-| Security/RBAC | API protegida /api/v1/teacher/dashboard | PASS | https://educore-production-beef.up.railway.app/api/v1/teacher/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
-| Security/RBAC | API protegida /api/v1/parent/dashboard | PASS | https://educore-production-beef.up.railway.app/api/v1/parent/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
-| Security/RBAC | API protegida /api/v1/student/dashboard | PASS | https://educore-production-beef.up.railway.app/api/v1/student/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Auth | login super admin | SKIPPED | https://onlineu.mx/educore/login/ | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Auth | login super admin via API | SKIPPED | https://educore-production-beef.up.railway.app/api/v1/auth/login | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Super Admin | navegar dashboard | SKIPPED_NO_CREDENTIALS | /super-admin/dashboard/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar modulos | SKIPPED_NO_CREDENTIALS | /super-admin/modules/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar billing | SKIPPED_NO_CREDENTIALS | /super-admin/billing/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar analytics | SKIPPED_NO_CREDENTIALS | /super-admin/analytics/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar health monitor | SKIPPED_NO_CREDENTIALS | /super-admin/health/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar database admin | SKIPPED_NO_CREDENTIALS | /super-admin/database/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar auditoria | SKIPPED_NO_CREDENTIALS | /super-admin/audit/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar soporte | SKIPPED_NO_CREDENTIALS | /super-admin/support/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar storage | SKIPPED_NO_CREDENTIALS | /super-admin/storage/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar feature flags | SKIPPED_NO_CREDENTIALS | /super-admin/feature-flags/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar backups | SKIPPED_NO_CREDENTIALS | /super-admin/backups/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar versioning | SKIPPED_NO_CREDENTIALS | /super-admin/version/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar planes | SKIPPED_NO_CREDENTIALS | /super-admin/plans/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar escuelas | SKIPPED_NO_CREDENTIALS | /super-admin/schools/ | Faltan credenciales Super Admin E2E. |
+| Super Admin | navegar usuarios globales | SKIPPED_NO_CREDENTIALS | /super-admin/users/ | Faltan credenciales Super Admin E2E. |
+| Auth | login super admin via API | SKIPPED | https://educore-production-beef.up.railway.app/api/v1/auth/login | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Auth | login super admin via API | SKIPPED | https://educore-production-beef.up.railway.app/api/v1/auth/login | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Auth | login super admin via API | SKIPPED | https://educore-production-beef.up.railway.app/api/v1/auth/login | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Auth | login super admin via API | SKIPPED | https://educore-production-beef.up.railway.app/api/v1/auth/login | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Auth | login super admin via API | SKIPPED | https://educore-production-beef.up.railway.app/api/v1/auth/login | Faltan E2E_SUPERADMIN_EMAIL y/o E2E_SUPERADMIN_PASSWORD. |
+| Billing/Credentials | credenciales desde Super Admin | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | credenciales desde School Admin | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | reset password temporal | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | usuario inactivo no entra | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | password_hash nunca visible | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | invitaciones con provider not configured si falta Resend | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | conceptos de cobro | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | adeudos y estado de cuenta | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | recibos | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | pagos sin pasarela real | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | becas/descuentos/recargos | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Billing/Credentials | vista padre/alumno de facturacion | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales E2E; no se ejecutan flujos autenticados ni mutantes. |
+| Backups/Deploy | Super Admin backups | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales para revisar historial y estados sin crear backups. |
+| Backups/Deploy | crear/editar/eliminar backup | SKIPPED_NO_CREDENTIALS |  | Operacion mutante bloqueada sin credenciales y mutation gate. |
+| Module Entitlements | Kinder: modulos activos/bloqueados | SKIPPED_NO_CREDENTIALS |  | Requiere escuela QA Kinder y rol autenticado. Esperado a validar: Reporte diario, alimentacion, siesta, higiene/panal, estado de animo, incidentes, entrada/salida, autorizados, pagos, credenciales, comunicacion. |
+| Module Entitlements | Preescolar: modulos activos/bloqueados | SKIPPED_NO_CREDENTIALS |  | Requiere escuela QA Preescolar y rol autenticado. Esperado a validar: Campos formativos, evaluacion cualitativa, observaciones, evidencias, actividades, materiales, asistencia, comunicacion, pagos, credenciales. |
+| Module Entitlements | Primaria: modulos activos/bloqueados | SKIPPED_NO_CREDENTIALS |  | Requiere escuela QA Primaria y rol autenticado. Esperado a validar: Materias, horarios, tareas, classroom, examenes, calificaciones, boletas, biblioteca, asistencia, estado de cuenta, pagos, credenciales, documentos, comunicacion. |
+| Security/RBAC | API protegida /api/v1/super-admin/schools | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/super-admin/schools | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/super-admin/users | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/super-admin/users | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/school-admin/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/school-admin/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/teacher/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/teacher/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/parent/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/parent/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/student/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/student/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
 | Security/RBAC | X-Support-Tenant-ID sin Super Admin | PASS |  | HTTP 401 |
 | Responsive/UX | landing desktop-1280 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
-| Responsive/UX | landing desktop-1280 overflow | PASS | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive/UX | landing desktop-1280 overflow | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
 | Responsive/UX | login desktop-1280 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Responsive/UX | login desktop-1280 overflow | PASS | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive/UX | login desktop-1280 overflow | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
 | Responsive/UX | landing tablet-768 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Responsive/UX | landing tablet-768 overflow | PASS | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive/UX | landing tablet-768 overflow | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
 | Responsive/UX | login tablet-768 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Responsive/UX | login tablet-768 overflow | PASS | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive/UX | login tablet-768 overflow | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
 | Responsive/UX | landing mobile-375 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Responsive/UX | landing mobile-375 overflow | PASS | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive/UX | landing mobile-375 overflow | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
 | Responsive/UX | login mobile-375 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
-| Responsive/UX | login mobile-375 overflow | PASS | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive/UX | login mobile-375 overflow | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
 | Responsive/UX | muestreo basico de elementos visibles | PASS | https://onlineu.mx/educore/login/ | 22 elementos visibles muestreados. |
+| Parent | primaria portal completo | SKIPPED |  | No hay escuela/alumno/padre QA-CODEX-NIGHTLY-PRIMARIA en checkpoint. |
+| Parent | ruta protegida parent primaria sin sesion | FAIL | https://onlineu.mx/educore/parent/primary/grades/ | HTTP 404; body length 129 |
+| Parent | primaria no captura datos academicos | PASS_READ_ONLY | https://onlineu.mx/educore/parent/primary/grades/ | Sin credencial QA activa se valido solo ruta protegida y se deja el flujo profundo pendiente. |
+| Student | kinder portal limitado | SKIPPED |  | No hay alumno QA-CODEX-NIGHTLY-KINDER con cuenta de portal. |
+| Student | kinder ruta protegida sin sesion | FAIL | https://onlineu.mx/educore/student/kinder/activities/ | HTTP 404; body length 129 |
+| Student | kinder no debe mostrar calificaciones/tareas/examenes por defecto | PASS_READ_ONLY | https://onlineu.mx/educore/student/kinder/activities/ | Sin credencial QA activa se deja la verificacion autenticada como pendiente, sin marcar PASS falso. |
+| Student | preescolar portal limitado | SKIPPED |  | No hay alumno QA-CODEX-NIGHTLY-PREESCOLAR con cuenta de portal. |
+| Student | preescolar ruta protegida sin sesion | FAIL | https://onlineu.mx/educore/student/preschool/activities/ | HTTP 404; body length 129 |
+| Student | preescolar solo actividades/recursos/evidencias/perfil | PASS_READ_ONLY | https://onlineu.mx/educore/student/preschool/activities/ | Validacion autenticada queda pendiente hasta tener cuenta QA; no se intento evadir autenticacion. |
+| Student | primaria portal completo | SKIPPED |  | No hay alumno QA-CODEX-NIGHTLY-PRIMARIA con cuenta de portal. |
+| Student | primaria /student/dashboard/ sin sesion | PASS | https://onlineu.mx/educore/student/dashboard/ | HTTP 200; 236 caracteres visibles. |
+| Student | primaria /student/primary/subjects/ sin sesion | FAIL | https://onlineu.mx/educore/student/primary/subjects/ | HTTP 404; body length 129 |
+| Student | primaria /student/primary/assignments/ sin sesion | FAIL | https://onlineu.mx/educore/student/primary/assignments/ | HTTP 404; body length 129 |
+| Student | primaria /student/primary/exams/ sin sesion | FAIL | https://onlineu.mx/educore/student/primary/exams/ | HTTP 404; body length 129 |
+| Student | primaria /student/primary/grades/ sin sesion | FAIL | https://onlineu.mx/educore/student/primary/grades/ | HTTP 404; body length 129 |
+| Student | primaria /student/attendance/ sin sesion | WARN | https://onlineu.mx/educore/student/attendance/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Student | primaria /student/schedule/ sin sesion | WARN | https://onlineu.mx/educore/student/schedule/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Student | primaria /student/messages/ sin sesion | WARN | https://onlineu.mx/educore/student/messages/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Student | primaria /student/notifications/ sin sesion | WARN | https://onlineu.mx/educore/student/notifications/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Student | primaria /student/profile/ sin sesion | WARN | https://onlineu.mx/educore/student/profile/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Student | primaria no entra a parent/teacher/admin | PASS_READ_ONLY |  | Se cubrio acceso anonimo seguro; wrong-role autenticado queda pendiente con cuenta QA. |
+| Backups | crear/editar/descargar/eliminar backup QA | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales Super Admin E2E. |
+| Billing | facturacion escolar completa | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales Super Admin E2E y objetos QA. |
+| Credenciales | crear accesos QA profesor/padre/alumno | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales Super Admin E2E y objetos QA. |
+| Mensajes | comunicaciones multirol QA | SKIPPED_NO_CREDENTIALS |  | Faltan credenciales Super Admin E2E y usuarios QA vinculados. |
+| Notificaciones | Parent notificaciones sin sesion | PASS | https://onlineu.mx/educore/parent/notifications/ | HTTP 200; 236 caracteres visibles. |
+| Permisos | Parent permisos sin sesion | WARN | https://onlineu.mx/educore/parent/consents/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Mensajes | no cross-tenant ni mensajes a otra escuela | SKIPPED_NO_CREDENTIALS |  | No se intento enviar mensajes entre tenants sin cuentas QA suficientes. |
+| Security/RBAC | API protegida /api/v1/super-admin/schools | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/super-admin/schools | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/school-admin/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/school-admin/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/teacher/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/teacher/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/parent/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/parent/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| Security/RBAC | API protegida /api/v1/student/dashboard | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/student/dashboard | sin token=[redacted]; token [redacted]; password_hash=false |
+| RBAC | IDOR ofensivo con mutacion de IDs | SKIPPED_SECURITY_SCOPE |  | No se prueban payloads, fuzzing, enumeracion agresiva ni explotacion. Solo se documenta como pendiente seguro con objetos QA conocidos. |
+| Tenant isolation | cross-tenant solo con objetos QA | SKIPPED_NO_CREDENTIALS |  | No hay dos sesiones QA completas en esta corrida; no se hizo probing ofensivo. |
+| Responsive | landing mobile 375x667 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. |
+| Responsive | landing overflow mobile 375x667 | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive | login mobile 375x667 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | login overflow mobile 375x667 | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive | landing tablet 768x1024 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | landing overflow tablet 768x1024 | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive | login tablet 768x1024 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | login overflow tablet 768x1024 | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive | landing desktop 1366x768 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | landing overflow desktop 1366x768 | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive | login desktop 1366x768 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | login overflow desktop 1366x768 | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive | landing desktop 1920x1080 | WARN | https://onlineu.mx/educore/ | Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / Minified React error #418; visit https://react.dev/errors/418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings. / https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | landing overflow desktop 1920x1080 | PASS_REAL | https://onlineu.mx/educore/ | Sin overflow horizontal relevante. |
+| Responsive | login desktop 1920x1080 | WARN | https://onlineu.mx/educore/login/ | https://onlineu.mx/cdn-cgi/rum?: net::ERR_ABORTED |
+| Responsive | login overflow desktop 1920x1080 | PASS_REAL | https://onlineu.mx/educore/login/ | Sin overflow horizontal relevante. |
+| Responsive | roles autenticados responsive | SKIPPED_NO_CREDENTIALS |  | La matriz autenticada queda pendiente hasta contar con sesiones QA por rol. |
+| Deploy/static export | landing production basePath | PASS_REAL | https://onlineu.mx/educore/ | HTTP 200; basePathAssets=true; bytes=78192 |
+| Deploy/static export | deep route refresh /login/ | PASS_READ_ONLY | https://onlineu.mx/educore/login/ | HTTP 200 |
+| Deploy/static export | deep route refresh /escuela/ | PASS_READ_ONLY | https://onlineu.mx/educore/escuela/ | HTTP 200 |
+| Deploy/static export | deep route refresh /super-admin/dashboard/ | PASS_READ_ONLY | https://onlineu.mx/educore/super-admin/dashboard/ | HTTP 200 |
+| Deploy/static export | API health no localhost | PASS_REAL | https://educore-production-beef.up.railway.app/api/v1/health | HTTP 200; localhost=false |
+| Cleanup | eliminar/archivar objetos QA | SKIPPED |  | E2E_CLEANUP_QA_OBJECTS no es true; no se ejecuta cleanup destructivo/archivado. |
 

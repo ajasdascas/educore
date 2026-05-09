@@ -1,24 +1,34 @@
 import { test } from '@playwright/test';
-import { qaName, recordResult, requireMutationGate } from './helpers/audit';
+import {
+  auditPageLoad,
+  ensureAllQASchools,
+  installAuthSession,
+  recordResult,
+  saveAuditScreenshot,
+  validateSchoolModules,
+} from './helpers/audit';
 
-const schools = [
-  { name: 'Kinder-E2E', level: 'KINDER', slug: 'qa-codex-kinder-e2e' },
-  { name: 'Preescolar-E2E', level: 'PRESCHOOL/PREESCOLAR', slug: 'qa-codex-preescolar-e2e' },
-  { name: 'Primaria-E2E', level: 'PRIMARY/PRIMARIA', slug: 'qa-codex-primaria-e2e' },
-];
-
-test('escuelas QA por nivel: crear o reutilizar solo con gate explicito', async () => {
-  if (!requireMutationGate('School Creation', 'crear/reutilizar escuelas QA por nivel')) return;
+test('escuelas QA por nivel: crear o reutilizar solo con gate explicito', async ({ page, request }, testInfo) => {
+  const { session, schools } = await ensureAllQASchools(request);
+  if (!session) return;
 
   for (const school of schools) {
-    recordResult({
-      area: 'School Creation',
-      flow: `crear o reutilizar ${school.level}`,
-      status: 'SKIPPED',
-      school: `QA-CODEX-${school.name}`,
-      expected: `Crear o reutilizar slug ${school.slug} con prefijo ${qaName(school.name)}.`,
-      actual: 'Gate de mutacion habilitado, pero este scaffold no ejecuta altas hasta confirmar selectores/API productivos sin riesgo.',
-      recommendation: 'Completar este caso con API/UI confirmada en una rama QA antes de activar mutaciones en produccion.',
-    });
+    await validateSchoolModules(request, session, school);
   }
+
+  await installAuthSession(page, session);
+  await auditPageLoad(page, 'School Creation', 'validar listado Super Admin escuelas QA', '/super-admin/schools/', /Escuelas|Instituciones|Schools/i);
+  const body = await page.locator('body').innerText().catch(() => '');
+  const visible = schools.some((school) => body.includes(school.slug) || body.includes(school.name));
+  const screenshot = await saveAuditScreenshot(page, 'qa-schools-super-admin-list', testInfo);
+  recordResult({
+    area: 'School Creation',
+    flow: 'validar escuelas QA visibles en UI',
+    status: visible ? 'PASS' : 'WARN',
+    url: page.url(),
+    expected: 'Al menos una escuela QA creada/reutilizada aparece en la UI Super Admin.',
+    actual: visible ? 'Escuela QA visible en listado.' : 'No se encontro slug/nombre QA en texto visible; API si devolvio escuelas QA.',
+    evidence: screenshot,
+    severity: visible ? undefined : 'P2',
+  });
 });

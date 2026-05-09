@@ -1,0 +1,8 @@
+URL,Rol,Desde,Modulo,Esperada,Fix
+https://onlineu.mx/educore/parent/primary/grades/,,Parent,ruta protegida parent primaria sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Calificaciones/i,Review route/export/basePath.
+https://onlineu.mx/educore/student/kinder/activities/,,Student,kinder ruta protegida sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Actividades/i,Review route/export/basePath.
+https://onlineu.mx/educore/student/preschool/activities/,,Student,preescolar ruta protegida sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Actividades/i,Review route/export/basePath.
+https://onlineu.mx/educore/student/primary/subjects/,,Student,primaria /student/primary/subjects/ sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Dashboard|Perfil|Calificaciones/i,Review route/export/basePath.
+https://onlineu.mx/educore/student/primary/assignments/,,Student,primaria /student/primary/assignments/ sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Dashboard|Perfil|Calificaciones/i,Review route/export/basePath.
+https://onlineu.mx/educore/student/primary/exams/,,Student,primaria /student/primary/exams/ sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Dashboard|Perfil|Calificaciones/i,Review route/export/basePath.
+https://onlineu.mx/educore/student/primary/grades/,,Student,primaria /student/primary/grades/ sin sesion,Texto visible compatible con /login|iniciar|Educore|No autorizado|Unauthorized|Dashboard|Perfil|Calificaciones/i,Review route/export/basePath.

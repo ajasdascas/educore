@@ -1,0 +1,31 @@
+﻿{
+    "started_at":  "2026-05-08T23:21:40.000Z",
+    "last_completed_phase":  "verification",
+    "completed":  [
+                      "git-index-repair",
+                      "qa-worktree-selected",
+                      "bootstrap",
+                      "reporting",
+                      "route-inventory",
+                      "production-assets",
+                      "playwright-full-suite",
+                      "backend-build",
+                      "frontend-build",
+                      "root-build",
+                      "final-reports"
+                  ],
+    "failed":  [
+
+               ],
+    "skipped":  [
+                    "qa-state-recovery"
+                ],
+    "created_qa_objects":  [
+
+                           ],
+    "deleted_qa_objects":  [
+
+                           ],
+    "next_step":  "Review generated reports and optionally rerun with E2E credentials for authenticated QA object lifecycle.",
+    "updated_at":  "2026-05-09T05:50:13.9548264Z"
+}
