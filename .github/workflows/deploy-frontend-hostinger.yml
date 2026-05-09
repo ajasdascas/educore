@@ -40,6 +40,10 @@ jobs:
         run: |
           test -d frontend/out
           test -f frontend/out/index.html
+          test -f frontend/out/school-admin/incidents/index.html
+          test -f frontend/out/school-admin/daily-logs/index.html
+          test -f frontend/out/school-admin/kinder/incidents/index.html
+          echo "✓ All critical route HTMLs present in frontend/out/"
           ls -la frontend/out | head
 
       - name: Audit navigation routes
@@ -51,9 +55,13 @@ jobs:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          port: 21
+          protocol: ftp
           local-dir: ./frontend/out/
           server-dir: /public_html/educore/
           state-name: .ftp-deploy-sync-state-v2.json
+          timeout: 120000
+          log-level: verbose
           exclude: |
             **/.git*
             **/.git*/**
