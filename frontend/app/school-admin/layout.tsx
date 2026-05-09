@@ -3,88 +3,17 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  Users,
-  GraduationCap,
-  Calendar,
-  BookOpen,
-  ClipboardCheck,
-  NotebookPen,
-  FileText,
-  FileCheck2,
-  FolderOpen,
-  MessageCircle,
-  Database,
-  CreditCard,
-  Settings,
-  Menu,
-  X,
-  Building2,
-  Baby,
-  Apple,
-  Moon,
-  Heart,
-  AlertTriangle,
-  LogIn,
-  Milestone,
-  Camera,
-  ActivitySquare,
-  Brain,
-  Eye,
-  Zap,
-  BookMarked,
-} from "lucide-react";
+import { Building2, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { RoleGuard } from "@/components/providers/RoleGuard";
-import { ModuleKey } from "@/lib/modules/registry";
 import { useEnabledModules } from "@/lib/modules/use-enabled-modules";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
 import { isSupportMode, setSupportContext } from "@/lib/auth";
-
-const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: ModuleKey }> = [
-  // Core — siempre visible
-  { href: "/school-admin/dashboard",    label: "Dashboard",       icon: LayoutDashboard },
-  { href: "/school-admin/academic",     label: "Estructura",      icon: BookOpen,       moduleKey: "academic_core" },
-  { href: "/school-admin/students",     label: "Estudiantes",     icon: GraduationCap,  moduleKey: "users" },
-  { href: "/school-admin/teachers",     label: "Profesores",      icon: Users,          moduleKey: "users" },
-  { href: "/school-admin/groups",       label: "Grupos",          icon: Users,          moduleKey: "academic_core" },
-  { href: "/school-admin/schedule",     label: "Horarios",        icon: Calendar,       moduleKey: "schedules" },
-  { href: "/school-admin/attendance",   label: "Asistencias",     icon: ClipboardCheck, moduleKey: "attendance" },
-
-  // Módulos bebés / guardería
-  { href: "/school-admin/daily-logs",   label: "Registro diario", icon: Baby,           moduleKey: "daily_logs" as ModuleKey },
-  { href: "/school-admin/meals",        label: "Comidas",         icon: Apple,          moduleKey: "meals" as ModuleKey },
-  { href: "/school-admin/naps",         label: "Siestas",         icon: Moon,           moduleKey: "naps" as ModuleKey },
-  { href: "/school-admin/health",       label: "Salud",           icon: Heart,          moduleKey: "health_checks" as ModuleKey },
-  { href: "/school-admin/incidents",    label: "Incidentes",      icon: AlertTriangle,  moduleKey: "incidents" as ModuleKey },
-  { href: "/school-admin/pickup",       label: "Autorizaciones",  icon: LogIn,          moduleKey: "pickup_authorizations" as ModuleKey },
-  { href: "/school-admin/milestones",   label: "Hitos",           icon: Milestone,      moduleKey: "milestones" as ModuleKey },
-  { href: "/school-admin/photos",       label: "Fotos/evidencias",icon: Camera,         moduleKey: "photos_evidence" as ModuleKey },
-
-  // Módulos preescolar / kinder
-  { href: "/school-admin/qualitative",  label: "Evaluaciones",    icon: ActivitySquare, moduleKey: "qualitative_assessments" as ModuleKey },
-  { href: "/school-admin/development",  label: "Desarrollo",      icon: Brain,          moduleKey: "development_areas" as ModuleKey },
-  { href: "/school-admin/observations", label: "Observaciones",   icon: Eye,            moduleKey: "observations" as ModuleKey },
-  { href: "/school-admin/activities",   label: "Actividades",     icon: Zap,            moduleKey: "activities" as ModuleKey },
-  { href: "/school-admin/preschool-report-cards", label: "Boletas preescolar", icon: BookMarked, moduleKey: "preschool_report_cards" as ModuleKey },
-
-  // Módulos primaria / secundaria
-  { href: "/school-admin/grades",       label: "Calificaciones",  icon: NotebookPen,    moduleKey: "grading" },
-  { href: "/school-admin/report-cards", label: "Boletas",         icon: FileCheck2,     moduleKey: "report_cards" },
-
-  // Admin general
-  { href: "/school-admin/documents",    label: "Documentos",      icon: FolderOpen,     moduleKey: "documents" },
-  { href: "/school-admin/payments",     label: "Pagos",           icon: CreditCard,     moduleKey: "payments" },
-  { href: "/school-admin/reports",      label: "Reportes",        icon: FileText,       moduleKey: "reports" },
-  { href: "/school-admin/communications", label: "Comunicaciones",icon: MessageCircle,  moduleKey: "communications" },
-  { href: "/school-admin/database",     label: "Base de datos",   icon: Database },
-  { href: "/school-admin/settings",     label: "Configuracion",   icon: Settings },
-];
+import { SCHOOL_ADMIN_NAV } from "@/lib/modules/navigation";
 
 export default function SchoolAdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -170,6 +99,10 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SA";
   const userRole = user?.role === "SCHOOL_ADMIN" ? "Administrador Escuela" : user?.role || "";
 
+  const visibleItems = SCHOOL_ADMIN_NAV.filter(
+    (item) => !item.moduleKey || isModuleEnabled(item.moduleKey as any)
+  );
+
   return (
     <RoleGuard allowedRoles={["SCHOOL_ADMIN", "SUPER_ADMIN"]}>
     <div className="min-h-screen overflow-x-hidden bg-background flex flex-col lg:flex-row">
@@ -207,8 +140,8 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
           </button>
         </div>
 
-        <nav className="min-w-0 flex-1 overflow-x-hidden py-4 space-y-1">
-          {navItems.filter((item) => !item.moduleKey || isModuleEnabled(item.moduleKey)).map((item) => {
+        <nav className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto py-4 space-y-1">
+          {visibleItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link

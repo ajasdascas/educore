@@ -3,11 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard, GraduationCap, Calendar, FileText, MessageCircle,
-  Bell, ClipboardCheck, CreditCard, FolderOpen, Settings, Menu, User, X, Building2,
-  ClipboardList, Utensils, Moon, Droplets, Smile, AlertTriangle, ShoppingBag,
-} from "lucide-react";
+import { Building2, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,27 +12,7 @@ import { RoleGuard } from "@/components/providers/RoleGuard";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
 import { authFetch, isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-
-const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
-  { href: "/parent/dashboard",      label: "Dashboard",       icon: LayoutDashboard },
-  { href: "/parent/children",       label: "Mis Hijos",       icon: GraduationCap },
-  { href: "/parent/daily-logs",     label: "Registro Diario", icon: ClipboardList,  moduleKey: "daily_logs" },
-  { href: "/parent/meals",          label: "Comidas",         icon: Utensils,       moduleKey: "meals" },
-  { href: "/parent/naps",           label: "Siestas",         icon: Moon,           moduleKey: "naps" },
-  { href: "/parent/diapers",        label: "Higiene",         icon: Droplets,       moduleKey: "diapers" },
-  { href: "/parent/mood",           label: "Estado Emocional",icon: Smile,          moduleKey: "mood" },
-  { href: "/parent/incidents",      label: "Incidentes",      icon: AlertTriangle,  moduleKey: "incidents" },
-  { href: "/parent/store",          label: "Tienda Escolar",  icon: ShoppingBag,    moduleKey: "school_store" },
-  { href: "/parent/grades",         label: "Calificaciones",  icon: FileText,       moduleKey: "grading" },
-  { href: "/parent/attendance",     label: "Asistencia",      icon: Calendar,       moduleKey: "attendance" },
-  { href: "/parent/messages",       label: "Mensajes",        icon: MessageCircle,  moduleKey: "communications" },
-  { href: "/parent/documents",      label: "Documentos",      icon: FolderOpen,     moduleKey: "documents" },
-  { href: "/parent/payments",       label: "Pagos",           icon: CreditCard,     moduleKey: "payments" },
-  { href: "/parent/consents",       label: "Permisos",        icon: ClipboardCheck },
-  { href: "/parent/notifications",  label: "Notificaciones",  icon: Bell },
-  { href: "/parent/profile",        label: "Mi Perfil",       icon: User },
-  { href: "/parent/settings",       label: "Configuración",   icon: Settings },
-];
+import { PARENT_NAV } from "@/lib/modules/navigation";
 
 export default function ParentLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -99,6 +75,12 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "P";
 
+  const visibleItems = PARENT_NAV.filter((item) => {
+    if (!item.moduleKey) return true;
+    if (enabledModuleKeys === null) return true; // muestra todo mientras carga
+    return enabledModuleKeys.has(item.moduleKey);
+  });
+
   return (
     <RoleGuard allowedRoles={["PARENT"]}>
       <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background flex flex-col lg:flex-row">
@@ -122,12 +104,8 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <nav className="flex-1 py-4 space-y-1">
-            {navItems.filter((item) => {
-              if (!item.moduleKey) return true;
-              if (enabledModuleKeys === null) return true;
-              return enabledModuleKeys.has(item.moduleKey);
-            }).map((item) => {
+          <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
+            {visibleItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
@@ -137,8 +115,8 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
                       : "hover:bg-sidebar-accent/50 text-sidebar-foreground border-l-4 border-transparent"
                   }`}
                 >
-                  <item.icon className="w-5 h-5 mr-3" />
-                  <span className="font-medium text-sm">{item.label}</span>
+                  <item.icon className="w-5 h-5 mr-3 shrink-0" />
+                  <span className="font-medium text-sm truncate">{item.label}</span>
                 </Link>
               );
             })}

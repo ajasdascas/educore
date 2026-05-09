@@ -3,11 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard, BookOpen, Building2, Calendar, ClipboardCheck,
-  Bell, Settings, Menu, X, User, BookMarked, MessageCircle,
-  Star, MessageSquare, FolderOpen,
-} from "lucide-react";
+import { Building2, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,22 +12,7 @@ import { RoleGuard } from "@/components/providers/RoleGuard";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
 import { authFetch, isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-
-const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
-  { href: "/student/dashboard",     label: "Dashboard",        icon: LayoutDashboard },
-  { href: "/student/profile",       label: "Mi Perfil",        icon: User },
-  { href: "/student/grades",        label: "Calificaciones",   icon: BookOpen,       moduleKey: "grading" },
-  { href: "/student/attendance",    label: "Asistencia",       icon: ClipboardCheck, moduleKey: "attendance" },
-  { href: "/student/qualitative-assessments", label: "Mis Evaluaciones",  icon: Star,          moduleKey: "qualitative_assessments" },
-  { href: "/student/development-areas",       label: "Campos Formativos", icon: BookMarked,    moduleKey: "development_areas" },
-  { href: "/student/observations",            label: "Observaciones",     icon: MessageSquare, moduleKey: "observations" },
-  { href: "/student/evidence",                label: "Evidencias",        icon: FolderOpen,    moduleKey: "photos_evidence" },
-  { href: "/student/assignments",   label: "Tareas",           icon: BookMarked,     moduleKey: "assignments" },
-  { href: "/student/schedule",      label: "Horario",          icon: Calendar,       moduleKey: "schedules" },
-  { href: "/student/messages",      label: "Mensajes",         icon: MessageCircle,  moduleKey: "communications" },
-  { href: "/student/notifications", label: "Notificaciones",   icon: Bell },
-  { href: "/student/settings",      label: "Configuración",    icon: Settings },
-];
+import { STUDENT_NAV } from "@/lib/modules/navigation";
 
 export default function StudentLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -94,6 +75,12 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "ES";
 
+  const visibleItems = STUDENT_NAV.filter((item) => {
+    if (!item.moduleKey) return true;
+    if (enabledModuleKeys === null) return true; // muestra todo mientras carga
+    return enabledModuleKeys.has(item.moduleKey);
+  });
+
   return (
     <RoleGuard allowedRoles={["STUDENT"]}>
       <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background flex flex-col lg:flex-row">
@@ -117,12 +104,8 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <nav className="flex-1 py-4 space-y-1">
-            {navItems.filter((item) => {
-              if (!item.moduleKey) return true;
-              if (enabledModuleKeys === null) return true; // show all while loading
-              return enabledModuleKeys.has(item.moduleKey);
-            }).map((item) => {
+          <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
+            {visibleItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
@@ -132,8 +115,8 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
                       : "hover:bg-sidebar-accent/50 text-sidebar-foreground border-l-4 border-transparent"
                   }`}
                 >
-                  <item.icon className="w-5 h-5 mr-3" />
-                  <span className="font-medium text-sm">{item.label}</span>
+                  <item.icon className="w-5 h-5 mr-3 shrink-0" />
+                  <span className="font-medium text-sm truncate">{item.label}</span>
                 </Link>
               );
             })}

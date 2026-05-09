@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BookOpen, Building2, Calendar, Clock, FileText, KeyRound, LayoutDashboard, Megaphone, Menu, MessageCircle, Settings, User, X } from "lucide-react";
+import { Building2, Menu, X } from "lucide-react";
 import { RoleGuard } from "@/components/providers/RoleGuard";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
@@ -12,19 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
 import { authFetch, isSupportMode, setSupportContext, type SupportRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-
-const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: string }> = [
-  { href: "/teacher/dashboard",     label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/teacher/classes",       label: "Mis Grupos",     icon: BookOpen,       moduleKey: "academic_core" },
-  { href: "/teacher/grades",        label: "Calificaciones", icon: FileText,       moduleKey: "grading" },
-  { href: "/teacher/attendance",    label: "Asistencia",     icon: Calendar,       moduleKey: "attendance" },
-  { href: "/teacher/schedule",      label: "Mi Horario",     icon: Clock,          moduleKey: "schedules" },
-  { href: "/teacher/messages",      label: "Mensajes",       icon: MessageCircle,  moduleKey: "communications" },
-  { href: "/teacher/notifications", label: "Avisos",          icon: Megaphone },
-  { href: "/teacher/profile",       label: "Mi Perfil",      icon: User },
-  { href: "/teacher/security",      label: "Seguridad",      icon: KeyRound },
-  { href: "/teacher/settings",      label: "Configuración",  icon: Settings },
-];
+import { TEACHER_NAV } from "@/lib/modules/navigation";
 
 export default function TeacherLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -87,6 +75,12 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "PR";
 
+  const visibleItems = TEACHER_NAV.filter((item) => {
+    if (!item.moduleKey) return true;
+    if (enabledModuleKeys === null) return true; // muestra todo mientras carga
+    return enabledModuleKeys.has(item.moduleKey);
+  });
+
   return (
     <RoleGuard allowedRoles={["TEACHER"]}>
       <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background flex flex-col lg:flex-row">
@@ -110,12 +104,8 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <nav className="flex-1 py-4 space-y-1">
-            {navItems.filter((item) => {
-              if (!item.moduleKey) return true;
-              if (enabledModuleKeys === null) return true;
-              return enabledModuleKeys.has(item.moduleKey);
-            }).map((item) => {
+          <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
+            {visibleItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
@@ -125,8 +115,8 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
                       : "hover:bg-sidebar-accent/50 text-sidebar-foreground border-l-4 border-transparent"
                   }`}
                 >
-                  <item.icon className="w-5 h-5 mr-3" />
-                  <span className="font-medium text-sm">{item.label}</span>
+                  <item.icon className="w-5 h-5 mr-3 shrink-0" />
+                  <span className="font-medium text-sm truncate">{item.label}</span>
                 </Link>
               );
             })}
