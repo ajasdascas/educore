@@ -65,7 +65,7 @@ func (h *Handler) GetChildMeals(c *fiber.Ctx) error {
 	db := h.service.repo.db
 	rows, err := db.Query(c.UserContext(),
 		database.RebindPlaceholders(db.Driver(), `
-			SELECT id, DATE_FORMAT(meal_date,'%Y-%m-%d'), meal_time, portion, COALESCE(food_note,'')
+			SELECT id, DATE_FORMAT(meal_date,'%Y-%m-%d'), meal_time, meal_portion, COALESCE(meal_note,'')
 			FROM kinder_meals
 			WHERE tenant_id = $1 AND student_id = $2
 			ORDER BY meal_date DESC, meal_time`),

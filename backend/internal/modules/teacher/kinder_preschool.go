@@ -197,7 +197,7 @@ func (h *Handler) KinderGetMeals(c *fiber.Ctx) error {
 	rows, err := db.Query(c.UserContext(),
 		database.RebindPlaceholders(db.Driver(), `
 			SELECT kr.id, kr.student_id, CONCAT(s.first_name,' ',s.last_name),
-			       DATE_FORMAT(kr.meal_date,'%Y-%m-%d'), kr.meal_time, kr.portion, COALESCE(kr.food_note,'')
+			       DATE_FORMAT(kr.meal_date,'%Y-%m-%d'), kr.meal_time, kr.meal_portion, COALESCE(kr.meal_note,'')
 			FROM kinder_meals kr
 			INNER JOIN students s ON s.id = kr.student_id
 			INNER JOIN group_students gs ON gs.student_id = s.id
@@ -260,7 +260,7 @@ func (h *Handler) KinderSaveMeal(c *fiber.Ctx) error {
 	newID := database.NewID()
 	_, err = db.Exec(c.UserContext(),
 		database.RebindPlaceholders(db.Driver(),
-			"INSERT INTO kinder_meals (id,tenant_id,student_id,teacher_id,meal_date,meal_time,portion,food_note) VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''))"),
+			"INSERT INTO kinder_meals (id,tenant_id,student_id,teacher_id,meal_date,meal_time,meal_portion,meal_note) VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''))"),
 		newID, tenantID, body.StudentID, userID, body.MealDate, body.MealTime, body.Portion, body.FoodNote)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("Error guardando: %v", err))
@@ -283,7 +283,7 @@ func (h *Handler) KinderUpdateMeal(c *fiber.Ctx) error {
 	}
 	_, err = db.Exec(c.UserContext(),
 		database.RebindPlaceholders(db.Driver(),
-			"UPDATE kinder_meals SET portion=$1, food_note=NULLIF($2,''), updated_at=NOW() WHERE id=$3 AND tenant_id=$4"),
+			"UPDATE kinder_meals SET meal_portion=$1, meal_note=NULLIF($2,''), updated_at=NOW() WHERE id=$3 AND tenant_id=$4"),
 		body.Portion, body.FoodNote, c.Params("id"), tenantID)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error actualizando")
