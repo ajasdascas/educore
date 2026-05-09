@@ -248,9 +248,9 @@ function PreescolarPanel({ child }: { child: ChildDetail }) {
       <TabsContent value="development" className="space-y-4 pt-4">
         <SummaryStats child={child} showGpa={false} />
         <QuickLinks links={[
-          { href: `/student/development-areas`,       label: "Áreas de Desarrollo",     icon: <BookOpen className="h-4 w-4" /> },
-          { href: `/student/qualitative-assessments`, label: "Evaluaciones Cualitativas",icon: <Heart className="h-4 w-4" /> },
-          { href: `/student/observations`,            label: "Observaciones",            icon: <ClipboardList className="h-4 w-4" /> },
+          { href: `/parent/preschool/development-areas`,       label: "Áreas de Desarrollo",     icon: <BookOpen className="h-4 w-4" /> },
+          { href: `/parent/preschool/qualitative-assessments`, label: "Evaluaciones Cualitativas",icon: <Heart className="h-4 w-4" /> },
+          { href: `/parent/preschool/observations`,            label: "Observaciones",            icon: <ClipboardList className="h-4 w-4" /> },
         ]} />
       </TabsContent>
 
@@ -259,8 +259,8 @@ function PreescolarPanel({ child }: { child: ChildDetail }) {
           En preescolar las evaluaciones son cualitativas: <strong>Logrado</strong>, <strong>En proceso</strong> o <strong>Iniciando</strong>.
         </p>
         <QuickLinks links={[
-          { href: `/student/qualitative-assessments`, label: "Ver evaluaciones",  icon: <BookOpen className="h-4 w-4" /> },
-          { href: `/student/evidence`,                label: "Ver evidencias",    icon: <Calendar className="h-4 w-4" /> },
+          { href: `/parent/preschool/qualitative-assessments`, label: "Ver evaluaciones",  icon: <BookOpen className="h-4 w-4" /> },
+          { href: `/parent/preschool/activities`,              label: "Ver evidencias",    icon: <Calendar className="h-4 w-4" /> },
         ]} />
       </TabsContent>
 

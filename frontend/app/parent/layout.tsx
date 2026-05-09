@@ -82,7 +82,7 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
   });
 
   return (
-    <RoleGuard allowedRoles={["PARENT"]}>
+    <RoleGuard allowedRoles={["PARENT", "SUPER_ADMIN"]}>
       <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background flex flex-col lg:flex-row">
         {sidebarOpen && (
           <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />

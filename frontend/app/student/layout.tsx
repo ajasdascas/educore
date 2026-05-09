@@ -91,7 +91,7 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
 
   if (!hasAcademicModule) {
     return (
-      <RoleGuard allowedRoles={["STUDENT"]}>
+      <RoleGuard allowedRoles={["STUDENT", "SUPER_ADMIN"]}>
         <div className="min-h-screen bg-background flex flex-col">
           <header className="h-16 bg-card border-b border-border flex items-center justify-between gap-2 px-4 shadow-sm">
             <div className="flex items-center">
@@ -145,7 +145,7 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <RoleGuard allowedRoles={["STUDENT"]}>
+    <RoleGuard allowedRoles={["STUDENT", "SUPER_ADMIN"]}>
       <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-background flex flex-col lg:flex-row">
         {sidebarOpen && (
           <div className="fixed inset-0 z-20 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />

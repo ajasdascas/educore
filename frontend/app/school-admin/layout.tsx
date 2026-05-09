@@ -42,16 +42,27 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
   }, [user, pathname, router]);
 
   useEffect(() => {
-    try {
-      const schools = JSON.parse(localStorage.getItem("mock_schools") || "[]");
-      const currentSchoolID = localStorage.getItem("mock_current_school_id");
-      const selected = schools.find((school: any) => school.id === currentSchoolID) || schools[0];
-      if (selected) {
-        setSchoolBrand({ name: selected.name, logo_url: selected.logo_url });
+    const loadBrand = async () => {
+      try {
+        const { authFetch } = await import("@/lib/auth");
+        const res = await authFetch("/api/v1/school/profile");
+        if (res?.success && res.data) {
+          setSchoolBrand({ name: res.data.name, logo_url: res.data.logo_url });
+          return;
+        }
+      } catch {}
+      try {
+        const schools = JSON.parse(localStorage.getItem("mock_schools") || "[]");
+        const currentSchoolID = localStorage.getItem("mock_current_school_id");
+        const selected = schools.find((school: any) => school.id === currentSchoolID) || schools[0];
+        if (selected) {
+          setSchoolBrand({ name: selected.name, logo_url: selected.logo_url });
+        }
+      } catch {
+        setSchoolBrand(null);
       }
-    } catch {
-      setSchoolBrand(null);
-    }
+    };
+    loadBrand();
   }, []);
 
   if (loading || !supportReady) {

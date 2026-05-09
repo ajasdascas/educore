@@ -94,6 +94,37 @@ export const DEFAULT_ENABLED_MODULES: EnabledModule[] = [
   { key: "communications", name: "Comunicaciones", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
   { key: "parent_portal", name: "Portal de Padres", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
   { key: "teacher_portal", name: "Portal de Profesores", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "payments", name: "Pagos", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  // Kinder / Guardería
+  { key: "daily_logs", name: "Registro diario", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "meals", name: "Comidas", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "naps", name: "Siestas", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "diapers", name: "Higiene", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "mood", name: "Estado emocional", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "health_checks", name: "Salud", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "incidents", name: "Incidentes", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "pickup_authorizations", name: "Autorizaciones de entrega", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "milestones", name: "Hitos de desarrollo", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "photos_evidence", name: "Fotos y evidencias", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "child_status", name: "Estado del niño", layer: "level", level: "kinder", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  // Preescolar
+  { key: "qualitative_assessments", name: "Evaluaciones cualitativas", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "development_areas", name: "Áreas de desarrollo", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "observations", name: "Observaciones", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "activities", name: "Actividades", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "behavior_notes", name: "Notas de conducta", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "preschool_report_cards", name: "Boletas preescolar", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "socioemotional", name: "Desarrollo socioemocional", layer: "level", level: "preescolar", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  // Primaria
+  { key: "subjects", name: "Materias", layer: "level", level: "primaria", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "assignments", name: "Tareas", layer: "level", level: "primaria", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "exams", name: "Evaluaciones", layer: "level", level: "primaria", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "discipline", name: "Conducta y disciplina", layer: "level", level: "primaria", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "classroom", name: "Aula virtual", layer: "level", level: "primaria", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  // Servicios
+  { key: "cafeteria_service", name: "Comedor escolar", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "transport_service", name: "Transporte escolar", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
+  { key: "database_admin", name: "Base de datos", layer: "internal", is_core: false, is_required: false, enabled: true, source: "demo-default" },
 ];
 
 export const MODULE_ALIASES: Record<string, string[]> = {
@@ -120,6 +151,35 @@ export const MODULE_ALIASES: Record<string, string[]> = {
   analytics: ["analytics", "reports"],
   database_admin: ["database_admin"],
   academic_core: ["academic_core"],
+  // Kinder / Guardería
+  daily_logs: ["daily_logs"],
+  meals: ["meals", "daily_logs"],
+  naps: ["naps", "daily_logs"],
+  diapers: ["diapers", "daily_logs"],
+  mood: ["mood", "daily_logs"],
+  health_checks: ["health_checks"],
+  incidents: ["incidents"],
+  pickup_authorizations: ["pickup_authorizations"],
+  milestones: ["milestones"],
+  photos_evidence: ["photos_evidence"],
+  child_status: ["child_status"],
+  // Preescolar
+  qualitative_assessments: ["qualitative_assessments"],
+  development_areas: ["development_areas"],
+  observations: ["observations"],
+  activities: ["activities"],
+  behavior_notes: ["behavior_notes"],
+  preschool_report_cards: ["preschool_report_cards"],
+  socioemotional: ["socioemotional"],
+  // Primaria
+  subjects: ["subjects"],
+  assignments: ["assignments"],
+  exams: ["exams"],
+  discipline: ["discipline"],
+  classroom: ["classroom"],
+  // Servicios
+  cafeteria_service: ["cafeteria_service"],
+  transport_service: ["transport_service"],
 };
 
 export const MODULES_BY_LEVEL: Record<EducationLevel, ModuleKey[]> = {

@@ -42,6 +42,9 @@ jobs:
           test -f frontend/out/index.html
           ls -la frontend/out | head
 
+      - name: Audit navigation routes
+        run: node scripts/audit-all-visible-routes-deep.js
+
       - name: Deploy to Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
