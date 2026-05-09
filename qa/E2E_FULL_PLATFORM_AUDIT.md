@@ -1,8 +1,17 @@
 # EduCore Full Real Platform Audit
 
-Generated: 2026-05-09T05:51:44.920Z
+Generated: 2026-05-09T06:07:48.313Z
 Base URL: https://onlineu.mx/educore
 API URL: https://educore-production-beef.up.railway.app
+
+Ultima ejecucion real en navegador:
+
+- Comando: `npx playwright test qa/e2e --headed --reporter=html`
+- Navegador: Chromium headed contra produccion.
+- Resultado runner: 26/26 specs ejecutaron sin fallar.
+- Mutaciones en produccion: desactivadas (`E2E_ALLOW_PRODUCTION_MUTATIONS=false`).
+- Credenciales E2E disponibles: no; los flujos autenticados profundos quedan `SKIPPED_NO_CREDENTIALS`.
+- Browser plugin de Codex: bloqueado por runtime local (`failed to write kernel assets`); se uso Playwright headed como navegador real de respaldo.
 
 ## 1. Resumen ejecutivo
 

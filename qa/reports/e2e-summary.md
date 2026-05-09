@@ -1,10 +1,10 @@
 # EduCore E2E Audit Summary
 
-Generated: 2026-05-09T05:45:13.631Z
+Generated: 2026-05-09T06:07:48.313Z
 Base URL: https://onlineu.mx/educore
 API URL: https://educore-production-beef.up.railway.app
-Run ID: 20260509054513
-Production mutations enabled: true
+Run ID: 20260509060748
+Production mutations enabled: false
 Super Admin credentials present: false
 
 | Status | Count |

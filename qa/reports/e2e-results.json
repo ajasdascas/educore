@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-05-09T05:45:13.631Z",
+  "generated_at": "2026-05-09T06:07:48.313Z",
   "base_url": "https://onlineu.mx/educore",
   "api_url": "https://educore-production-beef.up.railway.app",
-  "run_id": "20260509054513",
-  "production_mutations": true,
+  "run_id": "20260509060748",
+  "production_mutations": false,
   "credentials_present": {
     "super_admin": false,
     "qa_password": false

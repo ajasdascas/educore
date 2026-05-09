@@ -206,7 +206,7 @@ export function loadReport(): PersistedReport {
   if (!fs.existsSync(reportJsonPath)) {
     resetAuditReport();
   }
-  return JSON.parse(fs.readFileSync(reportJsonPath, 'utf8')) as PersistedReport;
+  return readJSONFile<PersistedReport>(reportJsonPath);
 }
 
 export function saveReport(report: PersistedReport): void {
@@ -219,7 +219,7 @@ export function saveReport(report: PersistedReport): void {
 export function updateProgress(phase: string, nextStep: string, status: 'completed' | 'failed' | 'skipped' = 'completed'): void {
   fs.mkdirSync(checkpointsDir, { recursive: true });
   const current = fs.existsSync(progressPath)
-    ? JSON.parse(fs.readFileSync(progressPath, 'utf8'))
+    ? readJSONFile<Record<string, any>>(progressPath)
     : {
         started_at: new Date().toISOString(),
         last_completed_phase: '',
@@ -241,7 +241,7 @@ export function updateProgress(phase: string, nextStep: string, status: 'complet
 export function appendCreatedQAObject(object: Record<string, unknown>): void {
   fs.mkdirSync(checkpointsDir, { recursive: true });
   const current = fs.existsSync(progressPath)
-    ? JSON.parse(fs.readFileSync(progressPath, 'utf8'))
+    ? readJSONFile<Record<string, any>>(progressPath)
     : {
         started_at: new Date().toISOString(),
         last_completed_phase: '',
@@ -1019,6 +1019,11 @@ function sanitizeRecord(record: AuditRecord): AuditRecord {
     evidence: record.evidence ? sanitizeText(record.evidence) : undefined,
     recommendation: record.recommendation ? sanitizeText(record.recommendation) : undefined,
   };
+}
+
+function readJSONFile<T>(filePath: string): T {
+  const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+  return JSON.parse(raw) as T;
 }
 
 function sanitizeText(value: string): string {
