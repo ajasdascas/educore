@@ -49,6 +49,21 @@ jobs:
       - name: Audit navigation routes
         run: node scripts/audit-all-visible-routes-deep.js
 
+      - name: Diagnose FTP connectivity
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
+        run: |
+          echo "── Runner public IP ──"
+          curl -s https://api.ipify.org || true
+          echo ""
+          echo "── DNS resolution ──"
+          getent hosts "$FTP_HOST" || true
+          echo "── TCP connectivity to port 21 ──"
+          nc -vz -w 10 "$FTP_HOST" 21 || true
+          echo "── TCP connectivity to port 22 (SFTP) ──"
+          nc -vz -w 10 "$FTP_HOST" 22 || true
+          echo "── Done ──"
+
       - name: Deploy to Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
