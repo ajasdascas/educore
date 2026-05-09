@@ -5,7 +5,7 @@ test('parent primaria: portal seguro y datos solo de hijos QA', async ({ page })
   const schools = await loadQASchoolsFromState();
   const primary = schools.find((school) => school.key === 'primaria');
   if (!primary) {
-    recordSkip('Parent', 'primaria portal completo', 'No hay escuela/alumno/padre QA-CODEX-NIGHTLY-PRIMARIA en checkpoint.');
+    recordSkip('Parent', 'primaria portal completo', 'No hay escuela/alumno/padre QA-CODEX-Primaria-E2E en checkpoint.');
   }
 
   await auditPageLoad(page, 'Parent', 'ruta protegida parent primaria sin sesion', '/parent/primary/grades/', /login|iniciar|Educore|No autorizado|Unauthorized|Calificaciones/i);

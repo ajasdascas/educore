@@ -111,22 +111,22 @@ export const qaRunId = process.env.E2E_RUN_ID ?? new Date().toISOString().replac
 export const qaSchoolSpecs: QASchoolSpec[] = [
   {
     key: 'kinder',
-    name: 'QA-CODEX-NIGHTLY-KINDER',
-    slug: 'qa-codex-nightly-kinder',
+    name: 'QA-CODEX-Kinder-E2E',
+    slug: 'qa-codex-kinder-e2e',
     level: 'kinder',
     expectedModules: ['academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'documents', 'reports', 'communications'],
   },
   {
     key: 'preescolar',
-    name: 'QA-CODEX-NIGHTLY-PREESCOLAR',
-    slug: 'qa-codex-nightly-preescolar',
+    name: 'QA-CODEX-Preescolar-E2E',
+    slug: 'qa-codex-preescolar-e2e',
     level: 'preescolar',
     expectedModules: ['academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'documents', 'reports', 'communications'],
   },
   {
     key: 'primaria',
-    name: 'QA-CODEX-NIGHTLY-PRIMARIA',
-    slug: 'qa-codex-nightly-primaria',
+    name: 'QA-CODEX-Primaria-E2E',
+    slug: 'qa-codex-primaria-e2e',
     level: 'primaria',
     expectedModules: ['academic_core', 'users', 'students', 'groups', 'schedules', 'attendance', 'grades', 'documents', 'reports', 'communications'],
   },
@@ -137,11 +137,11 @@ export function trimTrailingSlash(value: string): string {
 }
 
 export function qaName(base: string): string {
-  return `QA-CODEX-NIGHTLY-${base}-${qaRunId}`;
+  return `QA-CODEX-${base}-${qaRunId}`;
 }
 
 export function qaEmail(role: string): string {
-  return `qa.codex.nightly.${role}.${qaRunId}@example.test`;
+  return `qa.codex.${role}.${qaRunId}@example.test`;
 }
 
 export function resetAuditReport(): void {
@@ -441,6 +441,46 @@ export async function apiLoginSuperAdmin(request: APIRequestContext): Promise<Au
   };
 }
 
+export async function apiLoginUser(
+  request: APIRequestContext,
+  email: string | undefined,
+  password: string | undefined,
+  expectedRole: string,
+  area: string,
+  flow: string,
+  school?: string,
+): Promise<AuthSession | null> {
+  if (!email || !password) {
+    recordSkip(area, flow, `No hay credencial temporal en memoria para rol ${expectedRole}.`, `${e2eApiURL}/api/v1/auth/login`);
+    return null;
+  }
+
+  const response = await request.post(`${e2eApiURL}/api/v1/auth/login`, {
+    data: { email, password },
+  });
+  const body = await response.json().catch(() => null) as any;
+  const role = String(body?.data?.user?.role ?? '');
+  const success = response.ok() && body?.success && body?.data?.access_token && role === expectedRole;
+
+  recordResult({
+    area,
+    flow,
+    status: success ? 'PASS_REAL' : 'FAIL',
+    url: `${e2eApiURL}/api/v1/auth/login`,
+    role: expectedRole,
+    school,
+    expected: `Login real de ${expectedRole} con credencial QA temporal en memoria.`,
+    actual: success ? `Login exitoso; role=${role}; token no persistido.` : `HTTP ${response.status()}; success=${Boolean(body?.success)}; role=${role || 'unknown'}`,
+    severity: success ? undefined : 'P1',
+  });
+
+  if (!success) return null;
+  return {
+    accessToken: body.data.access_token,
+    user: body.data.user,
+  };
+}
+
 export async function installAuthSession(page: Page, session: AuthSession): Promise<void> {
   await page.addInitScript((auth) => {
     window.localStorage.setItem('access_token', auth.accessToken);
@@ -562,7 +602,7 @@ export async function ensureQASchool(request: APIRequestContext, session: AuthSe
     return state;
   }
 
-  const adminEmail = `qa.codex.nightly.admin.${spec.key}@example.test`;
+  const adminEmail = `qa.codex.admin.${spec.key}@example.test`;
   const created = await apiPostJSON(request, session, '/api/v1/super-admin/schools', {
     name: spec.name,
     levels: [spec.level],
@@ -658,7 +698,7 @@ export async function validateSchoolModules(request: APIRequestContext, session:
 export async function loadQASchoolsFromState(): Promise<QASchoolState[]> {
   if (!fs.existsSync(qaStatePath)) return [];
   try {
-    const raw = JSON.parse(fs.readFileSync(qaStatePath, 'utf8')) as { schools?: QASchoolState[] };
+    const raw = readJSONFile<{ schools?: QASchoolState[] }>(qaStatePath);
     return raw.schools ?? [];
   } catch (error) {
     updateProgress('qa-state-recovery', `Ignored corrupt qa-state.json: ${String((error as Error).message)}`, 'skipped');
@@ -760,7 +800,7 @@ async function parseAPIResponse(response: any): Promise<{ ok: boolean; status: n
   return { ok: response.ok(), status: response.status(), body, text: sanitizeText(rawText) };
 }
 
-function extractArray(body: any, keys: string[]): any[] {
+export function extractArray(body: any, keys: string[]): any[] {
   if (Array.isArray(body)) return body;
   if (Array.isArray(body?.data)) return body.data;
   for (const key of keys) {
@@ -789,7 +829,7 @@ function saveQASchoolState(school: QASchoolState): void {
   let existing: { schools?: QASchoolState[] } = { schools: [] };
   if (fs.existsSync(qaStatePath)) {
     try {
-      existing = JSON.parse(fs.readFileSync(qaStatePath, 'utf8')) as { schools?: QASchoolState[] };
+      existing = readJSONFile<{ schools?: QASchoolState[] }>(qaStatePath);
     } catch {
       existing = { schools: [] };
     }
@@ -800,7 +840,7 @@ function saveQASchoolState(school: QASchoolState): void {
 }
 
 async function ensureQATeacher(request: APIRequestContext, session: AuthSession, school: QASchoolState): Promise<Record<string, any> | undefined> {
-  const email = `qa.codex.nightly.teacher.${school.key}@example.test`;
+  const email = `qa.codex.teacher.${school.key}@example.test`;
   const teachers = await apiGetJSON(request, session, '/api/v1/school-admin/academic/teachers', school.id);
   const existing = extractArray(teachers.body, ['teachers', 'data']).find((teacher) => teacher.email === email);
   if (existing) {
@@ -822,7 +862,7 @@ async function ensureQATeacher(request: APIRequestContext, session: AuthSession,
     phone: '+52 555 010 1000',
     address: 'QA Codex',
     specialties: ['QA'],
-    employee_id: `QA-CODEX-NIGHTLY-${school.key.toUpperCase()}-T001`,
+    employee_id: `QA-CODEX-${school.key.toUpperCase()}-E2E-T001`,
     hire_date: '2026-05-08',
     salary: 0,
     status: 'active',
@@ -842,9 +882,9 @@ async function ensureQATeacher(request: APIRequestContext, session: AuthSession,
 }
 
 async function ensureQAStudent(request: APIRequestContext, session: AuthSession, school: QASchoolState, groupID: string): Promise<Record<string, any> | undefined> {
-  const enrollmentID = `QA-CODEX-NIGHTLY-${school.key.toUpperCase()}-S001`;
-  const email = `qa.codex.nightly.student.${school.key}@example.test`;
-  const parentEmail = `qa.codex.nightly.parent.${school.key}@example.test`;
+  const enrollmentID = `QA-CODEX-${school.key.toUpperCase()}-E2E-S001`;
+  const email = `qa.codex.student.${school.key}@example.test`;
+  const parentEmail = `qa.codex.parent.${school.key}@example.test`;
   const students = await apiGetJSON(request, session, `/api/v1/school-admin/academic/students?search=${encodeURIComponent(enrollmentID)}&per_page=50`, school.id);
   const existing = extractArray(students.body, ['students', 'data']).find((student) => student.enrollment_id === enrollmentID || student.email === email);
   if (existing) {
@@ -883,7 +923,7 @@ async function ensureQAStudent(request: APIRequestContext, session: AuthSession,
       phone: '+52 555 010 3000',
       relationship: 'tutor',
       is_primary: true,
-      notes: 'QA-CODEX-NIGHTLY automated parent',
+      notes: 'QA-CODEX automated parent',
     }],
     enrollment_id: enrollmentID,
     status: 'active',
@@ -908,7 +948,7 @@ export async function expectProtectedAPIRejects(
   role: string,
 ): Promise<void> {
   const noToken = await probeAPI(request, 'GET', endpoint);
-  const badToken = await probeAPI(request, 'GET', endpoint, { token: 'QA-CODEX-NIGHTLY-invalid-token' });
+  const badToken = await probeAPI(request, 'GET', endpoint, { token: 'QA-CODEX-invalid-token' });
   const leakedHash = /password_hash|bcrypt|\$2[aby]\$/i.test(`${noToken.body}\n${badToken.body}`);
   const accepted = noToken.status < 400 || badToken.status < 400;
   recordResult({

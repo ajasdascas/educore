@@ -13,7 +13,7 @@ test('backups: vista real, provider y acciones seguras', async ({ page, request 
   await auditPageLoad(page, 'Backups', 'abrir Super Admin Backups', '/super-admin/backups/', /Backup|Backups|Historial|Deploy|GitHub/i);
   recordResult({
     area: 'Backups',
-    flow: 'crear backup QA-CODEX-NIGHTLY Backup Test',
+    flow: 'crear backup QA-CODEX Backup Test',
     status: process.env.E2E_ALLOW_BACKUP_MUTATION === 'true' ? 'PARTIAL' : 'SKIPPED_PROVIDER_NOT_CONFIGURED',
     role: 'SUPER_ADMIN',
     url: page.url(),

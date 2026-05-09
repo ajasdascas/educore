@@ -5,7 +5,7 @@ test('student kinder: portal apagado o estrictamente limitado', async ({ page })
   const schools = await loadQASchoolsFromState();
   const kinder = schools.find((school) => school.key === 'kinder');
   if (!kinder) {
-    recordSkip('Student', 'kinder portal limitado', 'No hay alumno QA-CODEX-NIGHTLY-KINDER con cuenta de portal.');
+    recordSkip('Student', 'kinder portal limitado', 'No hay alumno QA-CODEX-Kinder-E2E con cuenta de portal.');
   }
 
   await auditPageLoad(page, 'Student', 'kinder ruta protegida sin sesion', '/student/kinder/activities/', /login|iniciar|Educore|No autorizado|Unauthorized|Actividades/i);

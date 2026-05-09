@@ -18,7 +18,7 @@ test('student primaria: matriz de rutas protegidas y alcance de portal', async (
   const schools = await loadQASchoolsFromState();
   const primary = schools.find((school) => school.key === 'primaria');
   if (!primary) {
-    recordSkip('Student', 'primaria portal completo', 'No hay alumno QA-CODEX-NIGHTLY-PRIMARIA con cuenta de portal.');
+    recordSkip('Student', 'primaria portal completo', 'No hay alumno QA-CODEX-Primaria-E2E con cuenta de portal.');
   }
 
   for (const route of primaryStudentRoutes) {

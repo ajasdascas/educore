@@ -23,7 +23,7 @@ test('access control seguro: APIs protegidas y limites de alcance', async ({ req
     area: 'Tenant isolation',
     flow: 'cross-tenant solo con objetos QA',
     status: 'SKIPPED_NO_CREDENTIALS',
-    expected: 'Usar dos tenants QA-CODEX-NIGHTLY y detenerse ante primer fallo de autorizacion.',
+    expected: 'Usar dos tenants QA-CODEX y detenerse ante primer fallo de autorizacion.',
     actual: 'No hay dos sesiones QA completas en esta corrida; no se hizo probing ofensivo.',
   });
 });

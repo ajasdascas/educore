@@ -1,5 +1,62 @@
-﻿{
-    "schools":  [
-
-                ]
+{
+  "schools": [
+    {
+      "key": "kinder",
+      "name": "QA-CODEX-Kinder-E2E",
+      "slug": "qa-codex-kinder-e2e",
+      "level": "kinder",
+      "expectedModules": [
+        "academic_core",
+        "users",
+        "students",
+        "groups",
+        "schedules",
+        "attendance",
+        "documents",
+        "reports",
+        "communications"
+      ],
+      "id": "6b2e9f2d-e8d5-44bd-9d71-a5100695054f",
+      "adminEmail": "qa.codex.admin.kinder@example.test"
+    },
+    {
+      "key": "preescolar",
+      "name": "QA-CODEX-Preescolar-E2E",
+      "slug": "qa-codex-preescolar-e2e",
+      "level": "preescolar",
+      "expectedModules": [
+        "academic_core",
+        "users",
+        "students",
+        "groups",
+        "schedules",
+        "attendance",
+        "documents",
+        "reports",
+        "communications"
+      ],
+      "id": "7e395a88-0944-4590-884f-22cc1abc72d1",
+      "adminEmail": "qa.codex.admin.preescolar@example.test"
+    },
+    {
+      "key": "primaria",
+      "name": "QA-CODEX-Primaria-E2E",
+      "slug": "qa-codex-primaria-e2e",
+      "level": "primaria",
+      "expectedModules": [
+        "academic_core",
+        "users",
+        "students",
+        "groups",
+        "schedules",
+        "attendance",
+        "grades",
+        "documents",
+        "reports",
+        "communications"
+      ],
+      "id": "f82e3d5e-df65-44d1-bacc-084cea626c8a",
+      "adminEmail": "qa.codex.admin.primaria@example.test"
+    }
+  ]
 }
