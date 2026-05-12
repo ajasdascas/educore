@@ -25,6 +25,8 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/settings", h.GetSettings)
 	router.Put("/settings", h.UpdateSettings)
 	router.Get("/security", h.GetSecurity)
+	router.Get("/modules", h.GetMyModules)
+	router.Get("/context", h.GetMyContext)
 }
 
 // --- DTOs ---
@@ -247,5 +249,199 @@ func (h *Handler) GetSecurity(c *fiber.Ctx) error {
 		EmailVerified: emailVerifiedAt != nil,
 		HasPassword:   passwordHash.Valid && passwordHash.String != "",
 	}, "Success")
+}
+
+// --- Modules + Context for the current authenticated user ---
+
+type MyModuleResponse struct {
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Layer       string `json:"layer"`
+	Level       string `json:"level"`
+	IsCore      bool   `json:"is_core"`
+	IsRequired  bool   `json:"is_required"`
+	Enabled     bool   `json:"enabled"`
+	Source      string `json:"source"`
+}
+
+type MyContextResponse struct {
+	UserID    string             `json:"user_id"`
+	Email     string             `json:"email"`
+	Role      string             `json:"role"`
+	TenantID  string             `json:"tenant_id"`
+	Tenant    *TenantContext     `json:"tenant"`
+	Modules   []MyModuleResponse `json:"modules"`
+}
+
+type TenantContext struct {
+	ID         string   `json:"id"`
+	Slug       string   `json:"slug"`
+	Name       string   `json:"name"`
+	Status     string   `json:"status"`
+	LevelKeys  []string `json:"level_keys"`
+}
+
+// GetMyModules — returns the modules enabled for the current user's tenant.
+// Accessible to ALL authenticated roles (Parent, Teacher, Student, SchoolAdmin, SuperAdmin).
+// Replaces /api/v1/school-admin/modules/enabled which was 403'd for non-admin roles.
+func (h *Handler) GetMyModules(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		// SUPER_ADMIN without tenant context — return empty so the frontend falls back to defaults
+		return response.Success(c, fiber.Map{"modules": []MyModuleResponse{}, "tenant_id": ""}, "Success")
+	}
+	modules, err := h.loadEnabledModulesForTenant(c, tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not load modules")
+	}
+	return response.Success(c, fiber.Map{"modules": modules, "tenant_id": tenantID}, "Success")
+}
+
+// GetMyContext — returns role + tenant + level + enabled modules in a single call.
+// Used by the frontend to drive sidebar filtering deterministically.
+func (h *Handler) GetMyContext(c *fiber.Ctx) error {
+	userID, _ := c.Locals("user_id").(string)
+	tenantID, _ := c.Locals("tenant_id").(string)
+	role, _ := c.Locals("user_role").(string)
+
+	ctxResp := MyContextResponse{
+		UserID:   userID,
+		TenantID: tenantID,
+		Role:     role,
+		Modules:  []MyModuleResponse{},
+	}
+
+	// User email (best-effort)
+	var email sql.NullString
+	_ = h.db.QueryRow(c.Context(), `SELECT email FROM users WHERE id = $1`, userID).Scan(&email)
+	if email.Valid {
+		ctxResp.Email = email.String
+	}
+
+	if tenantID != "" {
+		tenant, err := h.loadTenantContext(c, tenantID)
+		if err == nil {
+			ctxResp.Tenant = tenant
+		}
+		modules, err := h.loadEnabledModulesForTenant(c, tenantID)
+		if err == nil {
+			ctxResp.Modules = modules
+		}
+	}
+
+	return response.Success(c, ctxResp, "Success")
+}
+
+func (h *Handler) loadTenantContext(c *fiber.Ctx, tenantID string) (*TenantContext, error) {
+	var t TenantContext
+	t.ID = tenantID
+	var slug, name, status sql.NullString
+	err := h.db.QueryRow(c.Context(),
+		`SELECT slug, name, status FROM tenants WHERE id = $1`, tenantID).
+		Scan(&slug, &name, &status)
+	if err != nil {
+		return nil, err
+	}
+	if slug.Valid {
+		t.Slug = slug.String
+	}
+	if name.Valid {
+		t.Name = name.String
+	}
+	if status.Valid {
+		t.Status = status.String
+	}
+
+	// Read level keys from school_levels (preferred) — falls back silently if table missing
+	t.LevelKeys = []string{}
+	rows, err := h.db.Query(c.Context(),
+		`SELECT level_key FROM school_levels WHERE tenant_id = $1 AND enabled = 1 ORDER BY sort_order, level_key`, tenantID)
+	if err == nil && rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var lk sql.NullString
+			if scanErr := rows.Scan(&lk); scanErr == nil && lk.Valid && lk.String != "" {
+				t.LevelKeys = append(t.LevelKeys, lk.String)
+			}
+		}
+	}
+	return &t, nil
+}
+
+// loadEnabledModulesForTenant — portable across PG/MySQL.
+// Reads from tenant_modules joined with modules_catalog, no JSON metadata extraction.
+func (h *Handler) loadEnabledModulesForTenant(c *fiber.Ctx, tenantID string) ([]MyModuleResponse, error) {
+	query := `
+		SELECT mc.key,
+		       COALESCE(mc.name, mc.key),
+		       COALESCE(mc.description, ''),
+		       COALESCE(mc.category, 'general'),
+		       COALESCE(tm.level, mc.educational_level, ''),
+		       COALESCE(mc.is_core, false),
+		       COALESCE(tm.is_required, mc.is_core, false),
+		       COALESCE(tm.enabled, tm.is_active, false),
+		       COALESCE(tm.source, CASE WHEN mc.is_core THEN 'core' ELSE 'manual' END)
+		FROM tenant_modules tm
+		INNER JOIN modules_catalog mc ON mc.key = tm.module_key
+		WHERE tm.tenant_id = $1
+		  AND COALESCE(tm.enabled, tm.is_active, false) = true
+		ORDER BY mc.is_core DESC, mc.name`
+
+	rows, err := h.db.Query(c.Context(), query, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	modules := []MyModuleResponse{}
+	for rows.Next() {
+		var m MyModuleResponse
+		var name, description, category, level, source sql.NullString
+		var isCore, isRequired, enabled sql.NullBool
+		if scanErr := rows.Scan(&m.Key, &name, &description, &category, &level, &isCore, &isRequired, &enabled, &source); scanErr != nil {
+			continue
+		}
+		if name.Valid {
+			m.Name = name.String
+		}
+		if description.Valid {
+			m.Description = description.String
+		}
+		if category.Valid {
+			m.Category = category.String
+		}
+		if level.Valid {
+			m.Level = level.String
+		}
+		if isCore.Valid {
+			m.IsCore = isCore.Bool
+		}
+		if isRequired.Valid {
+			m.IsRequired = isRequired.Bool
+		}
+		if enabled.Valid {
+			m.Enabled = enabled.Bool
+		} else {
+			m.Enabled = true
+		}
+		if source.Valid {
+			m.Source = source.String
+		}
+		// Layer is informational; map common cases
+		switch {
+		case m.IsCore:
+			m.Layer = "core"
+		case m.Key == "database_admin":
+			m.Layer = "internal"
+		case m.Level != "":
+			m.Layer = "level"
+		default:
+			m.Layer = "extension"
+		}
+		modules = append(modules, m)
+	}
+	return modules, nil
 }
 

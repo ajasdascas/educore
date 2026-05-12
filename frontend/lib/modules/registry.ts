@@ -206,7 +206,9 @@ export function moduleMatches(enabled: EnabledModule[], moduleKey: ModuleKey) {
 }
 
 export async function fetchEnabledModules() {
-  const response = await authFetch("/api/v1/school-admin/modules/enabled");
-  const modules = normalizeEnabledModules(response);
+  const response = await authFetch("/api/v1/account/modules");
+  // response shape: { success: true, data: { modules: [...], tenant_id: "..." } }
+  const rawModules = response?.data?.modules ?? response;
+  const modules = normalizeEnabledModules(rawModules);
   return modules.length > 0 ? modules : DEFAULT_ENABLED_MODULES;
 }

@@ -30,6 +30,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schools", h.ListSchools)
 	router.Post("/schools", h.CreateSchool)
 	router.Get("/schools/:id", h.GetSchool)
+	router.Put("/schools/:id", h.UpdateSchool)
 	router.Patch("/schools/:id/status", h.UpdateSchoolStatus)
 	router.Get("/schools/:id/users", h.GetSchoolUsers)
 	router.Get("/schools/:id/modules", h.GetSchoolModules)
@@ -357,27 +358,29 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
-	// 1. Validate plan exists
+	// 1. Validate plan exists (plan is optional — if empty, level defaults are applied instead)
 	step = "validate_plan"
-	var planExists bool
-	if database.IsMySQL(h.db.Driver()) {
-		step = "validate_plan_mysql_subscription_plans"
-		err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
-		if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
-			step = "validate_plan_mysql_plans_fallback"
-			err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+	if strings.TrimSpace(req.Plan) != "" {
+		var planExists bool
+		if database.IsMySQL(h.db.Driver()) {
+			step = "validate_plan_mysql_subscription_plans"
+			err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+			if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
+				step = "validate_plan_mysql_plans_fallback"
+				err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+			}
+			if err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+			}
+		} else {
+			step = "validate_plan_postgres"
+			if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+			}
 		}
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+		if !planExists {
+			return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 		}
-	} else {
-		step = "validate_plan_postgres"
-		if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
-		}
-	}
-	if !planExists {
-		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 	}
 
 	// 2. Check if slug exists

@@ -281,7 +281,7 @@ function LoginInner() {
 
             <p className="text-center">
               <Link
-                href="/reset-password"
+                href="/forgot-password"
                 className="text-xs text-slate-500 transition-colors hover:text-blue-400"
               >
                 Olvidaste tu contrasena?
