@@ -36,8 +36,8 @@ function ResetPasswordInner() {
       const data = await res.json();
       if (res.ok) {
         setInfo(
-          "Si el correo existe en el sistema, el administrador podrá proporcionarte el token de recuperación. " +
-          "Si tienes acceso al servidor, el token se guarda en la base de datos en el campo invitation_token del usuario."
+          "Si el correo está registrado, recibirás un enlace con instrucciones para restablecer tu contraseña. " +
+          "Revisa también tu carpeta de spam. Si no llega en unos minutos, contacta a tu institución."
         );
         setStep("code");
       } else {

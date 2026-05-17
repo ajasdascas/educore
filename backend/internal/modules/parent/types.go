@@ -126,6 +126,7 @@ type ChildSummaryResponse struct {
 	EnrollmentID   string    `json:"enrollment_id"`
 	GroupName      string    `json:"group_name"`
 	GradeName      string    `json:"grade_name"`
+	LevelKey       string    `json:"level_key"`
 	Status         string    `json:"status"`
 	AttendanceRate float64   `json:"attendance_rate"`
 	CurrentGPA     float64   `json:"current_gpa"`

@@ -13,10 +13,14 @@ import {
   Pencil,
   Plus,
   Search,
+  Star,
   Trash2,
+  UserMinus,
   UserPlus,
   Users,
+  UsersRound,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,6 +68,20 @@ type ParentContact = {
   relationship: ParentRelationship;
   is_primary: boolean;
   notes?: string;
+};
+
+// LinkedParent — payload del endpoint GET /school-admin/academic/students/:id/parents
+// Representa un padre/tutor YA vinculado al estudiante (read + edit, no creación).
+type LinkedParent = {
+  id: string;                  // user_id del padre (PK de users)
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  relationship: ParentRelationship;
+  is_primary: boolean;
+  pickup_authorized?: boolean;
+  payment_responsible?: boolean;
 };
 
 type AcademicHistoryItem = {
@@ -399,6 +417,12 @@ function SchoolStudentsContent() {
   const [importOpen, setImportOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  // ── Manage Parents modal state ────────────────────────────────────────────
+  const [parentsManagerOpen, setParentsManagerOpen] = useState(false);
+  const [parentsManagerStudent, setParentsManagerStudent] = useState<Student | null>(null);
+  const [linkedParents, setLinkedParents] = useState<LinkedParent[]>([]);
+  const [linkedParentsLoading, setLinkedParentsLoading] = useState(false);
+  const [linkedParentSavingId, setLinkedParentSavingId] = useState<string | null>(null);
   const [portalAccessLoading, setPortalAccessLoading] = useState<"student" | "parent" | null>(null);
   const [portalAccessResult, setPortalAccessResult] = useState<{ role: string; email: string; password?: string } | null>(null);
   const [form, setForm] = useState<StudentFormState>(emptyForm);
@@ -681,6 +705,90 @@ function SchoolStudentsContent() {
     }
   };
 
+  // ── Manage Parents modal handlers ────────────────────────────────────────────
+  const loadLinkedParents = async (studentId: string) => {
+    try {
+      setLinkedParentsLoading(true);
+      const res = await authFetch(`/api/v1/school-admin/academic/students/${studentId}/parents`);
+      const list: LinkedParent[] = res?.success ? (res.data ?? []) : [];
+      setLinkedParents(Array.isArray(list) ? list : []);
+    } catch (error) {
+      toast({
+        title: "No se pudieron cargar los padres vinculados",
+        description: error instanceof Error ? error.message : "Intenta de nuevo.",
+        variant: "destructive",
+      });
+      setLinkedParents([]);
+    } finally {
+      setLinkedParentsLoading(false);
+    }
+  };
+
+  const openParentsManager = async (student: Student) => {
+    setParentsManagerStudent(student);
+    setParentsManagerOpen(true);
+    setLinkedParents([]);
+    await loadLinkedParents(student.id);
+  };
+
+  const updateParentLink = async (
+    parentId: string,
+    patch: Partial<{
+      relationship: ParentRelationship;
+      is_primary: boolean;
+      pickup_authorized: boolean;
+      payment_responsible: boolean;
+    }>
+  ) => {
+    if (!parentsManagerStudent) return;
+    try {
+      setLinkedParentSavingId(parentId);
+      const res = await authFetch(
+        `/api/v1/school-admin/academic/students/${parentsManagerStudent.id}/parents/${parentId}`,
+        { method: "PUT", body: JSON.stringify(patch) }
+      );
+      if (!res?.success) throw new Error(res?.error || res?.message || "No se pudo actualizar.");
+      // Optimistic local update
+      setLinkedParents((current) =>
+        current.map((p) => (p.id === parentId ? { ...p, ...patch } : p))
+      );
+      toast({ title: "Vínculo actualizado" });
+    } catch (error) {
+      toast({
+        title: "No se pudo actualizar",
+        description: error instanceof Error ? error.message : "Intenta de nuevo.",
+        variant: "destructive",
+      });
+      // Reload to be safe
+      await loadLinkedParents(parentsManagerStudent.id);
+    } finally {
+      setLinkedParentSavingId(null);
+    }
+  };
+
+  const unlinkParent = async (parentId: string) => {
+    if (!parentsManagerStudent) return;
+    if (!confirm("¿Desvincular a este padre/tutor del alumno? Podrás volver a vincularlo luego.")) return;
+    try {
+      setLinkedParentSavingId(parentId);
+      const res = await authFetch(
+        `/api/v1/school-admin/academic/students/${parentsManagerStudent.id}/parents/${parentId}`,
+        { method: "DELETE" }
+      );
+      if (!res?.success) throw new Error(res?.error || res?.message || "No se pudo desvincular.");
+      setLinkedParents((current) => current.filter((p) => p.id !== parentId));
+      toast({ title: "Padre desvinculado" });
+    } catch (error) {
+      toast({
+        title: "No se pudo desvincular",
+        description: error instanceof Error ? error.message : "Intenta de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setLinkedParentSavingId(null);
+    }
+  };
+
   const readExcel = async (file: File) => {
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data, { type: "array" });
@@ -858,6 +966,7 @@ function SchoolStudentsContent() {
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon-sm" title="Ver detalle" onClick={() => openDetail(student)}><Eye className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon-sm" title="Editar" onClick={() => openEdit(student)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon-sm" title="Gestionar padres/tutores" onClick={() => openParentsManager(student)}><UsersRound className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon-sm" title={student.status === "active" ? "Pausar" : "Activar"} onClick={() => changeStatus(student, student.status === "active" ? "inactive" : "active")}><Users className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon-sm" title="Eliminar" onClick={() => { setSelectedStudent(student); setDeleteOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
@@ -1218,6 +1327,130 @@ function SchoolStudentsContent() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setImportOpen(false)} disabled={saving}>Cancelar</Button>
             <Button onClick={commitImport} disabled={saving || currentRows.length === 0 || importValidation.missing.length > 0}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Importar registros</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Manage Parents Dialog ───────────────────────────────────────── */}
+      <Dialog open={parentsManagerOpen} onOpenChange={setParentsManagerOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UsersRound className="h-5 w-5" />
+              Padres y tutores
+            </DialogTitle>
+            <DialogDescription>
+              {parentsManagerStudent ? (
+                <>Gestiona quién está vinculado al expediente de <strong>{fullStudentName(parentsManagerStudent)}</strong>. Para añadir un padre nuevo, edita el alumno y completa los campos de Papá/Mamá.</>
+              ) : "Gestión de padres y tutores vinculados."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {linkedParentsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : linkedParents.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center space-y-2">
+              <UsersRound className="h-10 w-10 text-muted-foreground/50 mx-auto" />
+              <p className="font-medium">Sin padres vinculados</p>
+              <p className="text-sm text-muted-foreground">
+                Edita el alumno y completa los campos de Papá/Mamá para crear y vincular un acceso de padre.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {linkedParents.map((p) => {
+                const isSaving = linkedParentSavingId === p.id;
+                return (
+                  <Card key={p.id} className="border-l-4 border-l-primary/40">
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold truncate">
+                              {p.first_name} {p.last_name}
+                            </p>
+                            {p.is_primary && (
+                              <Badge variant="default" className="gap-1 text-xs">
+                                <Star className="h-3 w-3" />Principal
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{p.email}</p>
+                          {p.phone && <p className="text-xs text-muted-foreground">📞 {p.phone}</p>}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          title="Desvincular"
+                          onClick={() => unlinkParent(p.id)}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4 text-destructive" />}
+                        </Button>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Relación</Label>
+                          <Select
+                            value={p.relationship}
+                            onValueChange={(v) => updateParentLink(p.id, { relationship: v as ParentRelationship })}
+                            disabled={isSaving}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="mother">Madre</SelectItem>
+                              <SelectItem value="father">Padre</SelectItem>
+                              <SelectItem value="guardian">Tutor</SelectItem>
+                              <SelectItem value="other">Otro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex flex-col gap-2 justify-center">
+                          <label className="flex items-center justify-between gap-2 text-sm">
+                            <span>Contacto principal</span>
+                            <Switch
+                              checked={!!p.is_primary}
+                              onCheckedChange={(v) => updateParentLink(p.id, { is_primary: v })}
+                              disabled={isSaving}
+                            />
+                          </label>
+                          <label className="flex items-center justify-between gap-2 text-sm">
+                            <span>Autorizado para recoger</span>
+                            <Switch
+                              checked={!!p.pickup_authorized}
+                              onCheckedChange={(v) => updateParentLink(p.id, { pickup_authorized: v })}
+                              disabled={isSaving}
+                            />
+                          </label>
+                          <label className="flex items-center justify-between gap-2 text-sm">
+                            <span>Responsable de pagos</span>
+                            <Switch
+                              checked={!!p.payment_responsible}
+                              onCheckedChange={(v) => updateParentLink(p.id, { payment_responsible: v })}
+                              disabled={isSaving}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setParentsManagerOpen(false)}>Cerrar</Button>
+            {parentsManagerStudent && (
+              <Button onClick={() => { setParentsManagerOpen(false); openEdit(parentsManagerStudent); }}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Añadir padre nuevo
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

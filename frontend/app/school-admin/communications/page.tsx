@@ -452,7 +452,7 @@ function SchoolAdminCommunicationsContent() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{formMode === "send" ? "Enviar comunicado" : formMode === "schedule" ? "Programar comunicado" : "Guardar borrador"}</DialogTitle>
-            <DialogDescription>Modo demo con persistencia local para validar el flujo completo.</DialogDescription>
+            <DialogDescription>Completa los campos y selecciona los destinatarios.</DialogDescription>
           </DialogHeader>
           <form onSubmit={submitCommunication} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -503,7 +503,7 @@ function SchoolAdminCommunicationsContent() {
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Eliminar comunicado</DialogTitle><DialogDescription>Esta accion retira el comunicado del historial demo.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Eliminar comunicado</DialogTitle><DialogDescription>Esta accion retira el comunicado del historial de forma permanente.</DialogDescription></DialogHeader>
           <div className="rounded-lg border p-3 text-sm">{selectedCommunication?.title || "Comunicado seleccionado"}</div>
           <DialogFooter><Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={saving}>Cancelar</Button><Button variant="destructive" onClick={deleteCommunication} disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Eliminar</Button></DialogFooter>
         </DialogContent>

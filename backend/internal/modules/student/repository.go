@@ -229,6 +229,15 @@ func (r *Repository) GetNotifications(ctx context.Context, userID, tenantID stri
 	return items, nil
 }
 
+// MarkNotificationRead marks a notification as read for this student.
+func (r *Repository) MarkNotificationRead(ctx context.Context, tenantID, userID, notificationID string) error {
+	_, err := r.db.Exec(ctx, database.RebindPlaceholders(r.db.Driver(), `
+		UPDATE notifications SET is_read = TRUE, read_at = NOW(), status = 'read'
+		WHERE id = $1 AND user_id = $2 AND tenant_id = $3
+	`), notificationID, userID, tenantID)
+	return err
+}
+
 // GetSchedule returns the weekly schedule for the student's group.
 // start_time/end_time are TIME columns — TIME_FORMAT is correct for MySQL.
 // FIELD() for day ordering is MySQL-only; no portable translation needed since
@@ -268,4 +277,37 @@ func (r *Repository) GetSchedule(ctx context.Context, studentID, tenantID string
 		blocks = []ScheduleBlock{}
 	}
 	return blocks, nil
+}
+
+// GetEnabledModules returns active modules for this tenant (STUDENT role).
+func (r *Repository) GetEnabledModules(ctx context.Context, tenantID string) ([]map[string]interface{}, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT mc.`+"`key`"+`, mc.name, COALESCE(mc.description,''),
+		       COALESCE(tm.level,''), mc.is_core,
+		       COALESCE(tm.enabled, tm.is_active, false)
+		FROM tenant_modules tm
+		INNER JOIN modules_catalog mc ON mc.`+"`key`"+` = tm.module_key
+		WHERE tm.tenant_id = $1
+		  AND COALESCE(tm.enabled, tm.is_active, false) = true
+		ORDER BY mc.is_core DESC, mc.name`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []map[string]interface{}
+	for rows.Next() {
+		var key, name, desc, level string
+		var isCore, enabled bool
+		if err := rows.Scan(&key, &name, &desc, &level, &isCore, &enabled); err != nil {
+			continue
+		}
+		result = append(result, map[string]interface{}{
+			"key": key, "name": name, "description": desc,
+			"level": level, "is_core": isCore, "enabled": enabled,
+		})
+	}
+	if result == nil {
+		result = []map[string]interface{}{}
+	}
+	return result, nil
 }

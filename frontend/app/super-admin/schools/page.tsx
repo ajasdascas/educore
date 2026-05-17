@@ -128,6 +128,10 @@ export default function SchoolsPage() {
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
+  const [editFormData, setEditFormData] = useState({ name: "", slug: "", status: "", plan: "", contact_email: "", phone: "" });
+  const [editSubmitting, setEditSubmitting] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -328,6 +332,42 @@ export default function SchoolsPage() {
   };
 
   const totalPages = Math.ceil(total / limit);
+
+  async function openEditModal(school: School) {
+    setEditFormData({
+      name: school.name || "",
+      slug: school.slug || "",
+      status: school.status || "",
+      plan: school.plan || "",
+      contact_email: "",
+      phone: "",
+    });
+    setEditingSchool(school);
+    setEditModalOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingSchool) return;
+    setEditSubmitting(true);
+    try {
+      const res = await authFetch(`/api/v1/super-admin/schools/${editingSchool.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editFormData),
+      });
+      if (res.success) {
+        toast({ title: "Escuela actualizada" });
+        setEditModalOpen(false);
+        fetchSchools();
+      } else {
+        toast({ variant: "destructive", title: "Error", description: res.message || res.error?.message || "No se pudo actualizar" });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Error de conexión" });
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -691,7 +731,7 @@ export default function SchoolsPage() {
                           <ShieldCheck className="w-4 h-4 mr-2 text-amber-500" />
                           Modo Soporte → Estudiantes
                         </DropdownMenuItem>
-                        <DropdownMenuItem><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEditModal(school)}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -766,6 +806,93 @@ export default function SchoolsPage() {
           )}
         </>
       )}
+
+      {/* Edit School Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="w-[95vw] md:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Escuela</DialogTitle>
+            <DialogDescription>
+              Modifica los datos de <strong>{editingSchool?.name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-name">Nombre</Label>
+                <Input
+                  id="edit-name"
+                  value={editFormData.name}
+                  onChange={e => setEditFormData(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-slug">Slug / Subdominio</Label>
+                <Input
+                  id="edit-slug"
+                  value={editFormData.slug}
+                  onChange={e => setEditFormData(f => ({ ...f, slug: e.target.value }))}
+                />
+                {editFormData.slug && (
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="text-blue-400 font-mono">{editFormData.slug}.onlineu.mx</span>
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Estado</Label>
+                <Select value={editFormData.status} onValueChange={v => setEditFormData(f => ({ ...f, status: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Activa</SelectItem>
+                    <SelectItem value="trial">En Prueba</SelectItem>
+                    <SelectItem value="suspended">Suspendida</SelectItem>
+                    <SelectItem value="cancelled">Cancelada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Plan</Label>
+                <Select value={editFormData.plan} onValueChange={v => setEditFormData(f => ({ ...f, plan: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Plan" /></SelectTrigger>
+                  <SelectContent>
+                    {plans.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-email">Correo institucional</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editFormData.contact_email}
+                  onChange={e => setEditFormData(f => ({ ...f, contact_email: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-phone">Teléfono</Label>
+                <Input
+                  id="edit-phone"
+                  value={editFormData.phone}
+                  onChange={e => setEditFormData(f => ({ ...f, phone: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={editSubmitting}>
+              {editSubmitting
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
+                : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

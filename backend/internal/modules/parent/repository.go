@@ -64,6 +64,7 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		       COALESCE(s.enrollment_number, ''),
 		       COALESCE(g.name, ''),
 		       COALESCE(gl.name, ''),
+		       COALESCE(gl.level, ''),
 		       s.status,
 		       COALESCE(s.photo_url, ''),
 		       s.updated_at,
@@ -91,7 +92,7 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		        ORDER BY gr.created_at DESC LIMIT 1
 		       ), ''),
 		       COALESCE((
-		        SELECT CONCAT(sub.name, ' ', TO_CHAR(csb.start_time, 'HH24:MI'))
+		        SELECT CONCAT(sub.name, ' ', TIME_FORMAT(csb.start_time, '%H:%i'))
 		        FROM class_schedule_blocks csb
 		        LEFT JOIN subjects sub ON csb.subject_id = sub.id
 		        WHERE csb.group_id = gs.group_id AND csb.tenant_id = $1 AND csb.status = 'active'
@@ -117,7 +118,7 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		var child ChildSummaryResponse
 		if err := rows.Scan(
 			&child.ID, &child.FirstName, &child.LastName, &child.EnrollmentID,
-			&child.GroupName, &child.GradeName, &child.Status, &child.ProfilePhoto,
+			&child.GroupName, &child.GradeName, &child.LevelKey, &child.Status, &child.ProfilePhoto,
 			&child.UpdatedAt, &child.AttendanceRate, &child.CurrentGPA,
 			&child.LastAttendance, &child.RecentGrade, &child.NextClass,
 		); err != nil {
@@ -126,6 +127,76 @@ func (r *Repository) GetChildrenByParent(ctx context.Context, tenantID, userID s
 		children = append(children, child)
 	}
 
+	return children, rows.Err()
+}
+
+func (r *Repository) GetAllChildrenByTenant(ctx context.Context, tenantID string) ([]ChildSummaryResponse, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT s.id,
+		       s.first_name,
+		       s.last_name,
+		       COALESCE(s.enrollment_number, ''),
+		       COALESCE(g.name, ''),
+		       COALESCE(gl.name, ''),
+		       COALESCE(gl.level, ''),
+		       s.status,
+		       COALESCE(s.photo_url, ''),
+		       s.updated_at,
+		       COALESCE((
+		        SELECT ROUND(AVG(CASE WHEN ar.status IN ('present', 'late') THEN 100.0 ELSE 0.0 END), 2)
+		        FROM attendance_records ar
+		        WHERE ar.student_id = s.id AND ar.tenant_id = $1 AND ar.date >= CURRENT_DATE - INTERVAL 30 DAY
+		       ), 0),
+		       COALESCE((
+		        SELECT ROUND(AVG(gr.score), 2)
+		        FROM grade_records gr
+		        WHERE gr.student_id = s.id AND gr.tenant_id = $1
+		       ), 0),
+		       COALESCE((
+		        SELECT DATE_FORMAT(ar.date, '%Y-%m-%d')
+		        FROM attendance_records ar
+		        WHERE ar.student_id = s.id AND ar.tenant_id = $1
+		        ORDER BY ar.date DESC LIMIT 1
+		       ), ''),
+		       COALESCE((
+		        SELECT CONCAT(gr.score, ' - ', sub.name)
+		        FROM grade_records gr
+		        INNER JOIN subjects sub ON gr.subject_id = sub.id
+		        WHERE gr.student_id = s.id AND gr.tenant_id = $1
+		        ORDER BY gr.created_at DESC LIMIT 1
+		       ), ''),
+		       COALESCE((
+		        SELECT CONCAT(sub.name, ' ', TIME_FORMAT(csb.start_time, '%H:%i'))
+		        FROM class_schedule_blocks csb
+		        LEFT JOIN subjects sub ON csb.subject_id = sub.id
+		        WHERE csb.group_id = gs.group_id AND csb.tenant_id = $1 AND csb.status = 'active'
+		        ORDER BY csb.day, csb.start_time LIMIT 1
+		       ), '')
+		FROM students s
+		LEFT JOIN group_students gs ON s.id = gs.student_id
+		LEFT JOIN groups g ON gs.group_id = g.id
+		LEFT JOIN grade_levels gl ON g.grade_id = gl.id
+		WHERE s.tenant_id = $1
+		ORDER BY s.first_name, s.last_name
+	`, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all children: %w", err)
+	}
+	defer rows.Close()
+
+	var children []ChildSummaryResponse
+	for rows.Next() {
+		var child ChildSummaryResponse
+		if err := rows.Scan(
+			&child.ID, &child.FirstName, &child.LastName, &child.EnrollmentID,
+			&child.GroupName, &child.GradeName, &child.LevelKey, &child.Status, &child.ProfilePhoto,
+			&child.UpdatedAt, &child.AttendanceRate, &child.CurrentGPA,
+			&child.LastAttendance, &child.RecentGrade, &child.NextClass,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan child: %w", err)
+		}
+		children = append(children, child)
+	}
 	return children, rows.Err()
 }
 
@@ -1429,4 +1500,37 @@ func mapKeys(values map[string]int) []string {
 		}
 	}
 	return keys
+}
+
+// GetEnabledModules returns active modules for this tenant (PARENT role).
+func (r *Repository) GetEnabledModules(ctx context.Context, tenantID string) ([]map[string]interface{}, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT mc.`+"`key`"+`, mc.name, COALESCE(mc.description,''),
+		       COALESCE(tm.level,''), mc.is_core,
+		       COALESCE(tm.enabled, tm.is_active, false)
+		FROM tenant_modules tm
+		INNER JOIN modules_catalog mc ON mc.`+"`key`"+` = tm.module_key
+		WHERE tm.tenant_id = $1
+		  AND COALESCE(tm.enabled, tm.is_active, false) = true
+		ORDER BY mc.is_core DESC, mc.name`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []map[string]interface{}
+	for rows.Next() {
+		var key, name, desc, level string
+		var isCore, enabled bool
+		if err := rows.Scan(&key, &name, &desc, &level, &isCore, &enabled); err != nil {
+			continue
+		}
+		result = append(result, map[string]interface{}{
+			"key": key, "name": name, "description": desc,
+			"level": level, "is_core": isCore, "enabled": enabled,
+		})
+	}
+	if result == nil {
+		result = []map[string]interface{}{}
+	}
+	return result, nil
 }

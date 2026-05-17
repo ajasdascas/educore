@@ -30,11 +30,23 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schools", h.ListSchools)
 	router.Post("/schools", h.CreateSchool)
 	router.Get("/schools/:id", h.GetSchool)
+	router.Put("/schools/:id", h.UpdateSchool)
 	router.Patch("/schools/:id/status", h.UpdateSchoolStatus)
 	router.Get("/schools/:id/users", h.GetSchoolUsers)
 	router.Get("/schools/:id/modules", h.GetSchoolModules)
 	router.Post("/schools/:id/modules/toggle", h.ToggleModule)
 	router.Get("/modules-catalog", h.GetModulesCatalog)
+	router.Get("/education-levels", h.GetEducationLevels)
+	router.Get("/schools/:id/levels", h.GetSchoolLevels)
+	router.Post("/schools/:id/apply-module-template", h.ApplyModuleTemplate)
+	router.Get("/schools/:id/submodules", h.GetSchoolSubmodules)
+	router.Put("/schools/:id/modules/:moduleKey", h.UpdateSchoolModule)
+	router.Put("/schools/:id/submodules/:moduleKey/:submoduleKey", h.UpdateSchoolSubmodule)
+	router.Get("/schools/:id/plan-entitlements", h.GetSchoolPlanEntitlements)
+	router.Get("/schools/:id/credentials", h.GetSchoolCredentials)
+	router.Get("/schools/:id/student-billing", h.GetSchoolStudentBilling)
+	router.Get("/schools/:id/audit", h.GetSchoolAudit)
+	router.Get("/schools/:id/portal-preview", h.GetSchoolPortalPreview)
 	router.Post("/upload", h.UploadLogo)
 
 	h.RegisterPlanRoutes(router)
@@ -230,16 +242,20 @@ type CreateSchoolRequest struct {
 	EvalScheme string `json:"eval_scheme"`
 }
 
+// modulesByEducationLevel maps normalized education level keys to the module keys
+// that should be activated in tenant_modules when a school is created.
+// All keys listed here MUST exist in modules_catalog (FK constraint).
+// Missing keys were added in migration 017_level_module_catalog_expansion.sql.
 var modulesByEducationLevel = map[string][]string{
-	// Bebés / Guardería
-	"babies":   {"academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"},
-	"daycare":  {"academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"},
-	// Preescolar / Kinder
+	// Kinder / Estancia / Inicial — enfoque en cuidado, reporte diario, comunicación
+	"babies":  {"academic_core", "users", "students", "groups", "schedules", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence", "attendance"},
+	"daycare": {"academic_core", "users", "students", "groups", "schedules", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence", "attendance"},
+	"kinder":  {"academic_core", "users", "students", "groups", "schedules", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence", "attendance", "reports"},
+	// Preescolar — campos formativos, evaluación cualitativa, sin exámenes formales
 	"preescolar": {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"},
-	"kinder":     {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"},
-	// Primaria
-	"primaria": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications", "subjects", "assignments", "exams"},
-	// Secundaria / Prepa / Universidad
+	// Primaria — materias, tareas, exámenes, calificaciones, boletas
+	"primaria": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications", "subjects", "assignments", "exams", "classroom"},
+	// Niveles futuros (no soportados actualmente — solo se activan módulos base)
 	"secundaria_general": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
 	"secundaria_tecnica": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
 	"prepa_general":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
@@ -342,27 +358,29 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
-	// 1. Validate plan exists
+	// 1. Validate plan exists (plan is optional — if empty, level defaults are applied instead)
 	step = "validate_plan"
-	var planExists bool
-	if database.IsMySQL(h.db.Driver()) {
-		step = "validate_plan_mysql_subscription_plans"
-		err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
-		if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
-			step = "validate_plan_mysql_plans_fallback"
-			err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+	if strings.TrimSpace(req.Plan) != "" {
+		var planExists bool
+		if database.IsMySQL(h.db.Driver()) {
+			step = "validate_plan_mysql_subscription_plans"
+			err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+			if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
+				step = "validate_plan_mysql_plans_fallback"
+				err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+			}
+			if err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+			}
+		} else {
+			step = "validate_plan_postgres"
+			if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+			}
 		}
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
+		if !planExists {
+			return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 		}
-	} else {
-		step = "validate_plan_postgres"
-		if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
-		}
-	}
-	if !planExists {
-		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 	}
 
 	// 2. Check if slug exists
@@ -665,6 +683,31 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
+	// Seed school_levels — one row per education level chosen for this tenant
+	for _, level := range req.Levels {
+		normalizedLevel := normalizeEducationLevel(level)
+		levelLabel := levelDisplayName(normalizedLevel)
+		if database.IsMySQL(h.db.Driver()) {
+			step = "seed_school_level_mysql:" + normalizedLevel
+			_, _ = tx.Exec(c.UserContext(),
+				`INSERT IGNORE INTO school_levels (id, tenant_id, level_key, name, enabled, sort_order)
+				 VALUES (?, ?, ?, ?, 1, ?)`,
+				database.NewID(), tenantID, normalizedLevel, levelLabel, levelSortOrder(normalizedLevel))
+		}
+	}
+
+	// Seed school_periods — 3 trimestres for primaria/preescolar, simplified for kinder/babies
+	periodsForLevel := defaultPeriodsForLevels(req.Levels)
+	for i, periodName := range periodsForLevel {
+		if database.IsMySQL(h.db.Driver()) {
+			step = "seed_school_period_mysql:" + periodName
+			_, _ = tx.Exec(c.UserContext(),
+				`INSERT IGNORE INTO school_periods (id, tenant_id, school_year_id, name, sort_order, is_current)
+				 VALUES (?, ?, ?, ?, ?, ?)`,
+				database.NewID(), tenantID, schoolYearID, periodName, i+1, i == 0)
+		}
+	}
+
 	seedLevels := req.Levels
 	if len(seedLevels) == 0 {
 		seedLevels = []string{"Primaria"}
@@ -767,6 +810,53 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 				 ON CONFLICT (tenant_id, module_key) DO NOTHING`,
 				tenantID, mod)
 		}
+	}
+
+	// 7. Seed default grading scale for this tenant
+	step = "seed_grading_scale"
+	if database.IsMySQL(h.db.Driver()) {
+		_, _ = tx.Exec(c.UserContext(),
+			`INSERT IGNORE INTO school_grading_scales (id, tenant_id, name, min_score, max_score, passing, is_default)
+			 VALUES (?, ?, 'Escala default', 0, 100, 60, 1)`,
+			database.NewID(), tenantID)
+	}
+
+	// 8. Seed submodules from level_module_templates (where submodule_key IS NOT NULL)
+	step = "seed_level_submodules"
+	for _, level := range req.Levels {
+		normalizedLevel := normalizeEducationLevel(level)
+		if database.IsMySQL(h.db.Driver()) {
+			subRows, subErr := tx.Query(c.UserContext(),
+				`SELECT module_key, submodule_key FROM level_module_templates
+				 WHERE education_level_code = ? AND submodule_key IS NOT NULL AND is_default_enabled = 1`,
+				normalizedLevel)
+			if subErr == nil {
+				for subRows.Next() {
+					var modKey, subKey string
+					if subRows.Scan(&modKey, &subKey) == nil {
+						_, _ = tx.Exec(c.UserContext(),
+							`INSERT IGNORE INTO tenant_module_submodules (id, tenant_id, module_key, submodule_key, enabled)
+							 VALUES (?, ?, ?, ?, 1)`,
+							database.NewID(), tenantID, modKey, subKey)
+					}
+				}
+				subRows.Close()
+			}
+		}
+	}
+
+	// 9. Record provisioning event
+	step = "record_provisioning_event"
+	if database.IsMySQL(h.db.Driver()) {
+		provPayload := fmt.Sprintf(`{"levels":%s,"plan":"%s","modules_count":%d}`,
+			func() string {
+				b, _ := json.Marshal(req.Levels)
+				return string(b)
+			}(), req.Plan, len(portalMods))
+		_, _ = tx.Exec(c.UserContext(),
+			`INSERT IGNORE INTO school_provisioning_events (id, tenant_id, event_type, status, payload_json)
+			 VALUES (?, ?, 'provision_school', 'completed', ?)`,
+			database.NewID(), tenantID, provPayload)
 	}
 
 	step = "commit"
@@ -999,4 +1089,194 @@ func (h *Handler) UploadLogo(c *fiber.Ctx) error {
 	url := protocol + "://" + c.Hostname() + "/uploads/" + filename
 
 	return response.Success(c, fiber.Map{"url": url}, "Logo uploaded")
+}
+
+// ── Education level helpers ────────────────────────────────────────────────────
+
+func levelDisplayName(normalized string) string {
+	switch normalized {
+	case "kinder":
+		return "Kinder / Estancia / Inicial"
+	case "babies", "daycare":
+		return "Bebés / Guardería"
+	case "preescolar":
+		return "Preescolar"
+	case "primaria":
+		return "Primaria"
+	case "secundaria_general":
+		return "Secundaria General"
+	case "secundaria_tecnica":
+		return "Secundaria Técnica"
+	case "prepa_general":
+		return "Preparatoria"
+	case "prepa_tecnica":
+		return "Preparatoria Técnica"
+	case "universidad":
+		return "Universidad"
+	default:
+		return strings.Title(strings.ReplaceAll(normalized, "_", " "))
+	}
+}
+
+func levelSortOrder(normalized string) int {
+	switch normalized {
+	case "babies", "daycare":
+		return 5
+	case "kinder":
+		return 10
+	case "preescolar":
+		return 15
+	case "primaria":
+		return 20
+	default:
+		return 99
+	}
+}
+
+// defaultPeriodsForLevels returns period names appropriate for the school's levels.
+// Primaria/Preescolar → 3 trimestres. Kinder/Babies → 2 semestres.
+func defaultPeriodsForLevels(levels []string) []string {
+	for _, l := range levels {
+		n := normalizeEducationLevel(l)
+		if n == "primaria" || n == "preescolar" {
+			return []string{"Trimestre 1", "Trimestre 2", "Trimestre 3"}
+		}
+	}
+	return []string{"Semestre 1", "Semestre 2"}
+}
+
+// GetSchoolLevels returns the education levels active for a specific school.
+func (h *Handler) GetSchoolLevels(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var exists bool
+	if err := h.db.QueryRow(c.UserContext(),
+		"SELECT EXISTS(SELECT 1 FROM tenants WHERE id = ?)", id).Scan(&exists); err != nil || !exists {
+		return response.Error(c, fiber.StatusNotFound, "School not found")
+	}
+
+	rows, err := h.db.Query(c.UserContext(),
+		"SELECT level_key, name, enabled, sort_order FROM school_levels WHERE tenant_id = ? ORDER BY sort_order", id)
+	if err != nil {
+		// school_levels may not exist yet for older tenants — return empty
+		return response.Success(c, fiber.Map{"levels": []fiber.Map{}}, "No levels configured")
+	}
+	defer rows.Close()
+
+	var levels []fiber.Map
+	for rows.Next() {
+		var key, name string
+		var enabled bool
+		var sortOrder int
+		if rows.Scan(&key, &name, &enabled, &sortOrder) == nil {
+			levels = append(levels, fiber.Map{
+				"level_key":  key,
+				"name":       name,
+				"enabled":    enabled,
+				"sort_order": sortOrder,
+			})
+		}
+	}
+	if levels == nil {
+		levels = []fiber.Map{}
+	}
+	return response.Success(c, fiber.Map{"levels": levels}, "School levels retrieved")
+}
+
+// GetEducationLevels returns supported education levels from the catalog.
+func (h *Handler) GetEducationLevels(c *fiber.Ctx) error {
+	rows, err := h.db.Query(c.UserContext(),
+		"SELECT `key`, name, enabled, visible, supported_now, sort_order FROM educational_levels_catalog WHERE supported_now = true ORDER BY sort_order")
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching education levels")
+	}
+	defer rows.Close()
+
+	var levels []fiber.Map
+	for rows.Next() {
+		var key, name string
+		var enabled, visible, supportedNow bool
+		var sortOrder int
+		if err := rows.Scan(&key, &name, &enabled, &visible, &supportedNow, &sortOrder); err != nil {
+			continue
+		}
+		levels = append(levels, fiber.Map{
+			"key": key, "name": name, "enabled": enabled,
+			"visible": visible, "supported_now": supportedNow, "sort_order": sortOrder,
+		})
+	}
+	if levels == nil {
+		levels = []fiber.Map{}
+	}
+	return response.Success(c, fiber.Map{"levels": levels}, "Education levels retrieved")
+}
+
+// ApplyModuleTemplate re-applies the level_module_templates defaults for a school.
+// Useful to reset a school's modules to the template baseline after manual changes.
+func (h *Handler) ApplyModuleTemplate(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// Verify school exists
+	var exists bool
+	if err := h.db.QueryRow(c.UserContext(),
+		"SELECT EXISTS(SELECT 1 FROM tenants WHERE id = $1)", id).Scan(&exists); err != nil || !exists {
+		return response.Error(c, fiber.StatusNotFound, "School not found")
+	}
+
+	// Get school levels
+	rows, err := h.db.Query(c.UserContext(),
+		"SELECT level_key FROM school_levels WHERE tenant_id = $1 AND enabled = 1", id)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching school levels")
+	}
+	defer rows.Close()
+
+	var levelKeys []string
+	for rows.Next() {
+		var k string
+		if rows.Scan(&k) == nil {
+			levelKeys = append(levelKeys, k)
+		}
+	}
+	rows.Close()
+
+	// If no school_levels row, fall back to tenant settings JSON
+	if len(levelKeys) == 0 {
+		var settingsRaw []byte
+		_ = h.db.QueryRow(c.UserContext(), "SELECT COALESCE(settings,'{}') FROM tenants WHERE id = $1", id).Scan(&settingsRaw)
+		var settings map[string]interface{}
+		if json.Unmarshal(settingsRaw, &settings) == nil {
+			if lvls, ok := settings["levels"].([]interface{}); ok {
+				for _, l := range lvls {
+					if s, ok := l.(string); ok {
+						levelKeys = append(levelKeys, normalizeEducationLevel(s))
+					}
+				}
+			}
+		}
+	}
+
+	applied := 0
+	for _, levelKey := range levelKeys {
+		for _, mod := range modulesByEducationLevel[levelKey] {
+			if database.IsMySQL(h.db.Driver()) {
+				if _, err := h.db.Exec(c.UserContext(),
+					`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, level, is_required, source)
+					 VALUES (?, ?, true, true, ?, false, 'template')
+					 ON DUPLICATE KEY UPDATE is_active = true, enabled = true,
+					                         level = COALESCE(level, VALUES(level)),
+					                         source = 'template', updated_at = CURRENT_TIMESTAMP`,
+					id, mod, levelKey); err == nil {
+					applied++
+				}
+			}
+		}
+	}
+
+	h.auditSuperAdmin(c, "school.apply_template", "tenant_modules", id, "info",
+		fiber.Map{"levels": levelKeys, "modules_applied": applied}, "")
+
+	return response.Success(c, fiber.Map{
+		"tenant_id": id, "levels": levelKeys, "modules_applied": applied,
+	}, "Module template applied")
 }

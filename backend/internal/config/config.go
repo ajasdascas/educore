@@ -18,6 +18,10 @@ type Config struct {
 	JWTExpiration     time.Duration
 	RefreshExpiration time.Duration
 	AllowDemoLogin    bool
+	ResendAPIKey      string
+	EmailFrom         string
+	EmailFromName     string
+	PublicAppURL      string
 }
 
 func Load() *Config {
@@ -40,6 +44,10 @@ func Load() *Config {
 		JWTExpiration:     jwtExp,
 		RefreshExpiration: refreshExp,
 		AllowDemoLogin:    getEnv("ALLOW_DEMO_LOGIN", "false") == "true",
+		ResendAPIKey:      getEnv("RESEND_API_KEY", ""),
+		EmailFrom:         getEnv("PASSWORD_RESET_FROM_EMAIL", getEnv("EMAIL_FROM", "noreply@educore.mx")),
+		EmailFromName:     getEnv("EMAIL_FROM_NAME", "EduCore"),
+		PublicAppURL:      getEnv("PUBLIC_APP_URL", "http://localhost:3000"),
 	}
 }
 

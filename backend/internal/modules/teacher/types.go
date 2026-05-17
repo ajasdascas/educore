@@ -160,3 +160,19 @@ type TeacherAlert struct {
 	Message  string `json:"message"`
 	Priority string `json:"priority"`
 }
+
+type AnnouncementSummary struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Priority  string `json:"priority"`
+	Status    string `json:"status"`
+	AuthorID  string `json:"author_id"`
+	CreatedAt string `json:"created_at"`
+}
+
+type CreateAnnouncementRequest struct {
+	Title    string `json:"title"`
+	Content  string `json:"content"`
+	Priority string `json:"priority"`
+}

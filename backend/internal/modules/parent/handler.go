@@ -20,6 +20,8 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	// Parent portal routes - the parent router is already mounted at /api/v1/parent.
 	api := app
 
+	// Modules
+	api.Get("/modules", h.GetEnabledModules)
 	// Dashboard
 	api.Get("/dashboard", h.GetDashboard)
 	api.Get("/children", h.GetChildren)
@@ -33,6 +35,14 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	child.Get("/report-card", h.GetChildReportCard)
 	child.Get("/teachers", h.GetChildTeachers)
 	child.Get("/assignments", h.GetChildAssignments)
+
+	// Kinder-specific child routes
+	child.Get("/daily-logs", h.GetChildDailyLogs)
+	child.Get("/meals", h.GetChildMeals)
+	child.Get("/naps", h.GetChildNaps)
+	child.Get("/diapers", h.GetChildDiapers)
+	child.Get("/mood", h.GetChildMood)
+	child.Get("/incidents", h.GetChildIncidents)
 
 	// Communications
 	api.Get("/notifications", h.GetNotifications)
@@ -73,8 +83,9 @@ func (h *Handler) GetDashboard(c *fiber.Ctx) error {
 func (h *Handler) GetChildren(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	children, err := h.service.GetChildren(c.Context(), tenantID, userID)
+	children, err := h.service.GetChildren(c.Context(), tenantID, userID, isSupport)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
@@ -87,9 +98,9 @@ func (h *Handler) GetChildDetails(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify parent has access to this child
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
@@ -109,9 +120,9 @@ func (h *Handler) GetChildGrades(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -131,9 +142,9 @@ func (h *Handler) GetChildAttendance(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -153,9 +164,9 @@ func (h *Handler) GetChildSchedule(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -172,9 +183,9 @@ func (h *Handler) GetChildReportCard(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -193,9 +204,9 @@ func (h *Handler) GetChildTeachers(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -212,9 +223,9 @@ func (h *Handler) GetChildAssignments(c *fiber.Ctx) error {
 	tenantID := c.Locals("tenant_id").(string)
 	userID := c.Locals("user_id").(string)
 	childID := c.Params("childId")
+	isSupport, _ := c.Locals("support_mode").(bool)
 
-	// Verify access
-	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID)
+	hasAccess, err := h.service.VerifyParentAccess(c.Context(), tenantID, userID, childID, isSupport)
 	if err != nil || !hasAccess {
 		return response.Error(c, fiber.StatusForbidden, "Access denied")
 	}
@@ -423,3 +434,16 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 
 	return response.SuccessMessage(c, "Password changed successfully")
 }
+
+func (h *Handler) GetEnabledModules(c *fiber.Ctx) error {
+	tenantID, _ := c.Locals("tenant_id").(string)
+	if tenantID == "" {
+		return response.Error(c, fiber.StatusUnauthorized, "Missing tenant context")
+	}
+	modules, err := h.service.GetEnabledModules(c.Context(), tenantID)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error fetching modules")
+	}
+	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved")
+}
+
