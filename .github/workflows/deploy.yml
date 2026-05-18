@@ -9,9 +9,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      FTP_HOST: ftp.onlineu.mx
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      FTP_USER: u550473909
+      FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER || 'ftp.onlineu.mx' }}
+      FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME || 'u550473909' }}
+      FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD || secrets.FTP_PASSWORD }}
       FTP_TARGET_DIR: /domains/onlineu.mx/public_html/educore/
 
     steps:
@@ -58,7 +59,7 @@ jobs:
           set net:timeout 20
           set net:max-retries 2
           set net:reconnect-interval-base 5
-          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          open -u "${FTP_USER},${FTP_PASS}" ftp://${FTP_HOST}
           cd ${FTP_TARGET_DIR}
           pwd
           bye
@@ -88,7 +89,7 @@ jobs:
           set net:timeout 30
           set net:max-retries 3
           set net:reconnect-interval-base 5
-          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          open -u "${FTP_USER},${FTP_PASS}" ftp://${FTP_HOST}
           mirror --reverse --verbose --parallel=2 frontend/out/ ${FTP_TARGET_DIR}
           bye
           EOF
@@ -117,7 +118,7 @@ jobs:
           set net:timeout 20
           set net:max-retries 2
           set net:reconnect-interval-base 5
-          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          open -u "${FTP_USER},${FTP_PASS}" ftp://${FTP_HOST}
           put -O /domains/onlineu.mx/public_html/ frontend/htaccess-subdomain-root -o .htaccess
           bye
           EOF
@@ -135,7 +136,7 @@ jobs:
           set ssl:verify-certificate no
           set dns:order inet
           set net:timeout 20
-          open -u "${FTP_USER},${{ secrets.FTP_PASSWORD }}" ftp://${FTP_HOST}
+          open -u "${FTP_USER},${FTP_PASS}" ftp://${FTP_HOST}
           cd ${FTP_TARGET_DIR}
           cls -1
           bye
