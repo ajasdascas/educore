@@ -13,6 +13,8 @@ jobs:
   deploy-frontend:
     name: Build and deploy frontend
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repository
@@ -40,23 +42,93 @@ jobs:
         run: |
           test -d frontend/out
           test -f frontend/out/index.html
+          test -f frontend/out/school-admin/incidents/index.html
+          test -f frontend/out/school-admin/daily-logs/index.html
+          test -f frontend/out/school-admin/kinder/incidents/index.html
+          echo "✓ All critical route HTMLs present in frontend/out/"
           ls -la frontend/out | head
 
-      - name: Deploy to Hostinger via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
-        with:
-          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          local-dir: ./frontend/out/
-          server-dir: /public_html/educore/
-          state-name: .ftp-deploy-sync-state-v2.json
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.DS_Store
-            **/Thumbs.db
+      - name: Audit navigation routes
+        run: node scripts/audit-all-visible-routes-deep.js
+
+      - name: Diagnose FTP connectivity
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
+        run: |
+          echo "── Runner public IP ──"
+          curl -s https://api.ipify.org || true
+          echo ""
+          echo "── DNS resolution ──"
+          getent hosts "$FTP_HOST" || true
+          echo "── TCP connectivity to port 21 ──"
+          nc -vz -w 10 "$FTP_HOST" 21 || true
+          echo "── TCP connectivity to port 22 (SFTP) ──"
+          nc -vz -w 10 "$FTP_HOST" 22 || true
+          echo "── Done ──"
+
+      - name: Install deployment tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy to Hostinger (FTP/FTPS/SFTP)
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          FTP_TARGET_DIR: /public_html/educore/
+        run: |
+          cat <<'EOF' > ftp-deploy.lftp
+          set cmd:fail-exit yes
+          set ftp:passive-mode yes
+          set ftp:prefer-epsv false
+          set ssl:verify-certificate no
+          set dns:order inet
+          set net:timeout 30
+          set net:max-retries 2
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-multiplier 1
+
+          open_implicit_ftps() {
+            set ftp:ssl-force true
+            set ftp:ssl-protect-data true
+            open -u "${FTP_USER},${FTP_PASS}" "ftps://${FTP_HOST}:990"
+          }
+
+          open_explicit_ftps() {
+            set ftp:ssl-force true
+            set ftp:ssl-protect-data true
+            open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"
+          }
+
+          open_plain_ftp() {
+            set ftp:ssl-force false
+            set ftp:ssl-protect-data false
+            open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"
+          }
+
+          open_sftp() {
+            open -u "${FTP_USER},${FTP_PASS}" "sftp://${FTP_HOST}:22"
+          }
+
+          try_deploy() {
+            cd "${FTP_TARGET_DIR}"
+            mirror --reverse --verbose --parallel=2 --delete --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .
+          }
+          EOF
+
+          for mode in explicit_ftps plain_ftp implicit_ftps sftp; do
+            for attempt in 1 2 3; do
+              echo "Deploy mode=${mode} attempt=${attempt}/3"
+              if timeout 240s lftp -e "source ftp-deploy.lftp; open_${mode}; try_deploy; bye"; then
+                exit 0
+              fi
+              sleep 10
+            done
+          done
+
+          echo "Deploy failed: no connection mode succeeded (explicit_ftps/plain_ftp/implicit_ftps/sftp)."
+          exit 1
 
       - name: Record deployment in EduCore
         env:
