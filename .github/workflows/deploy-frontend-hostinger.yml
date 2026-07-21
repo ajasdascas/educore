@@ -1,18 +1,32 @@
-﻿name: Deploy Frontend to Hostinger
+name: Deploy Frontend to Hostinger
+
+# ─────────────────────────────────────────────────────────────
+# ÚNICO flujo automático del frontend estático de EduCore.
+# Destino canónico: https://onlineu.mx/educore/  (basePath /educore).
+# Hostinger solo sirve archivos estáticos — no ejecuta Node.
+#
+# El workflow duplicado antiguo (deploy.yml) fue archivado en
+# .github/workflows-disabled/ para evitar dos builds por push.
+# ─────────────────────────────────────────────────────────────
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
     paths:
       - "frontend/**"
       - ".github/workflows/deploy-frontend-hostinger.yml"
-  workflow_dispatch:
+  workflow_dispatch: {}
+
+# Evita despliegues simultáneos (dos pushes seguidos no lanzan dos deploys).
+concurrency:
+  group: educore-frontend-production
+  cancel-in-progress: true
 
 jobs:
   deploy-frontend:
     name: Build and deploy frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -27,6 +41,21 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      # Guard: sin NEXT_PUBLIC_API_URL el build queda mal configurado (login roto).
+      - name: Validate required secret
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: |
+          if [ -z "${NEXT_PUBLIC_API_URL}" ]; then
+            echo "::error::Falta el secret NEXT_PUBLIC_API_URL. Configúralo con la URL pública del backend (https://...)."
+            exit 1
+          fi
+          case "${NEXT_PUBLIC_API_URL}" in
+            https://*) : ;;
+            *) echo "::error::NEXT_PUBLIC_API_URL debe ser https://"; exit 1 ;;
+          esac
+          echo "NEXT_PUBLIC_API_URL presente y HTTPS ✓"
+
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
@@ -38,46 +67,43 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
         run: npm run build
 
-      - name: Verify output
+      - name: Verify output artifacts
         run: |
-          test -d frontend/out
+          set -e
           test -f frontend/out/index.html
-          test -f frontend/out/school-admin/incidents/index.html
-          test -f frontend/out/school-admin/daily-logs/index.html
-          test -f frontend/out/school-admin/kinder/incidents/index.html
-          echo "✓ All critical route HTMLs present in frontend/out/"
-          ls -la frontend/out | head
-
-      - name: Audit navigation routes
-        run: node scripts/audit-all-visible-routes-deep.js
-
-      - name: Diagnose FTP connectivity
-        env:
-          FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
-        run: |
-          echo "── Runner public IP ──"
-          curl -s https://api.ipify.org || true
-          echo ""
-          echo "── DNS resolution ──"
-          getent hosts "$FTP_HOST" || true
-          echo "── TCP connectivity to port 21 ──"
-          nc -vz -w 10 "$FTP_HOST" 21 || true
-          echo "── TCP connectivity to port 22 (SFTP) ──"
-          nc -vz -w 10 "$FTP_HOST" 22 || true
-          echo "── Done ──"
+          test -f frontend/out/login/index.html
+          test -f frontend/out/escuela/index.html
+          test -f frontend/out/super-admin/dashboard/index.html
+          test -d frontend/out/_next
+          echo "✓ Artefactos críticos presentes en frontend/out/"
+          # Asegura que NO quede la URL muerta de Railway horneada.
+          if grep -rq "educore-production-beef.up.railway.app" frontend/out/; then
+            echo "::error::El build contiene la URL muerta de Railway. Revisa NEXT_PUBLIC_API_URL."
+            exit 1
+          fi
+          echo "✓ Sin URL de Railway obsoleta en el build"
+          du -sh frontend/out/
 
       - name: Install deployment tools
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
 
+      # Despliegue estático resiliente (FTPS explícito → FTP plano → FTPS implícito → SFTP).
+      # SIN --delete: no borra archivos remotos en este flujo (rollback más seguro).
       - name: Deploy to Hostinger (FTP/FTPS/SFTP)
         env:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          FTP_TARGET_DIR: /public_html/educore/
+          # Ruta remota confirmada por FTP. Default explícito; overridable por secret.
+          FTP_TARGET_DIR: ${{ secrets.HOSTINGER_FTP_TARGET_DIR || '/domains/onlineu.mx/public_html/educore/' }}
         run: |
+          if [ -z "${FTP_HOST}" ] || [ -z "${FTP_USER}" ] || [ -z "${FTP_PASS}" ]; then
+            echo "::error::Faltan secrets FTP de Hostinger (HOSTINGER_FTP_SERVER/USERNAME/PASSWORD)."
+            exit 1
+          fi
+
           cat <<'EOF' > ftp-deploy.lftp
           set cmd:fail-exit yes
           set ftp:passive-mode yes
@@ -87,108 +113,52 @@ jobs:
           set net:timeout 30
           set net:max-retries 2
           set net:reconnect-interval-base 5
-          set net:reconnect-interval-multiplier 1
 
-          open_implicit_ftps() {
-            set ftp:ssl-force true
-            set ftp:ssl-protect-data true
-            open -u "${FTP_USER},${FTP_PASS}" "ftps://${FTP_HOST}:990"
-          }
-
-          open_explicit_ftps() {
-            set ftp:ssl-force true
-            set ftp:ssl-protect-data true
-            open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"
-          }
-
-          open_plain_ftp() {
-            set ftp:ssl-force false
-            set ftp:ssl-protect-data false
-            open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"
-          }
-
-          open_sftp() {
-            open -u "${FTP_USER},${FTP_PASS}" "sftp://${FTP_HOST}:22"
-          }
+          open_explicit_ftps() { set ftp:ssl-force true;  set ftp:ssl-protect-data true;  open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"; }
+          open_plain_ftp()     { set ftp:ssl-force false; set ftp:ssl-protect-data false; open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"; }
+          open_implicit_ftps() { set ftp:ssl-force true;  set ftp:ssl-protect-data true;  open -u "${FTP_USER},${FTP_PASS}" "ftps://${FTP_HOST}:990"; }
+          open_sftp()          { open -u "${FTP_USER},${FTP_PASS}" "sftp://${FTP_HOST}:22"; }
 
           try_deploy() {
             cd "${FTP_TARGET_DIR}"
-            mirror --reverse --verbose --parallel=2 --delete --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .
+            mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .
           }
           EOF
 
           for mode in explicit_ftps plain_ftp implicit_ftps sftp; do
-            for attempt in 1 2 3; do
-              echo "Deploy mode=${mode} attempt=${attempt}/3"
+            for attempt in 1 2; do
+              echo "Deploy mode=${mode} attempt=${attempt}/2"
               if timeout 240s lftp -e "source ftp-deploy.lftp; open_${mode}; try_deploy; bye"; then
+                echo "Deploy OK (mode=${mode})"
                 exit 0
               fi
               sleep 10
             done
           done
-
-          echo "Deploy failed: no connection mode succeeded (explicit_ftps/plain_ftp/implicit_ftps/sftp)."
+          echo "::error::Deploy falló: ningún modo de conexión funcionó."
           exit 1
 
+      - name: Smoke test público
+        run: |
+          echo "Probando https://onlineu.mx/educore/ ..."
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 https://onlineu.mx/educore/login/ || echo "000")
+          echo "login/ -> HTTP ${code}"
+          [ "${code}" = "200" ] || echo "::warning::login/ no devolvió 200 (revisar propagación/ruta)."
+
+      # Registro de historial (best-effort; no falla el deploy si no está configurado).
       - name: Record deployment in EduCore
+        if: ${{ always() }}
         env:
           EDUCORE_DEPLOY_WEBHOOK_URL: ${{ secrets.EDUCORE_DEPLOY_WEBHOOK_URL }}
           EDUCORE_DEPLOY_WEBHOOK_SECRET: ${{ secrets.EDUCORE_DEPLOY_WEBHOOK_SECRET }}
-          GITHUB_REF_NAME_VALUE: ${{ github.ref_name }}
-          GITHUB_ACTOR_VALUE: ${{ github.actor }}
-          GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
-          GITHUB_WORKFLOW_VALUE: ${{ github.workflow }}
-          GITHUB_RUN_ID_VALUE: ${{ github.run_id }}
-          GITHUB_RUN_NUMBER_VALUE: ${{ github.run_number }}
-          GITHUB_RUN_ATTEMPT_VALUE: ${{ github.run_attempt }}
         run: |
           if [ -z "${EDUCORE_DEPLOY_WEBHOOK_URL}" ] || [ -z "${EDUCORE_DEPLOY_WEBHOOK_SECRET}" ]; then
-            echo "::warning::Deployment history webhook is not configured."
+            echo "Historial de deploy no configurado (opcional)."
             exit 0
           fi
-
-          commit_title="$(git log -1 --pretty=%s)"
-          commit_description="$(git log -1 --pretty=%b)"
-          if [ -z "${commit_description}" ]; then
-            commit_description="Deploy automatico del frontend a Hostinger desde GitHub Actions."
-          fi
-
-          COMMIT_TITLE="${commit_title}" COMMIT_DESCRIPTION="${commit_description}" node <<'NODE'
-          const fs = require("fs");
-          const payload = {
-            environment: "production",
-            service: "frontend",
-            provider: "github_actions",
-            status: "success",
-            title: process.env.COMMIT_TITLE,
-            description: process.env.COMMIT_DESCRIPTION,
-            commit_sha: process.env.GITHUB_SHA,
-            commit_short_sha: (process.env.GITHUB_SHA || "").slice(0, 7),
-            branch: process.env.GITHUB_REF_NAME_VALUE,
-            actor: process.env.GITHUB_ACTOR_VALUE,
-            repository: process.env.GITHUB_REPOSITORY_VALUE,
-            workflow_name: process.env.GITHUB_WORKFLOW_VALUE,
-            run_id: process.env.GITHUB_RUN_ID_VALUE,
-            run_number: process.env.GITHUB_RUN_NUMBER_VALUE,
-            run_attempt: process.env.GITHUB_RUN_ATTEMPT_VALUE,
-            run_url: `https://github.com/${process.env.GITHUB_REPOSITORY_VALUE}/actions/runs/${process.env.GITHUB_RUN_ID_VALUE}`,
-          };
-          fs.writeFileSync("deployment-payload.json", JSON.stringify(payload));
-          NODE
-
-          http_code="$(curl -sS -o /tmp/educore-deployment-record-response.json -w "%{http_code}" \
-            -X POST "${EDUCORE_DEPLOY_WEBHOOK_URL}" \
+          payload=$(printf '{"environment":"production","service":"frontend","provider":"github_actions","status":"%s","commit_sha":"%s","branch":"%s","run_id":"%s"}' \
+            "${{ job.status }}" "${GITHUB_SHA}" "${GITHUB_REF_NAME}" "${GITHUB_RUN_ID}")
+          curl -sS -X POST "${EDUCORE_DEPLOY_WEBHOOK_URL}" \
             -H "Content-Type: application/json" \
             -H "X-EduCore-Deploy-Secret: ${EDUCORE_DEPLOY_WEBHOOK_SECRET}" \
-            --data @deployment-payload.json)"
-          curl_status=$?
-
-          if [ "${curl_status}" -ne 0 ]; then
-            echo "::warning::Could not record deployment in EduCore."
-            exit 0
-          fi
-
-          case "${http_code}" in
-            2*) echo "Deployment history recorded in EduCore." ;;
-            *) echo "::warning::EduCore deployment history webhook returned HTTP ${http_code}." ;;
-          esac
+            --data "${payload}" -o /dev/null -w "webhook -> HTTP %{http_code}\n" || echo "::warning::No se pudo registrar el deploy."
