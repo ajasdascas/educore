@@ -41,9 +41,12 @@ const slug = args.slug || process.env.SCHOOL_SLUG;
 const schoolName = args.name || process.env.SCHOOL_NAME || slug;
 
 const DOMAIN = process.env.DOMAIN || "onlineu.mx";
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://educore-production-beef.up.railway.app";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
+
+if (!API_URL) {
+  console.error("ERROR: define NEXT_PUBLIC_API_URL (URL pública del backend).");
+  process.exit(1);
+}
 
 if (!slug) {
   console.error("Usage: node scripts/provision-school-domain.js --slug=<school-slug>");

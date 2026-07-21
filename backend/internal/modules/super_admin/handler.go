@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"educore/internal/pkg/database"
+	"educore/internal/pkg/slug"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -365,7 +366,19 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
 	}
 
-	// 2. Check if slug exists
+	// 2. Normalize + validate slug (subdominio de la escuela)
+	step = "normalize_slug"
+	candidate := slug.Normalize(req.Slug)
+	if candidate == "" {
+		// Sin slug explícito: derivar del nombre de la escuela.
+		candidate = slug.Normalize(req.Name)
+	}
+	if err := slug.Validate(candidate); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Subdominio inválido: "+err.Error())
+	}
+	req.Slug = candidate
+
+	// 2b. Check if slug exists
 	step = "validate_slug"
 	var slugExists bool
 	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)", req.Slug).Scan(&slugExists); err != nil {
