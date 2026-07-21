@@ -1,6 +1,32 @@
 # Cambios Recientes — EduCore
 **Sesión:** 28-04-2026
 
+## [21-07-2026] — 🔧 Recuperación de producción (rama `recovery/production-login`)
+
+**Incidente:** login caído en `https://onlineu.mx/educore/`. Causa raíz: el backend de
+Railway (`educore-production-beef.up.railway.app`) **ya no existe** (404 "Application
+not found") y el frontend lo tenía hardcodeado. Frontend en Hostinger seguía vivo.
+
+**Cambios (locales, sin desplegar aún):**
+- `frontend/lib/api.ts`: URL del backend por `NEXT_PUBLIC_API_URL` (sin hardcode),
+  `ApiError` tipado, timeout con `AbortController`, `credentials:include`, validación HTTPS.
+- `frontend/app/login/page.tsx`: errores diferenciados (red/timeout vs 401).
+- `railway.json` eliminado (apuntaba a `backend/Dockerfile` Go 1.21 incompatible con
+  `go.mod` Go 1.26 → build fallaba). `railway.toml` (Dockerfile raíz Go 1.26) queda como único.
+- CI consolidado: `deploy-frontend-hostinger.yml` como único flujo (concurrency, timeout,
+  sin `--delete`, guard de `NEXT_PUBLIC_API_URL`). `deploy.yml` archivado. `sync.js` sin
+  git add/commit/push (evita cascada).
+- **Validación de slug REAL** en `super_admin.CreateSchool` (antes solo se comprobaba
+  existencia; el doc lo daba por hecho pero no ocurría): nuevo `pkg/slug` con Normalize +
+  Validate + Reserved, con tests. `tenant.ts` alineado.
+- Docs nuevas: `HOSTINGER_DEPLOYMENT.md`, `PRODUCTION_RUNBOOK.md`, `ROLLBACK.md`,
+  `HOSTINGER_REMOTE_INVENTORY.md` (plantilla), `LOGIN_INCIDENT_REPORT.md`.
+
+**Pendiente (requiere dueño):** reactivar backend en URL viva; secret `NEXT_PUBLIC_API_URL`;
+confirmar ruta FTP e inventario remoto; wildcard DNS `*.onlineu.mx` (subdominios); rotar
+contraseña admin expuesta.
+
+
 ## [28-04-2026] — ✅ Módulo de Usuarios Globales COMPLETADO
 
 ### 🏗️ Backend (Go)
