@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Bell, Calendar, CheckCircle, Key, Lock, Loader2, Mail, Monitor, Shield, User } from "lucide-react";
+import { Bell, Calendar, CheckCircle, Key, Lock, Loader2, Monitor, Shield, User } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { authFetch } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";

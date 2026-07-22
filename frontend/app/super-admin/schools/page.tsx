@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,17 +11,15 @@ import {
   Search,
   Building2,
   Users,
-  Calendar,
   MoreVertical,
   Eye,
-  Edit,
-  Trash2,
   Loader2,
-  Upload,
   ChevronLeft,
   ChevronRight,
   FilterX,
-  ShieldCheck
+  ShieldCheck,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,14 +35,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { authFetch, setSupportContext } from "@/lib/auth";
-import { API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { getTenantSlugError, normalizeTenantSlug } from "@/lib/tenant";
 
 const statusColors = {
   active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
@@ -77,21 +75,17 @@ const educationLevelOptions = [
   { value: "universidad",        label: "Universidad",         supportedNow: false },
 ];
 
-// Catálogo completo de módulos (sincronizado con migration 016)
-const MODULE_CATALOG = [
-  { key: "schedules",       label: "Horarios",                category: "academic" },
-  { key: "attendance",      label: "Asistencias",             category: "academic" },
-  { key: "documents",       label: "Expedientes digitales",   category: "operations" },
-  { key: "report_cards",    label: "Boletas",                 category: "academic" },
-  { key: "communications",  label: "Comunicaciones",          category: "operations" },
-  { key: "parent_portal",   label: "Portal de Padres",        category: "portal" },
-  { key: "teacher_portal",  label: "Portal de Profesores",    category: "portal" },
-  { key: "payments",        label: "Pagos y cobranza",        category: "monetization" },
-  { key: "qr_access",       label: "Acceso QR",               category: "operations" },
-  { key: "credentials",     label: "Credenciales",            category: "operations" },
-  { key: "workshops",       label: "Talleres",                category: "academic" },
-  { key: "analytics",       label: "Analytics",               category: "analytics" },
-];
+interface ModuleCatalogItem {
+  key: string;
+  name: string;
+  description?: string;
+  is_core: boolean;
+  price_monthly_mxn: number;
+  status: string;
+  global_enabled: boolean;
+  production_ready: boolean;
+  selectable: boolean;
+}
 
 interface School {
   id: string;
@@ -105,13 +99,17 @@ interface School {
   logo_url: string;
 }
 
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+interface CreatedSchoolCredential {
+  email: string;
+  password: string;
+  host: string;
+  domainReady: boolean;
+}
+
+interface PlanOption {
+  id: string;
+  name: string;
+  modules?: string | string[];
 }
 
 export default function SchoolsPage() {
@@ -128,6 +126,8 @@ export default function SchoolsPage() {
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdCredential, setCreatedCredential] = useState<CreatedSchoolCredential | null>(null);
+  const [credentialCopied, setCredentialCopied] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -151,8 +151,6 @@ export default function SchoolsPage() {
     logo_url: "",
   });
 
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-
   const fetchSchools = useCallback(async () => {
     setLoading(true);
     try {
@@ -171,16 +169,18 @@ export default function SchoolsPage() {
       } else {
         setError(response.message || "Error al cargar las escuelas");
       }
-    } catch (err) {
+    } catch {
       setError("Error de conexión con el servidor");
     } finally {
       setLoading(false);
     }
   }, [page, limit, searchTerm, statusFilter, planFilter]);
 
-  const [plans, setPlans] = useState<any[]>([]);
+  const [plans, setPlans] = useState<PlanOption[]>([]);
   // Keys of modules included in the currently selected plan
   const [planModuleKeys, setPlanModuleKeys] = useState<string[]>([]);
+  const [moduleCatalog, setModuleCatalog] = useState<ModuleCatalogItem[]>([]);
+  const [moduleCatalogError, setModuleCatalogError] = useState("");
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -195,7 +195,7 @@ export default function SchoolsPage() {
       try {
         const res = await authFetch("/api/v1/super-admin/plans");
         if (res.success && res.data) {
-          const loaded: any[] = Array.isArray(res.data?.plans) ? res.data.plans : Array.isArray(res.data) ? res.data : [];
+          const loaded: PlanOption[] = Array.isArray(res.data?.plans) ? res.data.plans : Array.isArray(res.data) ? res.data : [];
           setPlans(loaded);
           // Default to first plan UUID
           if (loaded.length > 0) {
@@ -210,6 +210,26 @@ export default function SchoolsPage() {
       }
     };
     fetchPlans();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    authFetch("/api/v1/super-admin/modules-catalog")
+      .then((res) => {
+        if (!active) return;
+        if (!res.success) throw new Error(res.message || res.error || "No se pudo cargar el catálogo");
+        const loaded = Array.isArray(res.data?.modules) ? res.data.modules : [];
+        setModuleCatalog(loaded);
+        setModuleCatalogError("");
+      })
+      .catch((catalogError) => {
+        if (!active) return;
+        setModuleCatalog([]);
+        setModuleCatalogError(catalogError instanceof Error ? catalogError.message : "No se pudo cargar el catálogo");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   function parsePlanModules(raw: string | string[] | undefined): string[] {
@@ -247,6 +267,16 @@ export default function SchoolsPage() {
 
   const handleCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedSlug = normalizeTenantSlug(formData.slug || formData.name);
+    const slugError = getTenantSlugError(normalizedSlug);
+    if (slugError) {
+      toast({
+        title: "Subdominio inválido",
+        description: slugError,
+        variant: "destructive",
+      });
+      return;
+    }
     if (formData.levels.length === 0) {
       toast({
         title: "Selecciona el nivel escolar",
@@ -258,31 +288,27 @@ export default function SchoolsPage() {
     setIsSubmitting(true);
 
     try {
-      let finalLogoUrl = formData.logo_url || "";
-      if (logoFile) {
-        const token = localStorage.getItem("access_token") || "";
-        if (token.startsWith("mock-")) {
-          finalLogoUrl = await fileToDataUrl(logoFile);
-        } else {
-          const logoFormData = new FormData();
-          logoFormData.append("logo", logoFile);
-          const uploadRes = await fetch(API_URL + "/api/v1/super-admin/upload", {
-            method: "POST",
-            body: logoFormData,
-            headers: {
-              "Authorization": `Bearer ${token}`
-            }
-          }).then(res => res.json());
-
-          if (uploadRes && uploadRes.success) {
-            finalLogoUrl = uploadRes.data.url;
-          } else {
-            finalLogoUrl = await fileToDataUrl(logoFile);
-          }
-        }
+      const finalLogoUrl = formData.logo_url.trim();
+      if (finalLogoUrl && !/^https:\/\/[^\s]+$/i.test(finalLogoUrl)) {
+        toast({
+          title: "Logotipo inválido",
+          description: "Usa una URL pública HTTPS o deja el campo vacío.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      const payload = { ...formData, logo_url: finalLogoUrl };
+      const selectableModules = new Set(
+        moduleCatalog
+          .filter((module) => module.production_ready && module.selectable && module.global_enabled && module.status === "active")
+          .map((module) => module.key),
+      );
+      const payload = {
+        ...formData,
+        slug: normalizedSlug,
+        logo_url: finalLogoUrl,
+        premium_modules: formData.premium_modules.filter((moduleKey) => selectableModules.has(moduleKey)),
+      };
 
       const response = await authFetch("/api/v1/super-admin/schools", {
         method: "POST",
@@ -291,12 +317,28 @@ export default function SchoolsPage() {
 
       if (response.success) {
         const generatedPw: string | undefined = response.data?.admin_password;
+        const generatedEmail: string = response.data?.admin_email || formData.admin_email;
+        const provisionedHost: string = response.data?.subdomain || `${normalizedSlug}.onlineu.mx`;
+        const domainReady = Boolean(response.data?.domain_ready);
+        const domainMessage = domainReady
+          ? `Subdominio configurado: ${provisionedHost}.`
+          : `Escuela registrada; el subdominio ${provisionedHost} quedó pendiente y puede reintentarse desde Detalles.`;
         toast({
-          title: "Escuela creada ✓",
+          title: domainReady ? "Escuela y subdominio creados ✓" : "Escuela creada; subdominio pendiente",
           description: generatedPw
-            ? `Escuela registrada. Contraseña temporal del admin: ${generatedPw} — guárdala ahora.`
-            : `La escuela ${formData.name} se ha registrado exitosamente.`,
+            ? `${domainMessage} Guarda la credencial temporal que se muestra a continuación.`
+            : `${domainMessage} La API no devolvió la credencial temporal; restablécela antes de entregar la cuenta.`,
+          variant: domainReady ? "default" : "destructive",
         });
+        if (generatedPw) {
+          setCredentialCopied(false);
+          setCreatedCredential({
+            email: generatedEmail,
+            password: generatedPw,
+            host: provisionedHost,
+            domainReady,
+          });
+        }
         setIsModalOpen(false);
         const defaultPlanId = plans[0]?.id || "";
         // Reset
@@ -307,7 +349,6 @@ export default function SchoolsPage() {
           school_year: "2026-2027", eval_scheme: "0-10", logo_url: ""
         });
         setPlanModuleKeys(parsePlanModules(plans[0]?.modules));
-        setLogoFile(null);
         fetchSchools();
       } else {
         toast({
@@ -316,7 +357,7 @@ export default function SchoolsPage() {
           description: response.message || "No se pudo crear la escuela",
         });
       }
-    } catch (err) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Error de conexión",
@@ -329,8 +370,86 @@ export default function SchoolsPage() {
 
   const totalPages = Math.ceil(total / limit);
 
+  const copyCreatedCredential = async () => {
+    if (!createdCredential) return;
+    try {
+      await navigator.clipboard.writeText(
+        `Correo: ${createdCredential.email}\nContraseña temporal: ${createdCredential.password}`,
+      );
+      setCredentialCopied(true);
+      toast({ title: "Credencial copiada", description: "Entrégala por un canal seguro al administrador de la escuela." });
+    } catch {
+      toast({
+        title: "No se pudo copiar",
+        description: "Selecciona y copia manualmente la credencial temporal.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <Dialog
+        open={createdCredential !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreatedCredential(null);
+            setCredentialCopied(false);
+          }
+        }}
+      >
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Credencial inicial de la escuela</DialogTitle>
+            <DialogDescription>
+              Esta contraseña se muestra una sola vez. El administrador tendrá que cambiarla al iniciar sesión.
+            </DialogDescription>
+          </DialogHeader>
+          {createdCredential && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+                <p><span className="font-medium">Subdominio:</span> {createdCredential.host}</p>
+                <p className={createdCredential.domainReady ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}>
+                  {createdCredential.domainReady ? "Confirmado por Hostinger" : "Pendiente de confirmación en Hostinger"}
+                </p>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="created-admin-email">Correo del administrador</Label>
+                <Input id="created-admin-email" value={createdCredential.email} readOnly autoComplete="off" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="created-admin-password">Contraseña temporal</Label>
+                <Input
+                  id="created-admin-password"
+                  value={createdCredential.password}
+                  readOnly
+                  autoComplete="new-password"
+                  className="font-mono"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                EduCore no vuelve a mostrar ni almacena esta contraseña en texto plano. Si se pierde, usa Restablecer contraseña en Usuarios Globales.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={copyCreatedCredential}>
+              {credentialCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              {credentialCopied ? "Copiada" : "Copiar credencial"}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setCreatedCredential(null);
+                setCredentialCopied(false);
+              }}
+            >
+              Ya guardé la credencial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -361,23 +480,23 @@ export default function SchoolsPage() {
                     <Label htmlFor="name">Nombre Oficial</Label>
                     <Input id="name" placeholder="Ej. Instituto Tecnológico Don Bosco" value={formData.name} onChange={(e) => {
                       const name = e.target.value;
-                      const slug = name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+                      const slug = normalizeTenantSlug(name);
                       setFormData({ ...formData, name, slug });
                     }} required />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Logo Institucional</Label>
+                    <Label htmlFor="logo_url">Logo Institucional</Label>
                     <div className="flex items-center gap-3">
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-                        {logoFile ? (
-                          <img src={URL.createObjectURL(logoFile)} alt="Vista previa del logo" className="h-full w-full object-contain" />
+                        {formData.logo_url ? (
+                          <Image src={formData.logo_url} alt="Vista previa del logo" width={56} height={56} unoptimized className="h-full w-full object-contain" />
                         ) : (
                           <Building2 className="h-6 w-6 text-muted-foreground" />
                         )}
                       </div>
-                      <Input id="logo" type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                      <Input id="logo_url" inputMode="url" placeholder="https://…" value={formData.logo_url} onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })} />
                     </div>
-                    <p className="text-xs text-muted-foreground">Opcional. Si la escuela tiene logo, se mostrara en su panel y configuracion.</p>
+                    <p className="text-xs text-muted-foreground">Opcional. Debe ser una imagen pública HTTPS; no se guardan archivos en el disco efímero del backend.</p>
                   </div>
                   <div className="grid gap-2">
                     <Label>Niveles Educativos</Label>
@@ -418,10 +537,20 @@ export default function SchoolsPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="slug">Slug / Subdominio</Label>
-                        <Input id="slug" value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} required />
+                        <Input
+                          id="slug"
+                          value={formData.slug}
+                          onChange={(e) => setFormData({ ...formData, slug: normalizeTenantSlug(e.target.value) })}
+                          minLength={2}
+                          maxLength={63}
+                          pattern="[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+                          required
+                        />
                         {formData.slug && (
-                          <p className="text-[11px] text-muted-foreground">
-                            Subdominio: <span className="text-blue-400 font-mono font-medium">{formData.slug}.onlineu.mx</span>
+                          <p className={`text-[11px] ${getTenantSlugError(formData.slug) ? "text-destructive" : "text-muted-foreground"}`}>
+                            {getTenantSlugError(formData.slug) || (
+                              <>Subdominio: <span className="text-blue-400 font-mono font-medium">{formData.slug}.onlineu.mx</span></>
+                            )}
                           </p>
                         )}
                       </div>
@@ -468,20 +597,43 @@ export default function SchoolsPage() {
                     <div className="grid gap-2">
                       <Label>Módulos del sistema</Label>
                       <p className="text-xs text-muted-foreground -mt-1">
-                        Los módulos en verde están incluidos en el plan. Los demás se añaden como extra.
+                        Solo los módulos con contrato de producción pueden incluirse. Los bloqueados permanecen visibles para que el plan no prometa funciones incompletas.
                       </p>
+                      {moduleCatalogError && (
+                        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                          {moduleCatalogError}. No se permitirá crear la escuela con extras hasta recuperar el catálogo.
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
-                        {MODULE_CATALOG.map((mod) => {
+                        {moduleCatalog.map((mod) => {
                           const inPlan = planModuleKeys.includes(mod.key);
                           const selected = formData.premium_modules.includes(mod.key);
-                          if (inPlan) {
+                          const available = mod.production_ready && mod.selectable && mod.global_enabled && mod.status === "active";
+                          if (available && inPlan) {
                             return (
                               <Badge
                                 key={mod.key}
                                 className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 cursor-default select-none"
                                 title="Incluido en el plan seleccionado"
                               >
-                                ✓ {mod.label}
+                                ✓ {mod.name}
+                              </Badge>
+                            );
+                          }
+                          if (!available) {
+                            const baseContract = mod.production_ready && !mod.selectable;
+                            return (
+                              <Badge
+                                key={mod.key}
+                                variant="outline"
+                                className={baseContract
+                                  ? "cursor-default border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                                  : "cursor-not-allowed border-amber-500/30 bg-amber-500/10 text-amber-800 opacity-80 dark:text-amber-300"}
+                                title={baseContract
+                                  ? "Se provisiona como parte del núcleo o del nivel escolar"
+                                  : `Bloqueado por auditoría de producción (${mod.status || "sin contrato"})`}
+                              >
+                                {baseContract ? "Base · " : "Bloqueado · "}{mod.name}
                               </Badge>
                             );
                           }
@@ -493,10 +645,13 @@ export default function SchoolsPage() {
                               onClick={() => handleModuleToggle(mod.key)}
                               title="Módulo adicional — click para activar/desactivar"
                             >
-                              {selected ? "＋ " : ""}{mod.label}
+                              {selected ? "✓ " : "+ "}{mod.name}
                             </Badge>
                           );
                         })}
+                        {!moduleCatalogError && moduleCatalog.length === 0 && (
+                          <span className="text-xs text-muted-foreground">Cargando catálogo validado…</span>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -661,7 +816,7 @@ export default function SchoolsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                       {school.logo_url ? (
-                        <img src={school.logo_url} alt="Logo" className="w-10 h-10 rounded-md object-contain bg-white border" />
+                        <Image src={school.logo_url} alt="Logo" width={40} height={40} unoptimized className="w-10 h-10 rounded-md object-contain bg-white border" />
                       ) : (
                         <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold">{school.name.charAt(0)}</div>
                       )}
@@ -691,8 +846,6 @@ export default function SchoolsPage() {
                           <ShieldCheck className="w-4 h-4 mr-2 text-amber-500" />
                           Modo Soporte → Estudiantes
                         </DropdownMenuItem>
-                        <DropdownMenuItem><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive"><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

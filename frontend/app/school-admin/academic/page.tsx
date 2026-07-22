@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, CalendarDays, Eye, GraduationCap, Loader2, Pencil, Plus, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type SchoolYear = {
@@ -74,9 +75,8 @@ const gradeLevels = [
 const emptyYear = { name: "", start_date: "", end_date: "", status: "planned", is_current: false, notes: "" };
 const emptySubject = { name: "", code: "", description: "", credits: "1", grade_level_id: "all", status: "active" };
 
-function normalize<T>(response: any, key: string): T[] {
-  const raw = response?.data?.[key] || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalize<T>(response: unknown, key: string): T[] {
+  return responseArray<T>(response, key);
 }
 
 function statusLabel(status: string) {
@@ -97,10 +97,10 @@ function SchoolAcademicStructureContent() {
   const [subjectOpen, setSubjectOpen] = useState(false);
   const [editingYear, setEditingYear] = useState<SchoolYear | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
-  const [yearForm, setYearForm] = useState<any>(emptyYear);
-  const [subjectForm, setSubjectForm] = useState<any>(emptySubject);
+  const [yearForm, setYearForm] = useState<typeof emptyYear>(emptyYear);
+  const [subjectForm, setSubjectForm] = useState<typeof emptySubject>(emptySubject);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [yearsResponse, subjectsResponse, groupsResponse, studentsResponse] = await Promise.all([
@@ -118,11 +118,11 @@ function SchoolAcademicStructureContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const currentYear = years.find((year) => year.is_current) || years[0];
   const previousYears = years.filter((year) => !year.is_current);
@@ -144,13 +144,13 @@ function SchoolAcademicStructureContent() {
 
   const openYear = (year?: SchoolYear) => {
     setEditingYear(year || null);
-    setYearForm(year ? { ...year } : { ...emptyYear, start_date: currentYear?.start_date || "2026-08-24", end_date: "2027-07-09" });
+    setYearForm(year ? { ...emptyYear, ...year } : { ...emptyYear, start_date: currentYear?.start_date || "2026-08-24", end_date: "2027-07-09" });
     setYearOpen(true);
   };
 
   const openSubject = (subject?: Subject) => {
     setEditingSubject(subject || null);
-    setSubjectForm(subject ? { ...subject, credits: String(subject.credits || 1), grade_level_id: subject.grade_level_id || "all" } : emptySubject);
+    setSubjectForm(subject ? { ...emptySubject, ...subject, credits: String(subject.credits || 1), grade_level_id: subject.grade_level_id || "all" } : { ...emptySubject });
     setSubjectOpen(true);
   };
 
@@ -308,12 +308,12 @@ function SchoolAcademicStructureContent() {
           <DialogHeader><DialogTitle>{editingYear ? "Editar ciclo escolar" : "Nuevo ciclo escolar"}</DialogTitle><DialogDescription>Define el periodo academico y si sera el ciclo actual.</DialogDescription></DialogHeader>
           <form onSubmit={saveYear} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2"><Label>Nombre</Label><Input value={yearForm.name} onChange={(event) => setYearForm((current: any) => ({ ...current, name: event.target.value }))} placeholder="Ciclo 2026-2027" /></div>
-              <div className="space-y-2"><Label>Inicio</Label><Input type="date" value={yearForm.start_date} onChange={(event) => setYearForm((current: any) => ({ ...current, start_date: event.target.value }))} /></div>
-              <div className="space-y-2"><Label>Fin</Label><Input type="date" value={yearForm.end_date} onChange={(event) => setYearForm((current: any) => ({ ...current, end_date: event.target.value }))} /></div>
-              <div className="space-y-2"><Label>Estado</Label><Select value={yearForm.status} onValueChange={(value) => setYearForm((current: any) => ({ ...current, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="planned">Planeado</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="closed">Cerrado</SelectItem><SelectItem value="archived">Archivado</SelectItem></SelectContent></Select></div>
-              <div className="space-y-2"><Label>Ciclo actual</Label><Select value={yearForm.is_current ? "yes" : "no"} onValueChange={(value) => setYearForm((current: any) => ({ ...current, is_current: value === "yes", status: value === "yes" ? "active" : current.status }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="yes">Si</SelectItem><SelectItem value="no">No</SelectItem></SelectContent></Select></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Notas</Label><Textarea value={yearForm.notes || ""} onChange={(event) => setYearForm((current: any) => ({ ...current, notes: event.target.value }))} /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Nombre</Label><Input value={yearForm.name} onChange={(event) => setYearForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ciclo 2026-2027" /></div>
+              <div className="space-y-2"><Label>Inicio</Label><Input type="date" value={yearForm.start_date} onChange={(event) => setYearForm((current) => ({ ...current, start_date: event.target.value }))} /></div>
+              <div className="space-y-2"><Label>Fin</Label><Input type="date" value={yearForm.end_date} onChange={(event) => setYearForm((current) => ({ ...current, end_date: event.target.value }))} /></div>
+              <div className="space-y-2"><Label>Estado</Label><Select value={yearForm.status} onValueChange={(value) => setYearForm((current) => ({ ...current, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="planned">Planeado</SelectItem><SelectItem value="active">Activo</SelectItem><SelectItem value="closed">Cerrado</SelectItem><SelectItem value="archived">Archivado</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2"><Label>Ciclo actual</Label><Select value={yearForm.is_current ? "yes" : "no"} onValueChange={(value) => setYearForm((current) => ({ ...current, is_current: value === "yes", status: value === "yes" ? "active" : current.status }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="yes">Si</SelectItem><SelectItem value="no">No</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Notas</Label><Textarea value={yearForm.notes || ""} onChange={(event) => setYearForm((current) => ({ ...current, notes: event.target.value }))} /></div>
             </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setYearOpen(false)}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button></DialogFooter>
           </form>
@@ -325,12 +325,12 @@ function SchoolAcademicStructureContent() {
           <DialogHeader><DialogTitle>{editingSubject ? "Editar materia" : "Nueva materia"}</DialogTitle><DialogDescription>Administra el catalogo global de materias de la institucion.</DialogDescription></DialogHeader>
           <form onSubmit={saveSubject} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>Nombre</Label><Input value={subjectForm.name} onChange={(event) => setSubjectForm((current: any) => ({ ...current, name: event.target.value }))} /></div>
-              <div className="space-y-2"><Label>Clave</Label><Input value={subjectForm.code} onChange={(event) => setSubjectForm((current: any) => ({ ...current, code: event.target.value.toUpperCase() }))} /></div>
-              <div className="space-y-2"><Label>Grado</Label><Select value={subjectForm.grade_level_id || "all"} onValueChange={(value) => setSubjectForm((current: any) => ({ ...current, grade_level_id: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos los grados</SelectItem>{gradeLevels.map((grade) => <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>Creditos</Label><Input type="number" min="1" value={subjectForm.credits} onChange={(event) => setSubjectForm((current: any) => ({ ...current, credits: event.target.value }))} /></div>
-              <div className="space-y-2"><Label>Estado</Label><Select value={subjectForm.status} onValueChange={(value) => setSubjectForm((current: any) => ({ ...current, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Activa</SelectItem><SelectItem value="inactive">Pausada</SelectItem></SelectContent></Select></div>
-              <div className="space-y-2 sm:col-span-2"><Label>Descripcion</Label><Textarea value={subjectForm.description} onChange={(event) => setSubjectForm((current: any) => ({ ...current, description: event.target.value }))} /></div>
+              <div className="space-y-2"><Label>Nombre</Label><Input value={subjectForm.name} onChange={(event) => setSubjectForm((current) => ({ ...current, name: event.target.value }))} /></div>
+              <div className="space-y-2"><Label>Clave</Label><Input value={subjectForm.code} onChange={(event) => setSubjectForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} /></div>
+              <div className="space-y-2"><Label>Grado</Label><Select value={subjectForm.grade_level_id || "all"} onValueChange={(value) => setSubjectForm((current) => ({ ...current, grade_level_id: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos los grados</SelectItem>{gradeLevels.map((grade) => <SelectItem key={grade.id} value={grade.id}>{grade.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Creditos</Label><Input type="number" min="1" value={subjectForm.credits} onChange={(event) => setSubjectForm((current) => ({ ...current, credits: event.target.value }))} /></div>
+              <div className="space-y-2"><Label>Estado</Label><Select value={subjectForm.status} onValueChange={(value) => setSubjectForm((current) => ({ ...current, status: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Activa</SelectItem><SelectItem value="inactive">Pausada</SelectItem></SelectContent></Select></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Descripcion</Label><Textarea value={subjectForm.description} onChange={(event) => setSubjectForm((current) => ({ ...current, description: event.target.value }))} /></div>
             </div>
             <DialogFooter><Button type="button" variant="outline" onClick={() => setSubjectOpen(false)}>Cancelar</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar</Button></DialogFooter>
           </form>

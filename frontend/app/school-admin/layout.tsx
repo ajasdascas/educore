@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,26 +16,14 @@ import {
   FileCheck2,
   FolderOpen,
   MessageCircle,
-  Database,
   CreditCard,
   Settings,
   Menu,
   X,
   Building2,
-  Baby,
-  Apple,
-  Moon,
-  Heart,
   AlertTriangle,
-  LogIn,
-  Milestone,
-  Camera,
-  ActivitySquare,
-  Brain,
-  Eye,
-  Zap,
-  BookMarked,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle/ThemeToggle";
 import { ProfileDropdown } from "@/components/ui/profile-dropdown";
 import { Toaster } from "@/components/ui/toaster";
@@ -44,9 +33,9 @@ import { RoleGuard } from "@/components/providers/RoleGuard";
 import { ModuleKey } from "@/lib/modules/registry";
 import { useEnabledModules } from "@/lib/modules/use-enabled-modules";
 import { SupportModeBanner } from "@/components/SupportModeBanner";
-import { isSupportMode, setSupportContext } from "@/lib/auth";
+import { authFetch, getSupportContext, isSupportMode, setSupportContext } from "@/lib/auth";
 
-const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: ModuleKey }> = [
+const navItems: Array<{ href: string; label: string; icon: LucideIcon; moduleKey?: ModuleKey }> = [
   // Core — siempre visible
   { href: "/school-admin/dashboard",    label: "Dashboard",       icon: LayoutDashboard },
   { href: "/school-admin/academic",     label: "Estructura",      icon: BookOpen,       moduleKey: "academic_core" },
@@ -55,23 +44,6 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: Modu
   { href: "/school-admin/groups",       label: "Grupos",          icon: Users,          moduleKey: "academic_core" },
   { href: "/school-admin/schedule",     label: "Horarios",        icon: Calendar,       moduleKey: "schedules" },
   { href: "/school-admin/attendance",   label: "Asistencias",     icon: ClipboardCheck, moduleKey: "attendance" },
-
-  // Módulos bebés / guardería
-  { href: "/school-admin/daily-logs",   label: "Registro diario", icon: Baby,           moduleKey: "daily_logs" as ModuleKey },
-  { href: "/school-admin/meals",        label: "Comidas",         icon: Apple,          moduleKey: "meals" as ModuleKey },
-  { href: "/school-admin/naps",         label: "Siestas",         icon: Moon,           moduleKey: "naps" as ModuleKey },
-  { href: "/school-admin/health",       label: "Salud",           icon: Heart,          moduleKey: "health_checks" as ModuleKey },
-  { href: "/school-admin/incidents",    label: "Incidentes",      icon: AlertTriangle,  moduleKey: "incidents" as ModuleKey },
-  { href: "/school-admin/pickup",       label: "Autorizaciones",  icon: LogIn,          moduleKey: "pickup_authorizations" as ModuleKey },
-  { href: "/school-admin/milestones",   label: "Hitos",           icon: Milestone,      moduleKey: "milestones" as ModuleKey },
-  { href: "/school-admin/photos",       label: "Fotos/evidencias",icon: Camera,         moduleKey: "photos_evidence" as ModuleKey },
-
-  // Módulos preescolar / kinder
-  { href: "/school-admin/qualitative",  label: "Evaluaciones",    icon: ActivitySquare, moduleKey: "qualitative_assessments" as ModuleKey },
-  { href: "/school-admin/development",  label: "Desarrollo",      icon: Brain,          moduleKey: "development_areas" as ModuleKey },
-  { href: "/school-admin/observations", label: "Observaciones",   icon: Eye,            moduleKey: "observations" as ModuleKey },
-  { href: "/school-admin/activities",   label: "Actividades",     icon: Zap,            moduleKey: "activities" as ModuleKey },
-  { href: "/school-admin/preschool-report-cards", label: "Boletas preescolar", icon: BookMarked, moduleKey: "preschool_report_cards" as ModuleKey },
 
   // Módulos primaria / secundaria
   { href: "/school-admin/grades",       label: "Calificaciones",  icon: NotebookPen,    moduleKey: "grading" },
@@ -82,7 +54,6 @@ const navItems: Array<{ href: string; label: string; icon: any; moduleKey?: Modu
   { href: "/school-admin/payments",     label: "Pagos",           icon: CreditCard,     moduleKey: "payments" },
   { href: "/school-admin/reports",      label: "Reportes",        icon: FileText,       moduleKey: "reports" },
   { href: "/school-admin/communications", label: "Comunicaciones",icon: MessageCircle,  moduleKey: "communications" },
-  { href: "/school-admin/database",     label: "Base de datos",   icon: Database },
   { href: "/school-admin/settings",     label: "Configuracion",   icon: Settings },
 ];
 
@@ -92,8 +63,8 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [schoolBrand, setSchoolBrand] = useState<{ name: string; logo_url?: string } | null>(null);
   const [supportReady, setSupportReady] = useState(false);
-  const { user, logout, loading } = useAuth();
-  const { isModuleEnabled } = useEnabledModules();
+  const { user, loading } = useAuth();
+  const { error: moduleError, isModuleEnabled } = useEnabledModules();
 
   useEffect(() => {
     // Hydrate support context from URL query params (resistant to direct links and reloads)
@@ -113,17 +84,25 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
   }, [user, pathname, router]);
 
   useEffect(() => {
-    try {
-      const schools = JSON.parse(localStorage.getItem("mock_schools") || "[]");
-      const currentSchoolID = localStorage.getItem("mock_current_school_id");
-      const selected = schools.find((school: any) => school.id === currentSchoolID) || schools[0];
-      if (selected) {
-        setSchoolBrand({ name: selected.name, logo_url: selected.logo_url });
-      }
-    } catch {
-      setSchoolBrand(null);
+    let cancelled = false;
+    const supportContext = getSupportContext();
+    if (supportContext?.schoolName) {
+      setSchoolBrand({ name: supportContext.schoolName });
     }
-  }, []);
+    authFetch("/api/v1/school-admin/settings")
+      .then((response) => {
+        const school = response?.data?.school;
+        if (!cancelled && response?.success && school?.name) {
+          setSchoolBrand({ name: school.name, logo_url: school.logo_url || "" });
+        }
+      })
+      .catch(() => {
+        if (!cancelled && !supportContext?.schoolName) setSchoolBrand(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.tenant_id]);
 
   if (loading || !supportReady) {
     return (
@@ -190,7 +169,7 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
           <div className="flex min-w-0 max-w-full flex-1 items-center overflow-hidden" title={schoolBrand?.name || "EduCore"}>
             <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center mr-3 overflow-hidden border border-border">
               {schoolBrand?.logo_url ? (
-                <img src={schoolBrand.logo_url} alt="Logo de la escuela" className="h-full w-full object-contain bg-white" />
+                <Image src={schoolBrand.logo_url} alt="Logo de la escuela" width={32} height={32} unoptimized className="h-full w-full object-contain bg-white" />
               ) : (
                 <span className="text-primary font-bold text-sm">E</span>
               )}
@@ -248,6 +227,15 @@ export default function SchoolAdminLayout({ children }: { children: ReactNode })
           </div>
         </header>
         <SupportModeBanner />
+        {moduleError && (
+          <div role="alert" className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200 sm:mx-4 lg:mx-5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">No se pudo verificar la configuración de módulos.</p>
+              <p className="text-xs opacity-90">{moduleError} Solo se muestran accesos básicos hasta recuperar la configuración.</p>
+            </div>
+          </div>
+        )}
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-5">
           {children}
         </div>

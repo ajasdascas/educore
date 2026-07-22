@@ -9,8 +9,40 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface TeacherDashboardData {
+  stats?: {
+    total_groups?: number;
+    total_students?: number;
+    today_classes?: number;
+    pending_attendance?: number;
+    average_grade?: number | null;
+  };
+  today_classes?: Array<{
+    id: string;
+    subject_name: string;
+    grade_name: string;
+    group_name: string;
+    start_time?: string;
+    end_time?: string;
+    room?: string;
+    group_id: string;
+  }>;
+  alerts?: Array<{
+    id: string;
+    priority: string;
+    type: string;
+    title: string;
+    message: string;
+  }>;
+  recent_messages?: Array<{
+    id: string;
+    subject: string;
+    sender_name: string;
+  }>;
+}
+
 export default function TeacherDashboard() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<TeacherDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEmpty, setIsEmpty] = useState(false);
 
@@ -34,14 +66,11 @@ export default function TeacherDashboard() {
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <GraduationCap className="w-12 h-12 text-muted-foreground/40" />
         <div className="text-center">
-          <p className="font-semibold">No hay profesores creados para esta escuela.</p>
+          <p className="font-semibold">No se pudo cargar el panel docente.</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Crea un profesor desde School Admin → Profesores y luego genera su acceso portal.
+            Intenta nuevamente. Si el problema continua, contacta al administrador de tu escuela.
           </p>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/school-admin/teachers">Crear profesor</Link>
-        </Button>
       </div>
     );
   }
@@ -69,7 +98,7 @@ export default function TeacherDashboard() {
         <Metric title="Alumnos" value={stats.total_students || 0} icon={<Users className="h-4 w-4" />} />
         <Metric title="Clases hoy" value={stats.today_classes || 0} icon={<CalendarCheck className="h-4 w-4" />} />
         <Metric title="Asistencias pendientes" value={stats.pending_attendance || 0} icon={<AlertTriangle className="h-4 w-4" />} />
-        <Metric title="Promedio" value={stats.average_grade || 0} icon={<GraduationCap className="h-4 w-4" />} />
+        <Metric title="Promedio" value={stats.average_grade ?? "Sin datos"} icon={<GraduationCap className="h-4 w-4" />} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_.7fr]">
@@ -79,7 +108,7 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {todayClasses.length === 0 && <p className="text-sm text-muted-foreground">No tienes clases asignadas para hoy.</p>}
-            {todayClasses.map((item: any) => (
+            {todayClasses.map((item) => (
               <div key={item.id} className="rounded-lg border p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
@@ -100,7 +129,8 @@ export default function TeacherDashboard() {
           <Card>
             <CardHeader><CardTitle>Alertas</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {alerts.map((alert: any) => (
+              {alerts.length === 0 && <p className="text-sm text-muted-foreground">No hay alertas pendientes.</p>}
+              {alerts.map((alert) => (
                 <div key={alert.id} className="rounded-lg border p-3">
                   <Badge variant={alert.priority === "high" ? "destructive" : "secondary"}>{alert.type}</Badge>
                   <p className="mt-2 font-medium">{alert.title}</p>
@@ -113,7 +143,7 @@ export default function TeacherDashboard() {
             <CardHeader><CardTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5" /> Mensajes recientes</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {messages.length === 0 && <p className="text-sm text-muted-foreground">Sin mensajes recientes.</p>}
-              {messages.map((message: any) => (
+              {messages.map((message) => (
                 <div key={message.id} className="rounded-lg border p-3">
                   <p className="font-medium">{message.subject}</p>
                   <p className="text-sm text-muted-foreground">{message.sender_name}</p>

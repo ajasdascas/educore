@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Bell, Check, CheckCircle, Info, Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 type NotificationItem = {
   id: string;
@@ -51,7 +52,7 @@ export default function NotificationsPage() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/api/v1/super-admin/system/notifications");
@@ -62,16 +63,16 @@ export default function NotificationsPage() {
         unread: Number(res.data?.unread || 0),
         read: Number(res.data?.read || 0),
       });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudieron cargar las notificaciones", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudieron cargar las notificaciones"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const markAllRead = async () => {
     setSaving(true);
@@ -80,8 +81,8 @@ export default function NotificationsPage() {
       if (!res.success) throw new Error(res.error || res.message || "No se pudo actualizar el estado");
       toast({ title: "Listo", description: "Notificaciones marcadas como leidas." });
       await load();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo actualizar el estado", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo actualizar el estado"), variant: "destructive" });
     } finally {
       setSaving(false);
     }

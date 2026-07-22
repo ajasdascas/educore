@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { authFetch, getAccessToken, setAuth } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -47,8 +48,8 @@ export default function ProfilePage() {
       const token = getAccessToken();
       if (token) setAuth(token, updatedUser);
       toast({ title: "Listo", description: "Perfil actualizado correctamente." });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo guardar el perfil", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo guardar el perfil"), variant: "destructive" });
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Calculator, Loader2, Save, Search, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type GroupOption = { id: string; name: string; grade_name: string; subject_ids?: string[] };
@@ -24,8 +25,8 @@ type GradeStudent = {
   grades: Array<{ id: string; score: number; max_score: number; description: string; type: string; date: string }>;
 };
 
-function normalizeArray(response: any) {
-  return Array.isArray(response?.data) ? response.data : response?.data?.items || [];
+function normalizeArray<T>(response: unknown): T[] {
+  return responseArray<T>(response, "items");
 }
 
 function GradesContent() {
@@ -43,20 +44,20 @@ function GradesContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadCatalogs = async () => {
+  const loadCatalogs = useCallback(async () => {
     const [groupsResponse, subjectsResponse] = await Promise.all([
       authFetch("/api/v1/school-admin/academic/groups"),
       authFetch("/api/v1/school-admin/academic/subjects"),
     ]);
-    const nextGroups = normalizeArray(groupsResponse);
-    const nextSubjects = normalizeArray(subjectsResponse);
+    const nextGroups = normalizeArray<GroupOption>(groupsResponse);
+    const nextSubjects = normalizeArray<SubjectOption>(subjectsResponse);
     setGroups(nextGroups);
     setSubjects(nextSubjects);
     setGroupID((current) => current || nextGroups[0]?.id || "");
     setSubjectID((current) => current || nextSubjects[0]?.id || "");
-  };
+  }, []);
 
-  const loadGrades = async (nextGroupID = groupID, nextSubjectID = subjectID) => {
+  const loadGrades = useCallback(async (nextGroupID: string, nextSubjectID: string) => {
     if (!nextGroupID || !nextSubjectID) return;
     try {
       setLoading(true);
@@ -73,15 +74,15 @@ function GradesContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadCatalogs();
-  }, []);
+  }, [loadCatalogs]);
 
   useEffect(() => {
     if (groupID && subjectID) loadGrades(groupID, subjectID);
-  }, [groupID, subjectID]);
+  }, [groupID, loadGrades, subjectID]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

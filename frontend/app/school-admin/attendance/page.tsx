@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2, Save, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type AttendanceStatus = "present" | "absent" | "late" | "sick" | "excused";
@@ -42,9 +43,8 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function normalizeGroups(response: any): GroupOption[] {
-  const raw = response?.data?.groups || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeGroups(response: unknown): GroupOption[] {
+  return responseArray<GroupOption>(response, "groups");
 }
 
 function AttendanceContent() {
@@ -57,14 +57,14 @@ function AttendanceContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     const response = await authFetch("/api/v1/school-admin/academic/groups");
     const nextGroups = normalizeGroups(response);
     setGroups(nextGroups);
     setGroupID((current) => current || nextGroups[0]?.id || "");
-  };
+  }, []);
 
-  const loadAttendance = async (nextGroupID = groupID) => {
+  const loadAttendance = useCallback(async (nextGroupID: string) => {
     if (!nextGroupID) return;
     try {
       setLoading(true);
@@ -79,15 +79,15 @@ function AttendanceContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [date, toast]);
 
   useEffect(() => {
     loadGroups();
-  }, []);
+  }, [loadGroups]);
 
   useEffect(() => {
     if (groupID) loadAttendance(groupID);
-  }, [groupID, date]);
+  }, [groupID, loadAttendance]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

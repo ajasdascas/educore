@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, CalendarDays, Eye, Loader2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type GroupStatus = "active" | "inactive";
@@ -115,29 +116,24 @@ const emptyForm: GroupFormState = {
   description: "",
 };
 
-function normalizeGroups(response: any): Group[] {
-  const raw = response?.data?.groups || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeGroups(response: unknown): Group[] {
+  return responseArray<Group>(response, "groups");
 }
 
-function normalizeTeachers(response: any): Teacher[] {
-  const raw = response?.data?.teachers || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeTeachers(response: unknown): Teacher[] {
+  return responseArray<Teacher>(response, "teachers");
 }
 
-function normalizeStudents(response: any): Student[] {
-  const raw = response?.data?.students || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeStudents(response: unknown): Student[] {
+  return responseArray<Student>(response, "students");
 }
 
-function normalizeSubjects(response: any): Subject[] {
-  const raw = response?.data?.subjects || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeSubjects(response: unknown): Subject[] {
+  return responseArray<Subject>(response, "subjects");
 }
 
-function normalizeSchoolYears(response: any): SchoolYear[] {
-  const raw = response?.data?.school_years || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeSchoolYears(response: unknown): SchoolYear[] {
+  return responseArray<SchoolYear>(response, "school_years");
 }
 
 function toForm(group: Group): GroupFormState {
@@ -197,7 +193,7 @@ function SchoolGroupsContent() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [form, setForm] = useState<GroupFormState>(emptyForm);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [groupsResponse, teachersResponse, studentsResponse, subjectsResponse, yearsResponse] = await Promise.all([
@@ -221,11 +217,11 @@ function SchoolGroupsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const filteredGroups = useMemo(() => {
     const term = search.trim().toLowerCase();

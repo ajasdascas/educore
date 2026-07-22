@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MessageCircle, Send } from "lucide-react";
 import { authFetch } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 
+interface TeacherMessage {
+  id: string;
+  subject: string;
+  sender_name: string;
+  recipient_name: string;
+  created_at: string;
+  content: string;
+}
+
+interface RecipientStudent {
+  id: string;
+  parent_id?: string;
+  parent_name?: string;
+  first_name: string;
+  last_name: string;
+}
+
 export default function TeacherMessagesPage() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
+  const [messages, setMessages] = useState<TeacherMessage[]>([]);
+  const [students, setStudents] = useState<RecipientStudent[]>([]);
   const [form, setForm] = useState({ recipient_id: "", subject: "", content: "", priority: "normal" });
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [messagesRes, classesRes] = await Promise.all([authFetch("/api/v1/teacher/messages"), authFetch("/api/v1/teacher/classes")]);
     setMessages(messagesRes.success ? messagesRes.data || [] : []);
     const firstClass = classesRes.success ? classesRes.data?.[0] : null;
@@ -26,11 +43,15 @@ export default function TeacherMessagesPage() {
       const studentsRes = await authFetch(`/api/v1/teacher/classes/${firstClass.group_id}/students`);
       const list = studentsRes.success ? studentsRes.data || [] : [];
       setStudents(list);
-      if (list[0] && !form.recipient_id) setForm((prev) => ({ ...prev, recipient_id: list[0].parent_id || `parent-${list[0].id}` }));
+      if (list[0]) {
+        setForm((prev) => prev.recipient_id
+          ? prev
+          : { ...prev, recipient_id: list[0].parent_id || `parent-${list[0].id}` });
+      }
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const send = async (event: FormEvent) => {
     event.preventDefault();

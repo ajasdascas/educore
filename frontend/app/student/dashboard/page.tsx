@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { BookOpen, ClipboardCheck, Calendar, TrendingUp, GraduationCap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authFetch } from "@/lib/auth";
-import { useAuth } from "@/components/providers/AuthProvider";
 
 interface GradeSummary {
   subject_name: string;
@@ -69,7 +68,6 @@ function StatCard({
 }
 
 export default function StudentDashboard() {
-  const { user } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -108,7 +106,7 @@ export default function StudentDashboard() {
             <p className="font-medium">Para activar este portal:</p>
             <p>1. Ve a <strong>School Admin → Estudiantes</strong></p>
             <p>2. Abre el detalle del alumno</p>
-            <p>3. Haz clic en <strong>"Acceso estudiante"</strong></p>
+            <p>3. Haz clic en <strong>&quot;Acceso estudiante&quot;</strong></p>
             <p className="text-amber-500/80 mt-1">Contacta al administrador si el acceso no aparece disponible.</p>
           </div>
         </div>
@@ -117,7 +115,6 @@ export default function StudentDashboard() {
   }
 
   const { student, recent_grades, attendance_summary } = data;
-  const fullName = `${student.first_name} ${student.last_name}`.trim();
   const attendanceRate = attendance_summary.rate?.toFixed(1) ?? "0.0";
 
   return (
@@ -166,7 +163,7 @@ export default function StudentDashboard() {
           icon={Calendar}
           label="Tardanzas"
           value={attendance_summary.late}
-          sub="retardos / enfermedades"
+          sub="total de retardos"
           color="bg-amber-500"
         />
       </div>
@@ -189,14 +186,10 @@ export default function StudentDashboard() {
                   <div>
                     <p className="text-sm font-medium">{g.subject_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {g.eval_type} · {g.period}
+                      {g.eval_type ? `${g.eval_type} · ${g.period}` : g.period}
                     </p>
                   </div>
-                  <span
-                    className={`text-lg font-bold ${
-                      g.grade >= 7 ? "text-emerald-500" : "text-rose-500"
-                    }`}
-                  >
+                  <span className="text-lg font-bold text-foreground">
                     {g.grade}
                   </span>
                 </div>

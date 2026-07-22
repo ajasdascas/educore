@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Download, FileCheck2, Loader2, Printer } from "lucide-react";
+import { Download, FileCheck2, FileJson2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,10 @@ import { authFetch } from "@/lib/auth";
 
 type Student = { id: string; first_name: string; last_name?: string; paternal_last_name?: string; maternal_last_name?: string; group_name?: string; grade_name?: string };
 type ReportCard = {
+  snapshot_id: string;
+  snapshot_sha256: string;
+  snapshot_payload_json: string;
+  school_name: string;
   student_id: string;
   student_name: string;
   group_name: string;
@@ -47,7 +51,7 @@ export default function SchoolAdminReportCardsPage() {
         if (list[0]) setStudentID(list[0].id);
       })
       .catch(() => toast({ title: "No se pudieron cargar alumnos", variant: "destructive" }));
-  }, []);
+  }, [toast]);
 
   const selectedStudent = useMemo(() => students.find((student) => student.id === studentID), [students, studentID]);
 
@@ -61,8 +65,9 @@ export default function SchoolAdminReportCardsPage() {
         body: JSON.stringify({ student_id: studentID, period, include_attendance: true, include_comments: true }),
       });
       if (!response?.success) throw new Error(response?.error || response?.message || "No se pudo generar.");
+      if (!response.data?.snapshot_id || !response.data?.snapshot_sha256 || !response.data?.snapshot_payload_json) throw new Error("El servidor no confirmo la persistencia del snapshot.");
       setReport(response.data);
-      toast({ title: "Boleta generada", description: "Preview listo para revision y exportacion." });
+      toast({ title: "Boleta generada", description: "El snapshot inmutable quedo guardado antes de habilitar la exportacion." });
     } catch (error) {
       toast({ title: "No se pudo generar", description: error instanceof Error ? error.message : "Intenta de nuevo.", variant: "destructive" });
     } finally {
@@ -86,6 +91,10 @@ export default function SchoolAdminReportCardsPage() {
       doc.setFont("helvetica", "bold");
       doc.text("BOLETA DE CALIFICACIONES", margin, y);
       y += lineH + 2;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(report.school_name, margin, y);
+      y += lineH;
       doc.setLineWidth(0.5);
       doc.line(margin, y, pageW - margin, y);
       y += 9;
@@ -150,7 +159,7 @@ export default function SchoolAdminReportCardsPage() {
         for (const c of report.comments) {
           if (y > 260) { doc.addPage(); y = 20; }
           doc.setFont("helvetica", "bold");
-          doc.text(`${c.subject} — ${c.teacher_name}`, margin, y); y += lineH - 1;
+          doc.text(`${c.subject} - ${c.teacher_name}`, margin, y); y += lineH - 1;
           doc.setFont("helvetica", "normal");
           const lines = doc.splitTextToSize(c.comment, pageW - margin * 2) as string[];
           for (const line of lines) {
@@ -164,7 +173,8 @@ export default function SchoolAdminReportCardsPage() {
       // Footer
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
-      doc.text("Generado por EduCore — Sistema de Administracion Escolar", pageW / 2, 290, { align: "center" });
+      doc.text(`Snapshot ${report.snapshot_id} | SHA-256 ${report.snapshot_sha256}`, pageW / 2, 286, { align: "center" });
+      doc.text(`Generado por ${report.school_name} con EduCore`, pageW / 2, 290, { align: "center" });
 
       const slug = report.student_name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
       doc.save(`boleta-${slug}-${report.period}.pdf`);
@@ -176,8 +186,29 @@ export default function SchoolAdminReportCardsPage() {
     }
   };
 
+  const downloadJSON = async () => {
+    if (!report?.snapshot_id || !report.snapshot_payload_json) return;
+    if (globalThis.crypto?.subtle) {
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(report.snapshot_payload_json));
+      const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      if (checksum !== report.snapshot_sha256) {
+        toast({ title: "Snapshot invalido", description: "El SHA-256 no coincide; la descarga fue bloqueada.", variant: "destructive" });
+        return;
+      }
+    }
+    const blob = new Blob([report.snapshot_payload_json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `boleta-snapshot-${report.snapshot_id}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <ModuleGuard moduleKey="grades">
+    <ModuleGuard moduleKey="report_cards" moduleName="Boletas">
       <div className="space-y-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Boletas</h1>
@@ -187,7 +218,7 @@ export default function SchoolAdminReportCardsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Generador</CardTitle>
-            <CardDescription>Elige alumno y periodo; revisa el preview antes de imprimir o exportar.</CardDescription>
+            <CardDescription>Elige alumno y periodo. Cada resultado se guarda como snapshot JSON con SHA-256 antes de exportarse.</CardDescription>
           </CardHeader>
           <CardContent>
             <form className="grid gap-3 md:grid-cols-[1fr_220px_auto]" onSubmit={generate}>
@@ -213,11 +244,11 @@ export default function SchoolAdminReportCardsPage() {
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <CardTitle>Preview</CardTitle>
-              <CardDescription>{report ? `${report.student_name} · ${report.group_name || selectedStudent?.group_name || "Sin grupo"}` : "Genera una boleta para ver el resultado."}</CardDescription>
+              <CardDescription>{report ? `${report.school_name} · ${report.student_name} · ${report.group_name || selectedStudent?.group_name || "Sin grupo"}` : "Genera una boleta para ver el resultado."}</CardDescription>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" disabled={!report} onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Imprimir</Button>
-              <Button variant="outline" disabled={!report || exporting} onClick={() => void downloadPDF()}>
+              <Button variant="outline" disabled={!report?.snapshot_id} onClick={() => void downloadJSON()}><FileJson2 className="mr-2 h-4 w-4" />JSON</Button>
+              <Button variant="outline" disabled={!report?.snapshot_id || exporting} onClick={() => void downloadPDF()}>
                 {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                 Exportar PDF
               </Button>
@@ -226,6 +257,10 @@ export default function SchoolAdminReportCardsPage() {
           <CardContent className="space-y-5">
             {report ? (
               <>
+                <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  <p><span className="font-medium text-foreground">Snapshot:</span> {report.snapshot_id}</p>
+                  <p className="break-all"><span className="font-medium text-foreground">SHA-256:</span> {report.snapshot_sha256}</p>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-4">
                   <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Promedio</p><p className="text-2xl font-bold">{report.overall_gpa}</p></CardContent></Card>
                   <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Nivel</p><p className="text-2xl font-bold">{report.overall_grade}</p></CardContent></Card>

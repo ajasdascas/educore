@@ -17,6 +17,7 @@ const accountBasePathByRole: Record<AuthUser["role"], string> = {
   SCHOOL_ADMIN: "/school-admin",
   TEACHER: "/teacher",
   PARENT: "/parent",
+  STUDENT: "/student",
 };
 
 export function ProfileDropdown({ userInitials, userRole }: ProfileDropdownProps) {

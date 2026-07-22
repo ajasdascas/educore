@@ -7,7 +7,7 @@ import { BookOpen, Eye, EyeOff, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { apiRequest, API_URL, ApiError, warmup } from "@/lib/api";
 import { getDashboardPath } from "@/lib/auth";
-import { getTenantFromHost } from "@/lib/tenant";
+import { getTenantFromHost, parseTenantSlug } from "@/lib/tenant";
 
 function formatSlug(s: string) {
   return s.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -22,20 +22,21 @@ const ROLE_LABELS: Record<string, string> = {
 
 /**
  * Resolve the active school slug in priority order:
- *  1. ?slug= searchParam  (direct link from super-admin or escuela page)
- *  2. hostname subdomain  (kinder1.onlineu.mx/login?role=school_admin)
+ *  1. hostname subdomain  (authoritative tenant boundary)
+ *  2. ?slug= searchParam  (fallback for onlineu.mx/educore links)
  *  3. null               (onlineu.mx/login — no school context)
  */
 function resolveSlug(paramSlug: string | null): {
   slug: string;
   fromSubdomain: boolean;
 } {
-  if (paramSlug) return { slug: paramSlug, fromSubdomain: false };
-
   if (typeof window !== "undefined") {
     const sub = getTenantFromHost(window.location.hostname);
     if (sub) return { slug: sub, fromSubdomain: true };
   }
+
+  const parsedParam = parseTenantSlug(paramSlug);
+  if (parsedParam) return { slug: parsedParam, fromSubdomain: false };
 
   return { slug: "", fromSubdomain: false };
 }
@@ -68,12 +69,21 @@ function LoginInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [schoolName, setSchoolName] = useState("");
+  const [schoolUnavailable, setSchoolUnavailable] = useState(false);
 
   // Fetch the school's real display name from the backend
   useEffect(() => {
+    setSchoolName("");
+    setSchoolUnavailable(false);
     if (!slug) return;
     fetch(`${API_URL}/api/v1/public/schools/resolve?slug=${encodeURIComponent(slug)}`)
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        if (r.status === 403 || r.status === 404) {
+          setSchoolUnavailable(true);
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
       .then((d) => { if (d?.data?.name) setSchoolName(d.data.name); })
       .catch(() => {});
   }, [slug]);
@@ -97,6 +107,10 @@ function LoginInner() {
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (schoolUnavailable) {
+      setError("Esta escuela no existe, está suspendida o todavía no está disponible.");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -123,6 +137,14 @@ function LoginInner() {
       if (response.success) {
         login(response.data.access_token, response.data.user);
         const userRole = response.data.user.role as string;
+
+		if (response.data.user.password_must_change === true) {
+		  const changePasswordHref = slug
+			? `/change-password?slug=${encodeURIComponent(slug)}`
+			: "/change-password";
+		  router.replace(changePasswordHref);
+		  return;
+		}
 
         // If a specific portal role was selected, redirect to that dashboard
         // regardless of what getDashboardPath() would normally return.
@@ -300,7 +322,7 @@ function LoginInner() {
 
             <p className="text-center">
               <Link
-                href="/reset-password"
+				href={slug ? `/reset-password?slug=${encodeURIComponent(slug)}` : "/reset-password"}
                 className="text-xs text-slate-500 transition-colors hover:text-blue-400"
               >
                 Olvidaste tu contrasena?

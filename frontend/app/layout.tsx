@@ -11,12 +11,12 @@ const geistMono = localFont({ src: "./fonts/GeistMonoVF.woff", variable: "--font
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://onlineu.mx/educore/"),
-  title: "Educore - Sistema integral de gestion escolar | SIS + LMS",
+  title: "EduCore - Administración escolar modular",
   description:
-    "Educore es una plataforma de gestion escolar todo-en-uno para Mexico: SIS, LMS, pagos, comunicacion y reportes.",
+    "EduCore centraliza estructura académica, estudiantes, personal, horarios, asistencias y calificaciones con acceso separado por escuela y rol.",
   openGraph: {
-    title: "Educore - Sistema integral de gestion escolar",
-    description: "SIS + LMS todo-en-uno para escuelas modernas en Mexico y Latinoamerica.",
+    title: "EduCore - Administración escolar modular",
+    description: "Gestión académica y portales por rol con datos separados por escuela.",
     url: "https://onlineu.mx/educore/",
     siteName: "Educore",
     images: [{ url: "/og-educore.svg", width: 1200, height: 630, alt: "Educore" }],

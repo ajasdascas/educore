@@ -5,6 +5,8 @@ export interface User {
   email: string;
   role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | "STUDENT";
   tenant_id: string;
+  tenant_slug?: string;
+  password_must_change?: boolean;
   first_name?: string;
   last_name?: string;
 }
@@ -48,6 +50,13 @@ function redirectToLogin() {
   if (typeof window === "undefined") return;
   const basePath = window.location.pathname.startsWith("/educore") ? "/educore" : "";
   window.location.href = `${basePath}/login`;
+}
+
+function redirectToPasswordChange(user: User) {
+  if (typeof window === "undefined") return;
+  const basePath = window.location.pathname.startsWith("/educore") ? "/educore" : "";
+  const query = user.tenant_slug ? `?slug=${encodeURIComponent(user.tenant_slug)}` : "";
+  window.location.href = `${basePath}/change-password${query}`;
 }
 
 export type SupportRole = "school_admin" | "teacher" | "parent" | "student";
@@ -111,7 +120,7 @@ function buildAuthHeaders(options: RequestInit = {}) {
   return { headers, token };
 }
 
-export async function authFetch(endpoint: string, options: RequestInit = {}): Promise<any> {
+export async function authFetch(endpoint: string, options: RequestInit = {}) {
   const { headers, token } = buildAuthHeaders(options);
 
   if (token?.startsWith("mock-")) {
@@ -125,8 +134,9 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
     response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
+	  credentials: "include",
     });
-  } catch (networkErr) {
+  } catch {
     return {
       success: false,
       error: `No se pudo conectar al servidor (${API_URL}). Verifica que el backend esté activo y que CORS permita este origen.`,
@@ -144,6 +154,7 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
         const retryResponse = await fetch(`${API_URL}${endpoint}`, {
           ...options,
           headers: retryHeaders,
+		  credentials: "include",
         });
         return retryResponse.json();
       } catch {
@@ -157,10 +168,20 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
   }
 
   if (response.status === 403) {
-    let body: any = null;
-    try { body = await response.json(); } catch { /* ignore */ }
+	let body: { code?: string; error?: string } | null = null;
+	try { body = await response.json() as { code?: string; error?: string }; } catch { /* ignore */ }
+	if (body?.code === "PASSWORD_CHANGE_REQUIRED") {
+	  const currentUser = getUser();
+	  const currentToken = getAccessToken();
+	  if (currentUser && currentToken) {
+		const forcedUser = { ...currentUser, password_must_change: true };
+		setAuth(currentToken, forcedUser);
+		redirectToPasswordChange(forcedUser);
+	  }
+	}
     return {
       success: false,
+	  code: body?.code,
       error: body?.error || "Sin permisos. Si eres Super Admin, selecciona una escuela primero desde /super-admin/schools.",
     };
   }
@@ -180,6 +201,7 @@ async function tryRefreshToken(): Promise<boolean> {
     const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
       method: "POST",
       headers,
+	  credentials: "include",
     });
     if (!response.ok) return false;
 
@@ -202,6 +224,7 @@ export async function logout() {
     await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: "POST",
       headers,
+	  credentials: "include",
     });
   } catch {
     // Ignore network errors on client logout.

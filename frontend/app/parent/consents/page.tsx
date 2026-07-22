@@ -9,8 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 
+interface Consent {
+  id: string;
+  title: string;
+  student_name: string;
+  due_date?: string;
+  status: string;
+  description: string;
+  signed_at?: string;
+}
+
 export default function ParentConsentsPage() {
-  const [consents, setConsents] = useState<any[]>([]);
+  const [consents, setConsents] = useState<Consent[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const { toast } = useToast();
 

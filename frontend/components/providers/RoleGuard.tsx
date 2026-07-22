@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { getDashboardPath, User } from "@/lib/auth";
+import { getDashboardPath } from "@/lib/auth";
 
 type RoleGuardProps = {
   allowedRoles: Array<"SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | "STUDENT">;

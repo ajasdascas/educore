@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw, Save, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage, isRecord } from "@/lib/api-response";
 
 type SettingsMap = Record<string, Record<string, unknown>>;
 
@@ -35,10 +36,10 @@ const defaultSettings: SettingsMap = {
   },
 };
 
-function mergeSettings(items: any[]): SettingsMap {
+function mergeSettings(items: unknown[]): SettingsMap {
   const next: SettingsMap = { ...defaultSettings };
   for (const item of items) {
-    if (!item?.key || typeof item.value !== "object") continue;
+    if (!isRecord(item) || typeof item.key !== "string" || !isRecord(item.value)) continue;
     next[item.key] = {
       ...(next[item.key] || {}),
       ...item.value,
@@ -53,22 +54,22 @@ export default function SettingsPage() {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/api/v1/super-admin/system/settings");
       if (!res.success) throw new Error(res.error || res.message || "No se pudo cargar configuracion");
       setSettings(mergeSettings(Array.isArray(res.data?.settings) ? res.data.settings : []));
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo cargar configuracion", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo cargar configuracion"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const updateValue = (key: string, field: string, value: unknown) => {
     setSettings((prev) => ({
@@ -94,8 +95,8 @@ export default function SettingsPage() {
       });
       if (!res.success) throw new Error(res.error || res.message || "No se pudo guardar configuracion");
       toast({ title: "Listo", description: `Configuracion ${key} guardada.` });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo guardar configuracion", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo guardar configuracion"), variant: "destructive" });
     } finally {
       setSavingKey(null);
     }

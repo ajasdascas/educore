@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Database,
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 type DatabaseTable = {
   name: string;
@@ -85,22 +86,22 @@ export default function DatabaseAdminPage() {
     return tables.filter((table) => !value || table.name.toLowerCase().includes(value));
   }, [tables, query]);
 
-  const loadTables = async () => {
+  const loadTables = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/api/v1/super-admin/database/tables");
       if (!res.success) throw new Error(res.message || res.error || "No se pudo cargar la base de datos");
       const nextTables = res.data?.tables || [];
       setTables(nextTables);
-      if (!selectedTable && nextTables.length > 0) setSelectedTable(nextTables[0].name);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudieron cargar tablas", variant: "destructive" });
+      setSelectedTable((current) => current || nextTables[0]?.name || "");
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudieron cargar tablas"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const loadTable = async (tableName: string) => {
+  const loadTable = useCallback(async (tableName: string) => {
     if (!tableName) return;
     setTableLoading(true);
     try {
@@ -113,20 +114,20 @@ export default function DatabaseAdminPage() {
       setColumns(schemaRes.data?.columns || []);
       setRelationships(schemaRes.data?.relationships || []);
       setRows(rowsRes.data?.rows || []);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo cargar tabla", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo cargar tabla"), variant: "destructive" });
     } finally {
       setTableLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadTables();
-  }, []);
+  }, [loadTables]);
 
   useEffect(() => {
     if (selectedTable) loadTable(selectedTable);
-  }, [selectedTable]);
+  }, [loadTable, selectedTable]);
 
   const exportSelected = async () => {
     try {
@@ -134,8 +135,8 @@ export default function DatabaseAdminPage() {
       if (!res.success) throw new Error(res.message || res.error || "No se pudo exportar");
       downloadWorkbook(`educore-${selectedTable}.xlsx`, res.data?.tables || { [selectedTable]: rows });
       toast({ title: "Export listo", description: `${selectedTable} descargado como Excel.` });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo exportar", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo exportar"), variant: "destructive" });
     }
   };
 
@@ -145,8 +146,8 @@ export default function DatabaseAdminPage() {
       if (!res.success) throw new Error(res.message || res.error || "No se pudo exportar");
       downloadWorkbook("educore-full-database.xlsx", res.data?.tables || {});
       toast({ title: "Export completo", description: "Base de datos descargada con una hoja por tabla." });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo exportar", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo exportar"), variant: "destructive" });
     }
   };
 

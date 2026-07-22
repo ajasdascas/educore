@@ -14,13 +14,39 @@ interface PlanFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
-  plan: any | null;
+  plan: EditablePlan | null;
+}
+
+interface EditablePlan {
+  id: string;
+  name: string;
+  description: string;
+  price_monthly: number;
+  price_annual: number;
+  currency: string;
+  max_students: number;
+  max_teachers: number;
+  modules: string | string[];
+  features: string | string[];
+  is_active: boolean;
+  is_featured: boolean;
+}
+
+interface CatalogModule {
+  key: string;
+  name: string;
+  description?: string;
+  production_ready: boolean;
+  selectable: boolean;
+  global_enabled: boolean;
+  status: string;
 }
 
 export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [catalog, setCatalog] = useState<any[]>([]);
+  const [catalog, setCatalog] = useState<CatalogModule[]>([]);
+  const [catalogError, setCatalogError] = useState("");
   
   const [formData, setFormData] = useState({
     name: "",
@@ -44,9 +70,14 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
         const res = await authFetch("/api/v1/super-admin/modules-catalog");
         if (res.success) {
           setCatalog(Array.isArray(res.data?.modules) ? res.data.modules : []);
+          setCatalogError("");
+        } else {
+          throw new Error(res.message || "No se pudo cargar el catálogo validado");
         }
       } catch (err) {
         console.error("Error loading catalog:", err);
+        setCatalog([]);
+        setCatalogError("No se pudo cargar el catálogo validado; no se guardará el plan.");
       }
     };
     loadCatalog();
@@ -66,18 +97,28 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
 
       try {
         setSelectedModules(Array.isArray(plan.modules) ? plan.modules : JSON.parse(plan.modules || "[]"));
-      } catch (e) {
+      } catch {
         setSelectedModules([]);
       }
 
       try {
         const parsedF = Array.isArray(plan.features) ? plan.features : JSON.parse(plan.features || "[]");
         setFeatures(parsedF.length > 0 ? parsedF : [""]);
-      } catch (e) {
+      } catch {
         setFeatures([""]);
       }
     }
   }, [plan]);
+
+  useEffect(() => {
+    if (catalog.length === 0) return;
+    const selectable = new Set(
+      catalog
+        .filter((mod) => mod.production_ready && mod.selectable && mod.global_enabled && mod.status === "active")
+        .map((mod) => mod.key),
+    );
+    setSelectedModules((current) => current.filter((key) => selectable.has(key)));
+  }, [catalog]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -108,6 +149,10 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
   };
 
   const toggleModule = (key: string) => {
+    const catalogModule = catalog.find((item) => item.key === key);
+    if (!catalogModule?.production_ready || !catalogModule?.selectable || !catalogModule?.global_enabled || catalogModule?.status !== "active") {
+      return;
+    }
     if (selectedModules.includes(key)) {
       setSelectedModules(selectedModules.filter(m => m !== key));
     } else {
@@ -117,13 +162,17 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (catalogError || catalog.length === 0) {
+      toast({ title: "Catálogo no disponible", description: "Recarga el catálogo antes de guardar el plan.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
 
     const cleanFeatures = features.filter(f => f.trim() !== "");
 
     const payload = {
       ...formData,
-      modules: selectedModules,
+      modules: selectedModules.filter((key) => catalog.some((mod) => mod.key === key && mod.production_ready && mod.selectable && mod.global_enabled && mod.status === "active")),
       features: cleanFeatures
     };
 
@@ -145,7 +194,7 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
       } else {
         toast({ title: "Error", description: res.message || "No se pudo guardar el plan", variant: "destructive" });
       }
-    } catch (err) {
+    } catch {
       toast({ title: "Error", description: "Ocurrió un error inesperado", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -235,32 +284,42 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">Módulos Incluidos</h3>
+                <p className="text-xs text-muted-foreground">
+                  El núcleo académico se incluye automáticamente. Solo los complementos aprobados para producción pueden venderse en un plan.
+                </p>
+                {catalogError && <p role="alert" className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">{catalogError}</p>}
                 <div className="bg-muted/30 rounded-lg p-4 max-h-[300px] overflow-y-auto space-y-2 border">
                   {catalog.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Cargando módulos...</p>
                   ) : (
-                    catalog.map(mod => (
-                      <div key={mod.key} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50 transition-colors">
+                    catalog.map(mod => {
+                      const selectable = mod.production_ready && mod.selectable && mod.global_enabled && mod.status === "active";
+                      const base = mod.production_ready && !mod.selectable && mod.global_enabled && mod.status === "active";
+                      return (
+                      <div key={mod.key} className={`flex items-start space-x-3 p-2 rounded transition-colors ${selectable ? "hover:bg-muted/50" : "opacity-60"}`}>
                         <Switch 
                           id={`mod-${mod.key}`} 
-                          checked={selectedModules.includes(mod.key)} 
+                          checked={base || selectedModules.includes(mod.key)}
                           onCheckedChange={() => toggleModule(mod.key)}
+                          disabled={!selectable}
                         />
                         <div className="grid gap-1.5 leading-none">
-                          <label htmlFor={`mod-${mod.key}`} className="text-sm font-medium leading-none cursor-pointer">
+                          <label htmlFor={`mod-${mod.key}`} className={`text-sm font-medium leading-none ${selectable ? "cursor-pointer" : "cursor-default"}`}>
                             {mod.name}
-                            {mod.is_core && <span className="ml-2 text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase tracking-wider">Base</span>}
+                            {base && <span className="ml-2 text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase tracking-wider">Base</span>}
+                            {!base && !selectable && <span className="ml-2 text-[10px] bg-amber-500/15 text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wider dark:text-amber-300">Bloqueado</span>}
                           </label>
                           <p className="text-xs text-muted-foreground">{mod.description}</p>
                         </div>
                       </div>
-                    ))
+                    )})
                   )}
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold border-b pb-2">Características (Viñetas)</h3>
+                <h3 className="text-lg font-semibold border-b pb-2">Características comerciales</h3>
+                <p className="text-xs text-muted-foreground">No anuncies aquí módulos o integraciones que estén marcados como bloqueados.</p>
                 <div className="space-y-2">
                   {features.map((feat, index) => (
                     <div key={index} className="flex items-center gap-2">
@@ -286,7 +345,7 @@ export function PlanFormModal({ isOpen, onClose, onSaved, plan }: PlanFormModalP
 
         <div className="px-6 py-4 border-t border-border bg-muted/10 flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" form="plan-form" disabled={loading} className="min-w-[120px]">
+          <Button type="submit" form="plan-form" disabled={loading || Boolean(catalogError) || catalog.length === 0} className="min-w-[120px]">
             {loading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (

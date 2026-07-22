@@ -121,10 +121,31 @@ export const warmup = () => {
  *   - Si hay fallo de red/timeout/respuesta no-JSON, LANZA un ApiError con
  *     `.message` amigable en español y `.kind` para distinguir el caso.
  */
-export const apiRequest = async (
+export type ApiResponse = {
+  success: boolean;
+  code?: string;
+  message?: string;
+  error?: string;
+  data: {
+    access_token: string;
+    user: {
+      id: string;
+      email: string;
+      tenant_id: string;
+      role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "PARENT" | "STUDENT";
+      first_name?: string;
+      last_name?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
+export const apiRequest = async <TResponse = ApiResponse>(
   endpoint: string,
   options: RequestInit = {}
-): Promise<any> => {
+): Promise<TResponse> => {
   if (API_MISCONFIGURED) {
     throw new ApiError("misconfigured");
   }
@@ -179,7 +200,7 @@ export const apiRequest = async (
   }
 
   try {
-    return JSON.parse(raw);
+    return JSON.parse(raw) as TResponse;
   } catch {
     throw new ApiError("invalid_response", { status: response.status, requestId });
   }

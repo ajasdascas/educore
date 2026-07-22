@@ -26,6 +26,15 @@ interface Message {
   created_at: string;
 }
 
+interface TeacherRecipient {
+  id: string;
+  user_id?: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  subject_name?: string;
+}
+
 const SCHOOL_ADMIN_RECIPIENT: Recipient = { id: "school-admin", name: "Dirección / Administración" };
 
 export default function ParentMessagesPage() {
@@ -51,7 +60,7 @@ export default function ParentMessagesPage() {
         const firstChild = res.data[0];
         const teachersRes = await authFetch(`/api/v1/parent/children/${firstChild.id}/teachers`);
         if (teachersRes?.success && Array.isArray(teachersRes.data)) {
-          const teacherRecipients: Recipient[] = teachersRes.data.map((t: any) => ({
+          const teacherRecipients: Recipient[] = teachersRes.data.map((t: TeacherRecipient) => ({
             id: t.user_id || t.id,
             name: `${t.name || t.first_name + " " + t.last_name}${t.subject_name ? " · " + t.subject_name : ""}`,
           }));

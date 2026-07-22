@@ -10,9 +10,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
+interface ChildDetail {
+  id: string;
+  first_name: string;
+  last_name: string;
+  grade_name?: string;
+  group_name?: string;
+  current_gpa?: number;
+  attendance_rate?: number;
+  status?: string;
+  recent_grade?: string;
+  next_class?: string;
+  enrollment_id?: string;
+  teacher_email?: string;
+  emergency_info?: { primary_phone?: string };
+  address?: string;
+}
+
 export default function ParentChildrenPage() {
-  const [children, setChildren] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
+  const [children, setChildren] = useState<ChildDetail[]>([]);
+  const [selected, setSelected] = useState<ChildDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,7 +49,7 @@ export default function ParentChildrenPage() {
     load();
   }, []);
 
-  const selectChild = async (child: any) => {
+  const selectChild = async (child: ChildDetail) => {
     setSelected(child);
     const detail = await authFetch(`/api/v1/parent/children/${child.id}`);
     if (detail.success) setSelected(detail.data);

@@ -7,10 +7,29 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+interface TeacherClass {
+  id: string;
+  group_id: string;
+  subject_name: string;
+  grade_name: string;
+  group_name: string;
+  student_count: number;
+}
+
+interface ClassStudent {
+  id: string;
+  first_name: string;
+  last_name: string;
+  enrollment_id?: string;
+  attendance_rate?: number;
+  average_grade?: number;
+  status?: string;
+}
+
 export default function TeacherClassesPage() {
-  const [classes, setClasses] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
+  const [students, setStudents] = useState<ClassStudent[]>([]);
+  const [selected, setSelected] = useState<TeacherClass | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +41,7 @@ export default function TeacherClassesPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const selectClass = async (item: any) => {
+  const selectClass = async (item: TeacherClass) => {
     setSelected(item);
     const res = await authFetch(`/api/v1/teacher/classes/${item.group_id}/students`);
     setStudents(res.success ? res.data || [] : []);

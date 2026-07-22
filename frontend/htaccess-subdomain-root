@@ -1,67 +1,34 @@
-# EduCore — Wildcard Subdomain Router v2
-# Upload this file as .htaccess to the ROOT of public_html (NOT inside /educore/)
+# EduCore school-subdomain router (alternative public_html-root topology).
 #
-# ONE-TIME SETUP (done once, applies to ALL schools forever):
-#   1. DNS panel: *.onlineu.mx  →  A  →  [same IP as onlineu.mx]
-#   2. Hostinger hPanel → Hosting → cPanel → Domains → Subdomains:
-#      Subdomain: *  |  Domain: onlineu.mx  |  Root: public_html/
-#   3. This .htaccess is auto-deployed via GitHub Actions on every push to master.
+# Use this file only when Hostinger maps *.onlineu.mx to:
+#   /home/u550473909/domains/onlineu.mx/public_html
 #
-# BEHAVIOR per path on {slug}.onlineu.mx:
-#   /                            → /educore/escuela/?slug={slug}         (portal selector)
-#   /login?role=X                → /educore/login?slug={slug}&role=X     (login page)
-#   /login                       → /educore/login?slug={slug}            (login, no role)
-#   /escuela/                    → /educore/escuela/?slug={slug}         (explicit portal)
-#   /school-admin/...            → /educore/school-admin/...             (app, JWT handles auth)
-#   anything else                → /educore/{path}?{original-query}      (passthrough)
+# It must be MERGED into the existing public_html/.htaccess; do not overwrite
+# unrelated rules for the main onlineu.mx website. The recommended topology is
+# documented in docs/AUTOMATIC_SCHOOL_SUBDOMAINS.md and uses the router shipped
+# automatically inside /public_html/educore instead.
 
 RewriteEngine On
 
-# ── Skip main domain — no rewrite needed ──────────────────────────────────────
-RewriteCond %{HTTP_HOST} ^(www\.)?onlineu\.mx$ [NC]
-RewriteRule ^ - [L]
+# Main platform and infrastructure hosts are never tenant routes.
+RewriteCond %{HTTP_HOST} ^(?:www\.)?onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^ - [END]
 
-# ── Exclude system subdomains ─────────────────────────────────────────────────
-# (applied to all rules below via shared ENV flag)
-RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
-RewriteCond %1 ^(www|mail|ftp|api|smtp|webmail|admin|dev|staging|cpanel|webdisk)$ [NC]
-RewriteRule ^ - [L]
+RewriteCond %{HTTP_HOST} ^(?:www|api|mail|ftp|smtp|webmail|admin|dashboard|app|educore|onlineu|support|status|static|assets|cdn|dev|staging|cpanel|webdisk|portal|login|auth|public|ns1|ns2|mx)\.onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^ - [END]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# RULE 1: Root path (/) → portal selector
-# kinder1.onlineu.mx  →  https://onlineu.mx/educore/escuela/?slug=kinder1
-# ─────────────────────────────────────────────────────────────────────────────
-RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
-RewriteCond %{REQUEST_URI} ^/?$
-RewriteRule ^ https://onlineu.mx/educore/escuela/?slug=%1 [R=302,L]
+# /educore is the real static application directory in this topology.
+RewriteCond %{HTTP_HOST} ^(?![a-z0-9-]*--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])\.onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^educore(?:/|$) - [END]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# RULE 2: /login path → inject slug into login URL
-# kinder1.onlineu.mx/login?role=school_admin
-#   → https://onlineu.mx/educore/login?slug=kinder1&role=school_admin
-# ─────────────────────────────────────────────────────────────────────────────
-RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
-RewriteCond %{REQUEST_URI} ^/login$ [NC]
-RewriteCond %{QUERY_STRING} .+
-RewriteRule ^ https://onlineu.mx/educore/login?slug=%1&%{QUERY_STRING} [R=302,L,QSD]
+RewriteCond %{HTTP_HOST} ^(?![a-z0-9-]*--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])\.onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^$ /educore/escuela/ [R=302,END,NE,QSA]
 
-# /login with no query string
-RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
-RewriteCond %{REQUEST_URI} ^/login$ [NC]
-RewriteRule ^ https://onlineu.mx/educore/login?slug=%1 [R=302,L]
+RewriteCond %{HTTP_HOST} ^(?![a-z0-9-]*--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])\.onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^login/?$ /educore/login/ [R=302,END,NE,QSA]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# RULE 3: /escuela/ path → portal selector (in case user navigates to it directly)
-# ─────────────────────────────────────────────────────────────────────────────
-RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
-RewriteCond %{REQUEST_URI} ^/escuela/? [NC]
-RewriteRule ^ https://onlineu.mx/educore/escuela/?slug=%1 [R=302,L,QSD]
+RewriteCond %{HTTP_HOST} ^(?![a-z0-9-]*--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])\.onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^escuela/?$ /educore/escuela/ [R=302,END,NE,QSA]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# RULE 4: All other paths → passthrough to educore with original query string
-# kinder1.onlineu.mx/school-admin/dashboard
-#   → https://onlineu.mx/educore/school-admin/dashboard
-# (JWT token in localStorage handles tenant auth — no slug injection needed)
-# ─────────────────────────────────────────────────────────────────────────────
-RewriteCond %{HTTP_HOST} ^([a-z0-9][a-z0-9-]*)\.onlineu\.mx$ [NC]
-RewriteRule ^/?(.+)$ https://onlineu.mx/educore/$1 [R=302,L,QSA]
+RewriteCond %{HTTP_HOST} ^(?![a-z0-9-]*--)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])\.onlineu\.mx(?::[0-9]+)?$ [NC]
+RewriteRule ^(.+)$ /educore/$1 [R=302,END,NE,QSA]

@@ -4,23 +4,16 @@ import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity,
+  AlertTriangle,
   BarChart3,
   Building,
-  CreditCard,
-  Database,
-  Flag,
   FlaskConical,
-  HeartPulse,
   History,
   LayoutDashboard,
   LifeBuoy,
   LogOut,
   Menu,
   Package,
-  RotateCcw,
-  Settings,
-  ShieldCheck,
   Users,
   X,
 } from "lucide-react";
@@ -33,22 +26,25 @@ import { RoleGuard } from "@/components/providers/RoleGuard";
 const navItems = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/super-admin/modules", label: "Modulos", icon: Package },
-  { href: "/super-admin/billing", label: "Billing", icon: CreditCard },
   { href: "/super-admin/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/super-admin/health", label: "Health Monitor", icon: HeartPulse },
-  { href: "/super-admin/database", label: "Database Admin", icon: Database },
   { href: "/super-admin/audit", label: "Auditoria", icon: History },
   { href: "/super-admin/support", label: "Soporte", icon: LifeBuoy },
-  { href: "/super-admin/storage", label: "Storage", icon: Database },
-  { href: "/super-admin/feature-flags", label: "Feature Flags", icon: Flag },
-  { href: "/super-admin/backups", label: "Backups", icon: RotateCcw },
-  { href: "/super-admin/version", label: "Versioning", icon: ShieldCheck },
   { href: "/super-admin/plans", label: "Planes", icon: Package },
   { href: "/super-admin/schools", label: "Escuelas", icon: Building },
   { href: "/super-admin/users", label: "Usuarios Globales", icon: Users },
-  { href: "/super-admin/settings", label: "Configuración", icon: Settings },
   { href: "/super-admin/lab", label: "Laboratorio", icon: FlaskConical },
 ];
+
+const blockedProductionSections: Record<string, { title: string; reason: string }> = {
+  "/super-admin/database": { title: "Database Admin", reason: "El CRUD directo de la base queda cerrado hasta completar allowlists, respaldos previos y pruebas negativas de seguridad." },
+  "/super-admin/billing": { title: "Billing", reason: "Faltan conciliación con proveedor, webhooks firmados y recordatorios realmente entregados." },
+  "/super-admin/health": { title: "Health Monitor", reason: "El estado actual mezcla eventos manuales con indicadores sin probes ni alertas operativas." },
+  "/super-admin/storage": { title: "Storage", reason: "No existe todavía un proveedor durable de objetos ni un job real de archivado." },
+  "/super-admin/feature-flags": { title: "Feature Flags", reason: "El registro persiste, pero todavía no hay enforcement e invalidación consistentes en toda la aplicación." },
+  "/super-admin/backups": { title: "Backups", reason: "El dump no se conserva en almacenamiento durable y la restauración no tiene ejecutor probado." },
+  "/super-admin/version": { title: "Versioning", reason: "Deploy y rollback solo registran solicitudes; no existe un ejecutor seguro." },
+  "/super-admin/settings": { title: "Configuración de integraciones", reason: "Las banderas guardadas no configuran ni verifican proveedores reales." },
+};
 
 export default function SuperAdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -65,6 +61,9 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SA";
   const userRole = user?.role === "SUPER_ADMIN" ? "Super Admin" : user?.role || "";
+  const blockedSection = Object.entries(blockedProductionSections).find(
+    ([route]) => pathname === route || pathname.startsWith(route + "/"),
+  )?.[1];
 
   return (
     <RoleGuard allowedRoles={["SUPER_ADMIN"]}>
@@ -146,7 +145,18 @@ export default function SuperAdminLayout({ children }: { children: ReactNode }) 
           </div>
         </header>
         <div className="min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-5">
-          {children}
+          {blockedSection ? (
+            <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center">
+              <div className="w-full rounded-xl border border-amber-500/35 bg-amber-500/10 p-6 text-center">
+                <AlertTriangle className="mx-auto h-10 w-10 text-amber-600 dark:text-amber-300" />
+                <h2 className="mt-4 text-xl font-bold">{blockedSection.title} no está liberado</h2>
+                <p className="mt-2 text-sm text-muted-foreground">{blockedSection.reason}</p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  La sección permanece inaccesible para no presentar como funcional una operación incompleta. Consulta la auditoría de producción antes de habilitarla.
+                </p>
+              </div>
+            </div>
+          ) : children}
         </div>
       </main>
       <Toaster />

@@ -69,7 +69,7 @@ export default function StudentLayout({ children }: { children: ReactNode }) {
             <h2 className="text-xl font-bold">Selecciona una escuela</h2>
             <p className="text-muted-foreground mt-2 text-sm">
               Para ver el portal de alumnos en modo soporte, ve a
-              Super Admin → Escuelas → Detalles → Portales → "Ver como Estudiante".
+              Super Admin → Escuelas → Detalles → Portales → &quot;Ver como Estudiante&quot;.
             </p>
           </div>
           <Button onClick={() => router.push("/super-admin/schools")}>Ver escuelas</Button>

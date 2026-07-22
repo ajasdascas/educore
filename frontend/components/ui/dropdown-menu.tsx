@@ -16,7 +16,10 @@ function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {
 
 function DropdownMenuTrigger({ asChild, children, ...props }: MenuPrimitive.Trigger.Props & { asChild?: boolean }) {
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<any>
+    const child = children as React.ReactElement<{
+      className?: string
+      "data-slot"?: string
+    }>
     return React.cloneElement(child, {
       ...props,
       "data-slot": "dropdown-menu-trigger",
@@ -100,7 +103,12 @@ function DropdownMenuItem({
   )
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<any>
+    const child = children as React.ReactElement<{
+      className?: string
+      "data-slot"?: string
+      "data-inset"?: boolean
+      "data-variant"?: "default" | "destructive"
+    }>
     return React.cloneElement(child, {
       ...props,
       "data-slot": "dropdown-menu-item",

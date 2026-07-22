@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, DatabaseBackup, ExternalLink, Loader2, RefreshCw, Rocket } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 type BackupJob = {
   id: string;
@@ -77,22 +78,22 @@ export default function BackupsPage() {
   const [creatingBackup, setCreatingBackup] = useState(false);
   const { toast } = useToast();
 
-  const loadBackups = async () => {
+  const loadBackups = useCallback(async () => {
     setLoadingBackups(true);
     setBackupError("");
     try {
       const res = await authFetch("/api/v1/super-admin/backups");
       if (!res.success) throw new Error(res.error || res.message || "No se pudo cargar respaldos");
       setBackups(Array.isArray(res.data?.backups) ? res.data.backups : []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setBackups([]);
-      setBackupError(error.message || "No se pudo cargar respaldos");
+      setBackupError(errorMessage(error, "No se pudo cargar respaldos"));
     } finally {
       setLoadingBackups(false);
     }
-  };
+  }, []);
 
-  const loadDeployments = async () => {
+  const loadDeployments = useCallback(async () => {
     setLoadingDeployments(true);
     setDeploymentError("");
     try {
@@ -105,15 +106,15 @@ export default function BackupsPage() {
     } finally {
       setLoadingDeployments(false);
     }
-  };
+  }, []);
 
-  const refreshAll = async () => {
+  const refreshAll = useCallback(async () => {
     await Promise.all([loadBackups(), loadDeployments()]);
-  };
+  }, [loadBackups, loadDeployments]);
 
   useEffect(() => {
     refreshAll();
-  }, []);
+  }, [refreshAll]);
 
   const latestDeployment = useMemo(() => deployments[0], [deployments]);
 
@@ -128,10 +129,10 @@ export default function BackupsPage() {
       if (!res.success) throw new Error(res.error || res.message || "No se pudo crear el backup");
       toast({ title: "Backup solicitado", description: "El job de respaldo quedo registrado." });
       await loadBackups();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear el backup",
+        description: errorMessage(error, "No se pudo crear el backup"),
         variant: "destructive",
       });
     } finally {

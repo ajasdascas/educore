@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Bell, Building2, GraduationCap, Loader2, Lock, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,42 @@ import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
 
 type SettingsState = {
-  school: Record<string, any>;
-  academic: Record<string, any>;
-  notifications: Record<string, any>;
-  security: Record<string, any>;
+  school: {
+    name: string;
+    legal_name: string;
+    campus_code: string;
+    logo_url: string;
+    primary_color: string;
+    timezone: string;
+    language: string;
+    phone: string;
+    email: string;
+    address: string;
+  };
+  academic: {
+    school_year: string;
+    attendance_mode: string;
+    default_capacity: number;
+    periods: string[];
+    grading_scale: { min: number; max: number; passing: number };
+  };
+  notifications: {
+    email_enabled: boolean;
+    push_enabled: boolean;
+    absence_alerts: boolean;
+    grade_alerts: boolean;
+    weekly_summary: boolean;
+  };
+  security: {
+    require_2fa_admins: boolean;
+    session_timeout_minutes: number;
+    allow_parent_invites: boolean;
+    audit_log_enabled: boolean;
+  };
   updated_at?: string;
 };
+
+type SettingsSection = "school" | "academic" | "notifications" | "security";
 
 const fallbackSettings: SettingsState = {
   school: {
@@ -78,7 +108,7 @@ export default function SchoolAdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       const response = await authFetch("/api/v1/school-admin/settings");
@@ -89,16 +119,16 @@ export default function SchoolAdminSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [loadSettings]);
 
-  const updateSection = (section: keyof SettingsState, key: string, value: any) => {
+  const updateSection = (section: SettingsSection, key: string, value: unknown) => {
     setSettings((current) => ({
       ...current,
-      [section]: { ...(current[section] as Record<string, any>), [key]: value },
+      [section]: { ...current[section], [key]: value },
     }));
   };
 
@@ -198,13 +228,13 @@ export default function SchoolAdminSettingsPage() {
           <Card>
             <CardHeader><CardTitle>Notificaciones escolares</CardTitle><CardDescription>Controla los canales y eventos automaticos.</CardDescription></CardHeader>
             <CardContent className="space-y-3">
-              {[
+              {([
                 ["email_enabled", "Email habilitado", "Permite enviar avisos y reportes por correo."],
                 ["push_enabled", "Notificaciones internas", "Muestra alertas dentro del panel."],
                 ["absence_alerts", "Alertas por ausencia", "Avisa a padres cuando un alumno falte."],
                 ["grade_alerts", "Alertas de calificaciones", "Notifica cuando se publiquen evaluaciones."],
                 ["weekly_summary", "Resumen semanal", "Genera un resumen operativo para direccion."],
-              ].map(([key, title, description]) => (
+              ] as const).map(([key, title, description]) => (
                 <div key={key} className="flex items-center justify-between rounded-lg border p-4">
                   <div><p className="text-sm font-medium">{title}</p><p className="text-sm text-muted-foreground">{description}</p></div>
                   <Switch checked={!!settings.notifications[key]} onCheckedChange={(checked) => updateSection("notifications", key, checked)} />
@@ -219,11 +249,11 @@ export default function SchoolAdminSettingsPage() {
             <CardHeader><CardTitle>Seguridad operativa</CardTitle><CardDescription>Políticas para administracion escolar y auditoria.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2"><Label>Tiempo de sesion inactiva (minutos)</Label><Input type="number" min="15" max="480" value={settings.security.session_timeout_minutes || 120} onChange={(event) => updateSection("security", "session_timeout_minutes", Number(event.target.value))} /></div>
-              {[
+              {([
                 ["require_2fa_admins", "2FA para administradores", "Solicitar doble factor a usuarios administrativos."],
                 ["allow_parent_invites", "Invitaciones a padres", "Permitir crear accesos de padres desde alumnos."],
                 ["audit_log_enabled", "Audit log activo", "Registrar acciones sensibles del panel escuela."],
-              ].map(([key, title, description]) => (
+              ] as const).map(([key, title, description]) => (
                 <div key={key} className="flex items-center justify-between rounded-lg border p-4">
                   <div><p className="text-sm font-medium">{title}</p><p className="text-sm text-muted-foreground">{description}</p></div>
                   <Switch checked={!!settings.security[key]} onCheckedChange={(checked) => updateSection("security", key, checked)} />
