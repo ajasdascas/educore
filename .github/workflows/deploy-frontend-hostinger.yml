@@ -144,21 +144,13 @@ jobs:
             mode="$1"
             case "${FTP_TARGET_DIR%/}" in
               educore|/educore|/public_html/educore|/domains/onlineu.mx/public_html/educore)
-                target_dir="/educore"
+                target_leaf="educore"
                 ;;
               *)
                 echo "::error::HOSTINGER_FTP_TARGET_DIR debe apuntar exclusivamente a /educore/."
                 return 1
                 ;;
             esac
-            target_parent="${target_dir%/*}"
-            target_leaf="${target_dir##*/}"
-            if [ -z "${target_leaf}" ]; then
-              echo "::error::HOSTINGER_FTP_TARGET_DIR no es una ruta válida."
-              return 1
-            fi
-            [ -n "${target_parent}" ] || target_parent="/"
-
             case "${mode}" in
               explicit_ftps)
                 url="ftp://${ftp_endpoint}:21"
@@ -184,12 +176,14 @@ jobs:
 
             # lftp toma la contraseña desde el entorno; nunca se incluye en
             # el archivo de comandos ni en los argumentos del proceso.
+            # La cuenta principal ve public_html/ como carpeta; una cuenta
+            # aislada puede exponerla directamente como /.
             LFTP_PASSWORD="${FTP_PASS}" timeout 240s lftp --norc -e "
               source ftp-deploy.lftp;
               set ftp:ssl-force ${ssl_force};
               set ftp:ssl-protect-data ${ssl_protect};
               open --user ${FTP_USER} --env-password ${url};
-              cd ${target_parent};
+              cd /public_html || cd /;
               mkdir -f ${target_leaf};
               cd ${target_leaf};
               mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .;
