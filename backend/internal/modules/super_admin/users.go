@@ -42,11 +42,13 @@ type UpdateGlobalUserRequest struct {
 
 // RegisterUserRoutes adds user management routes
 func (h *Handler) RegisterUserRoutes(router fiber.Router) {
-	router.Get("/users", h.ListGlobalUsers)
-	router.Post("/users", h.CreateGlobalUser)
+	// Legacy aliases now use the same tenant-safe implementation as the
+	// enterprise screen so an older client cannot bypass role validation.
+	router.Get("/users", h.ListAllUsers)
+	router.Post("/users", h.CreateScopedUser)
 	router.Get("/users/:id", h.GetGlobalUser)
 	router.Put("/users/:id", h.UpdateGlobalUser)
-	router.Patch("/users/:id/toggle", h.ToggleGlobalUserStatus)
+	router.Patch("/users/:id/toggle", h.ToggleLegacyScopedUserStatus)
 	router.Delete("/users/:id", h.DeleteGlobalUser)
 	router.Get("/users/:id/activity", h.GetGlobalUserActivity)
 }
@@ -218,6 +220,21 @@ func (h *Handler) UpdateGlobalUser(c *fiber.Ctx) error {
 	if !exists {
 		return response.Error(c, fiber.StatusNotFound, "User not found")
 	}
+	if req.IsActive != nil && !*req.IsActive {
+		if currentUserID, _ := c.Locals("user_id").(string); currentUserID == id {
+			return response.Error(c, fiber.StatusForbidden, "No puedes desactivar tu propia cuenta")
+		}
+	}
+	tx, err := h.db.Begin(c.UserContext())
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo iniciar la actualizacion")
+	}
+	defer tx.Rollback(c.UserContext())
+	if req.IsActive != nil {
+		if err := guardLastActiveSuperAdminTx(c.UserContext(), tx, id, *req.IsActive); err != nil {
+			return lastActiveSuperAdminResponse(c, err)
+		}
+	}
 
 	// Build dynamic update query
 	setParts := []string{}
@@ -227,7 +244,7 @@ func (h *Handler) UpdateGlobalUser(c *fiber.Ctx) error {
 	if req.Email != "" {
 		// Check if new email already exists (excluding current user)
 		var emailExists bool
-		if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id != $2)", req.Email, id).Scan(&emailExists); err != nil {
+		if err := tx.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id != $2)", req.Email, id).Scan(&emailExists); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, "Error checking email")
 		}
 		if emailExists {
@@ -271,9 +288,15 @@ func (h *Handler) UpdateGlobalUser(c *fiber.Ctx) error {
 	query := fmt.Sprintf("UPDATE users SET %s WHERE id = $%d AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
 		strings.Join(setParts, ", "), argIndex)
 
-	_, err = h.db.Exec(c.UserContext(), query, args...)
+	result, err := tx.Exec(c.UserContext(), query, args...)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error updating user")
+	}
+	if result.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "User not found")
+	}
+	if err := tx.Commit(c.UserContext()); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo guardar la actualizacion")
 	}
 
 	// Fetch updated user
@@ -282,35 +305,13 @@ func (h *Handler) UpdateGlobalUser(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching updated user")
 	}
 
+	h.auditSuperAdmin(c, "user.update", "users", id, "warning", fiber.Map{"legacy_profile_route": true, "email": user.Email, "is_active": user.IsActive}, "")
 	return response.Success(c, user, "Global user updated successfully")
 }
 
 // ToggleGlobalUserStatus toggles the active status of a user
 func (h *Handler) ToggleGlobalUserStatus(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	// Get current status
-	var currentStatus bool
-	err := h.db.QueryRow(c.UserContext(),
-		"SELECT is_active FROM users WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
-		id).Scan(&currentStatus)
-	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "User not found")
-	}
-
-	// Toggle status
-	newStatus := !currentStatus
-	_, err = h.db.Exec(c.UserContext(),
-		"UPDATE users SET is_active = $1, updated_at = $2 WHERE id = $3 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
-		newStatus, time.Now(), id)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error updating user status")
-	}
-
-	return response.Success(c, fiber.Map{
-		"id":        id,
-		"is_active": newStatus,
-	}, "User status updated successfully")
+	return h.ToggleLegacyScopedUserStatus(c)
 }
 
 // DeleteGlobalUser soft-deletes a global Super Admin user.
@@ -321,9 +322,17 @@ func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 	if currentUserID, ok := c.Locals("user_id").(string); ok && currentUserID == id {
 		return response.Error(c, fiber.StatusForbidden, "No puedes eliminar tu propia cuenta")
 	}
+	tx, err := h.db.Begin(c.UserContext())
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo iniciar la eliminacion")
+	}
+	defer tx.Rollback(c.UserContext())
+	if err := guardLastActiveSuperAdminTx(c.UserContext(), tx, id, false); err != nil {
+		return lastActiveSuperAdminResponse(c, err)
+	}
 
 	var targetEmail string
-	if err := h.db.QueryRow(c.UserContext(), `
+	if err := tx.QueryRow(c.UserContext(), `
 		SELECT email
 		FROM users
 		WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL
@@ -331,7 +340,7 @@ func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusNotFound, "Usuario no encontrado")
 	}
 
-	result, err := h.db.Exec(c.UserContext(),
+	result, err := tx.Exec(c.UserContext(),
 		"UPDATE users SET is_active = false, deleted_at = NOW(), updated_at = NOW() WHERE id = $1 AND tenant_id IS NULL AND role = 'SUPER_ADMIN' AND deleted_at IS NULL",
 		id)
 	if err != nil {
@@ -340,6 +349,9 @@ func (h *Handler) DeleteGlobalUser(c *fiber.Ctx) error {
 
 	if result.RowsAffected() == 0 {
 		return response.Error(c, fiber.StatusNotFound, "Usuario no encontrado")
+	}
+	if err := tx.Commit(c.UserContext()); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo guardar la eliminacion")
 	}
 
 	h.auditSuperAdmin(c, "user.soft_delete", "users", id, "critical", fiber.Map{"email": targetEmail}, "")

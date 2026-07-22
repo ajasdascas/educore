@@ -16,11 +16,17 @@ import (
 )
 
 type Handler struct {
-	db *database.DB
+	db                 *database.DB
+	secret             string
+	expectedRepository string
 }
 
 func NewHandler(db *database.DB) *Handler {
-	return &Handler{db: db}
+	return &Handler{
+		db:                 db,
+		secret:             strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_SECRET")),
+		expectedRepository: strings.TrimSpace(os.Getenv("GITHUB_WEBHOOK_REPOSITORY")),
+	}
 }
 
 func RegisterRoutes(router fiber.Router, db *database.DB) {
@@ -49,20 +55,19 @@ type githubPushPayload struct {
 }
 
 func (h *Handler) HandleGitHubPush(c *fiber.Ctx) error {
-	secret := os.Getenv("GITHUB_WEBHOOK_SECRET")
+	if h.secret == "" || h.expectedRepository == "" {
+		return response.Error(c, fiber.StatusServiceUnavailable, "GitHub webhook is not configured")
+	}
 
-	// Verify HMAC signature if secret is configured
-	if secret != "" {
-		sig := c.Get("X-Hub-Signature-256")
-		if sig == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "missing signature"})
-		}
-		mac := hmac.New(sha256.New, []byte(secret))
-		mac.Write(c.Body())
-		expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-		if !hmac.Equal([]byte(sig), []byte(expected)) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid signature"})
-		}
+	sig := c.Get("X-Hub-Signature-256")
+	if sig == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "missing signature"})
+	}
+	mac := hmac.New(sha256.New, []byte(h.secret))
+	mac.Write(c.Body())
+	expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(sig), []byte(expected)) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid signature"})
 	}
 
 	// Only process push events
@@ -74,6 +79,13 @@ func (h *Handler) HandleGitHubPush(c *fiber.Ctx) error {
 	var payload githubPushPayload
 	if err := json.Unmarshal(c.Body(), &payload); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid payload")
+	}
+	if !strings.EqualFold(strings.TrimSpace(payload.Repository.FullName), h.expectedRepository) {
+		return response.Error(c, fiber.StatusForbidden, "Unexpected repository")
+	}
+	deliveryID := strings.TrimSpace(c.Get("X-GitHub-Delivery"))
+	if deliveryID == "" || len(deliveryID) > 100 {
+		return response.Error(c, fiber.StatusBadRequest, "Valid GitHub delivery ID required")
 	}
 
 	// Only process pushes to master or main
@@ -123,25 +135,47 @@ func (h *Handler) HandleGitHubPush(c *fiber.Ctx) error {
 		"repo":        payload.Repository.FullName,
 		"description": description,
 		"branch":      branch,
+		"delivery_id": deliveryID,
 	}
 	metadataJSON, _ := json.Marshal(metadata)
 
 	version := fmt.Sprintf("commit-%s", shortHash)
 
 	ctx := c.UserContext()
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not start webhook transaction")
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(ctx)
+		}
+	}()
 
-	// Mark previous current version as previous
-	_, _ = h.db.Exec(ctx,
-		`UPDATE system_versions SET status = 'previous', updated_at = NOW() WHERE status = 'current'`)
+	var alreadyRecorded bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM system_versions WHERE version = $1)`, version).Scan(&alreadyRecorded); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not verify webhook delivery")
+	}
+	if alreadyRecorded {
+		return c.JSON(fiber.Map{"success": true, "skipped": true, "reason": "commit already recorded"})
+	}
 
-	// Insert new version
-	_, err := h.db.Exec(ctx,
+	if _, err := tx.Exec(ctx, `UPDATE system_versions SET status = 'previous' WHERE status = 'current'`); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not update version history")
+	}
+
+	_, err = tx.Exec(ctx,
 		`INSERT INTO system_versions (version, status, changelog, deployed_at, metadata)
 		 VALUES ($1, 'current', $2, $3, $4)`,
 		version, changelog, deployedAt, string(metadataJSON))
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error saving version: "+err.Error())
+		return response.Error(c, fiber.StatusInternalServerError, "Could not save version history")
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Could not commit version history")
+	}
+	committed = true
 
 	return c.JSON(fiber.Map{
 		"success":    true,

@@ -1,18 +1,22 @@
 package superadmin
 
 import (
+	"context"
 	"crypto/rand"
 	"educore/internal/pkg/response"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"educore/internal/pkg/database"
+	"educore/internal/pkg/rbac"
+	"educore/internal/pkg/schooldomain"
 	"educore/internal/pkg/slug"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -31,12 +35,13 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/schools", h.ListSchools)
 	router.Post("/schools", h.CreateSchool)
 	router.Get("/schools/:id", h.GetSchool)
+	router.Patch("/schools/:id", h.UpdateSchool)
 	router.Patch("/schools/:id/status", h.UpdateSchoolStatus)
 	router.Get("/schools/:id/users", h.GetSchoolUsers)
 	router.Get("/schools/:id/modules", h.GetSchoolModules)
 	router.Post("/schools/:id/modules/toggle", h.ToggleModule)
+	router.Post("/schools/:id/domain/provision", h.ProvisionSchoolDomain)
 	router.Get("/modules-catalog", h.GetModulesCatalog)
-	router.Post("/upload", h.UploadLogo)
 
 	h.RegisterPlanRoutes(router)
 	h.RegisterUserRoutes(router)
@@ -47,23 +52,26 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 func (h *Handler) Stats(c *fiber.Ctx) error {
 	var totalTenants, activeTenants, trialTenants, totalStudents int
 
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants").Scan(&totalTenants); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE deleted_at IS NULL").Scan(&totalTenants); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching total tenants")
 	}
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE status = 'active'").Scan(&activeTenants); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE status = 'active' AND deleted_at IS NULL").Scan(&activeTenants); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching active tenants")
 	}
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE status = 'trial'").Scan(&trialTenants); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM tenants WHERE status = 'trial' AND deleted_at IS NULL").Scan(&trialTenants); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching trial tenants")
 	}
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM students").Scan(&totalStudents); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), `
+		SELECT COUNT(*) FROM students s
+		JOIN tenants t ON t.id = s.tenant_id
+		WHERE s.deleted_at IS NULL AND t.deleted_at IS NULL`).Scan(&totalStudents); err != nil {
 		// No devolvemos error fatal si falla el conteo de alumnos (tabla students podría no existir aún en dev)
 		totalStudents = 0
 	}
 
 	// Recent schools
 	rows, err := h.db.Query(c.UserContext(),
-		"SELECT id, name, slug, plan, status, created_at FROM tenants ORDER BY created_at DESC LIMIT 5")
+		"SELECT id, name, slug, plan, status, created_at FROM tenants WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 5")
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching recent schools")
 	}
@@ -73,13 +81,18 @@ func (h *Handler) Stats(c *fiber.Ctx) error {
 	for rows.Next() {
 		var id, name, slug, plan, status string
 		var createdAt interface{}
-		rows.Scan(&id, &name, &slug, &plan, &status, &createdAt)
+		if err := rows.Scan(&id, &name, &slug, &plan, &status, &createdAt); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error reading recent schools")
+		}
 		recentSchools = append(recentSchools, fiber.Map{
 			"id": id, "name": name, "slug": slug, "plan": plan, "status": status, "created_at": createdAt,
 		})
 	}
 	if recentSchools == nil {
 		recentSchools = []fiber.Map{}
+	}
+	if err := rows.Err(); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error completing recent schools query")
 	}
 
 	return response.Success(c, fiber.Map{
@@ -96,15 +109,24 @@ func (h *Handler) Stats(c *fiber.Ctx) error {
 func (h *Handler) ListSchools(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
-	search := c.Query("search", "")
-	status := c.Query("status", "")
-	plan := c.Query("plan", "")
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	search := strings.TrimSpace(c.Query("search", ""))
+	status := strings.TrimSpace(c.Query("status", ""))
+	plan := strings.TrimSpace(c.Query("plan", ""))
 	offset := (page - 1) * limit
 
 	query := `SELECT t.id, t.slug, t.name, t.logo_url, t.status, t.plan, t.created_at,
-		 (SELECT COUNT(*) FROM students s WHERE s.tenant_id = t.id) as student_count,
-		 (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as user_count
-		 FROM tenants t WHERE 1=1`
+		 (SELECT COUNT(*) FROM students s WHERE s.tenant_id = t.id AND s.deleted_at IS NULL) as student_count,
+		 (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id AND u.deleted_at IS NULL) as user_count
+		 FROM tenants t WHERE t.deleted_at IS NULL`
 
 	args := []interface{}{}
 	argCount := 1
@@ -144,7 +166,9 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 		var createdAt interface{}
 		var studentCount, userCount int
 
-		rows.Scan(&id, &slug, &name, &logoURL, &status, &plan, &createdAt, &studentCount, &userCount)
+		if err := rows.Scan(&id, &slug, &name, &logoURL, &status, &plan, &createdAt, &studentCount, &userCount); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error reading schools")
+		}
 
 		logo := ""
 		if logoURL != nil {
@@ -166,10 +190,13 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 	if schools == nil {
 		schools = []fiber.Map{}
 	}
+	if err := rows.Err(); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error completing schools query")
+	}
 
 	// Get total count for pagination
 	var total int
-	countQuery := "SELECT COUNT(*) FROM tenants WHERE 1=1"
+	countQuery := "SELECT COUNT(*) FROM tenants WHERE deleted_at IS NULL"
 	countArgs := []interface{}{}
 	cArgCount := 1
 	if search != "" {
@@ -188,8 +215,7 @@ func (h *Handler) ListSchools(c *fiber.Ctx) error {
 		cArgCount++
 	}
 	if err := h.db.QueryRow(c.UserContext(), countQuery, countArgs...).Scan(&total); err != nil {
-		// Log error if needed, but for now we fallback to schools count
-		total = len(schools)
+		return response.Error(c, fiber.StatusInternalServerError, "Error counting schools")
 	}
 
 	return response.SuccessWithMeta(c, fiber.Map{
@@ -232,20 +258,110 @@ type CreateSchoolRequest struct {
 }
 
 var modulesByEducationLevel = map[string][]string{
-	// Bebés / Guardería
-	"babies":   {"academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"},
-	"daycare":  {"academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"},
-	// Preescolar / Kinder
-	"preescolar": {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"},
-	"kinder":     {"academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"},
-	// Primaria
-	"primaria": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications", "subjects", "assignments", "exams"},
+	// Only modules backed by a real route, API and persistence contract can be
+	// provisioned. Level-specific capabilities that are still under design stay
+	// out of this map so a newly-created tenant never receives dead navigation.
+	"babies":     {"students", "groups"},
+	"daycare":    {"students", "groups"},
+	"preescolar": {"students", "groups"},
+	"kinder":     {"students", "groups"},
+	"primaria":   {"students", "groups", "grades"},
 	// Secundaria / Prepa / Universidad
-	"secundaria_general": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
-	"secundaria_tecnica": {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
-	"prepa_general":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
-	"prepa_tecnica":      {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
-	"universidad":        {"academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"},
+	"secundaria_general": {"students", "groups", "grades"},
+	"secundaria_tecnica": {"students", "groups", "grades"},
+	"prepa_general":      {"students", "groups", "grades"},
+	"prepa_tecnica":      {"students", "groups", "grades"},
+	"universidad":        {"students", "groups", "grades"},
+}
+
+var productionReadyTenantModules = map[string]struct{}{
+	"auth": {}, "users": {}, "academic_core": {}, "grading": {},
+	"students": {}, "groups": {}, "grades": {}, "schedules": {}, "attendance": {},
+}
+
+var productionCoreTenantModules = map[string]struct{}{
+	"auth": {}, "users": {}, "academic_core": {}, "grading": {},
+}
+
+var tenantSelectableProductionModules = map[string]struct{}{
+	"schedules": {}, "attendance": {},
+}
+
+func isProductionReadyTenantModule(key string) bool {
+	_, ok := productionReadyTenantModules[strings.ToLower(strings.TrimSpace(key))]
+	return ok
+}
+
+func isProductionCoreTenantModule(key string) bool {
+	_, ok := productionCoreTenantModules[strings.ToLower(strings.TrimSpace(key))]
+	return ok
+}
+
+func isTenantSelectableProductionModule(key string) bool {
+	_, ok := tenantSelectableProductionModules[strings.ToLower(strings.TrimSpace(key))]
+	return ok
+}
+
+func decodePlanModules(raw string) ([]string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return []string{}, nil
+	}
+	var modules []string
+	if err := json.Unmarshal([]byte(raw), &modules); err != nil {
+		return nil, err
+	}
+	return modules, nil
+}
+
+func classifyPlanModules(modules []string) (ready []string, unavailable []string) {
+	seenReady := map[string]struct{}{}
+	seenUnavailable := map[string]struct{}{}
+	for _, value := range modules {
+		key := strings.ToLower(strings.TrimSpace(value))
+		if key == "" {
+			continue
+		}
+		if isTenantSelectableProductionModule(key) {
+			if _, exists := seenReady[key]; !exists {
+				ready = append(ready, key)
+				seenReady[key] = struct{}{}
+			}
+			continue
+		}
+		// Core and level-required modules are provisioned by their own contract,
+		// so they are neither add-ons nor unavailable plan promises.
+		if isProductionReadyTenantModule(key) {
+			continue
+		}
+		if _, exists := seenUnavailable[key]; !exists {
+			unavailable = append(unavailable, key)
+			seenUnavailable[key] = struct{}{}
+		}
+	}
+	return ready, unavailable
+}
+
+func classifyRequestedAddons(modules []string) (ready []string, invalid []string) {
+	seenReady := map[string]struct{}{}
+	seenInvalid := map[string]struct{}{}
+	for _, value := range modules {
+		key := strings.ToLower(strings.TrimSpace(value))
+		if key == "" {
+			continue
+		}
+		if isTenantSelectableProductionModule(key) {
+			if _, exists := seenReady[key]; !exists {
+				ready = append(ready, key)
+				seenReady[key] = struct{}{}
+			}
+			continue
+		}
+		if _, exists := seenInvalid[key]; !exists {
+			invalid = append(invalid, key)
+			seenInvalid[key] = struct{}{}
+		}
+	}
+	return ready, invalid
 }
 
 func normalizeEducationLevel(level string) string {
@@ -282,17 +398,43 @@ func isSupportedEducationLevel(level string) bool {
 	}
 }
 
-func cleanProvisioningSecret(value string) string {
-	cleaned := strings.TrimSpace(value)
-	cleaned = strings.Trim(cleaned, "\"'")
-	return strings.TrimSpace(cleaned)
+func generateSchoolAdminPassword() (string, error) {
+	// The credential is returned once to the super admin and must never be a
+	// shared environment value. The fixed prefix guarantees the character
+	// classes commonly required by password policies; the random suffix carries
+	// 128 bits of entropy and has no static fallback.
+	randomBytes := make([]byte, 16)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", err
+	}
+	return "Ec1!" + hex.EncodeToString(randomBytes), nil
 }
 
-func minimumProvisioningPasswordLength() int {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "staging") {
-		return 10
+type tenantRoleSeed struct {
+	Key         string
+	Name        string
+	Description string
+	Permissions string
+}
+
+func productionTenantRoleSeeds() ([]tenantRoleSeed, error) {
+	roles := []string{rbac.RoleSchoolAdmin, rbac.RoleTeacher, rbac.RoleParent, rbac.RoleStudent}
+	seeds := make([]tenantRoleSeed, 0, len(roles))
+	for _, role := range roles {
+		definition, ok := rbac.Definition(role)
+		if !ok || definition.TenantRoleKey == "" {
+			return nil, fmt.Errorf("missing tenant role definition for %s", role)
+		}
+		permissions, err := json.Marshal(definition.DefaultPermissions)
+		if err != nil {
+			return nil, fmt.Errorf("serialize permissions for %s: %w", role, err)
+		}
+		seeds = append(seeds, tenantRoleSeed{
+			Key: definition.TenantRoleKey, Name: definition.Name,
+			Description: definition.Description, Permissions: string(permissions),
+		})
 	}
-	return 12
+	return seeds, nil
 }
 
 func superAdminInternalErrorMessage(message string, err error) string {
@@ -348,22 +490,70 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 	var planExists bool
 	if database.IsMySQL(h.db.Driver()) {
 		step = "validate_plan_mysql_subscription_plans"
-		err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+		err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE (id = ? OR name = ?) AND is_active = true)", req.Plan, req.Plan).Scan(&planExists)
 		if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
 			step = "validate_plan_mysql_plans_fallback"
-			err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE id = ? OR name = ?)", req.Plan, req.Plan).Scan(&planExists)
+			err = h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM plans WHERE (id = ? OR name = ?) AND is_active = true)", req.Plan, req.Plan).Scan(&planExists)
 		}
 		if err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
 		}
 	} else {
 		step = "validate_plan_postgres"
-		if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE id::text = $1 OR name = $1)", req.Plan).Scan(&planExists); err != nil {
+		if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE (id::text = $1 OR name = $1) AND is_active = true)", req.Plan).Scan(&planExists); err != nil {
 			return response.Error(c, fiber.StatusInternalServerError, internalError("Error validating subscription plan", err))
 		}
 	}
 	if !planExists {
 		return response.Error(c, fiber.StatusBadRequest, "El plan seleccionado no es válido")
+	}
+
+	// Load the plan contract. Previously the plan was stored on the tenant but
+	// its modules were never provisioned, leaving newly-created schools with a
+	// misleading subscription and missing functionality.
+	step = "load_plan_modules"
+	var planModulesRaw string
+	if database.IsMySQL(h.db.Driver()) {
+		err = h.db.QueryRow(c.UserContext(),
+			"SELECT CAST(COALESCE(modules, JSON_ARRAY()) AS CHAR) FROM subscription_plans WHERE (id = ? OR name = ?) AND is_active = true LIMIT 1",
+			req.Plan, req.Plan).Scan(&planModulesRaw)
+		if err != nil && strings.Contains(err.Error(), "subscription_plans") && strings.Contains(err.Error(), "doesn't exist") {
+			err = h.db.QueryRow(c.UserContext(),
+				"SELECT CAST(COALESCE(modules, JSON_ARRAY()) AS CHAR) FROM plans WHERE (id = ? OR name = ?) AND is_active = true LIMIT 1",
+				req.Plan, req.Plan).Scan(&planModulesRaw)
+		}
+	} else {
+		err = h.db.QueryRow(c.UserContext(),
+			"SELECT COALESCE(modules, '[]'::jsonb)::text FROM subscription_plans WHERE (id::text = $1 OR name = $1) AND is_active = true LIMIT 1",
+			req.Plan).Scan(&planModulesRaw)
+	}
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error loading subscription plan modules", err))
+	}
+	planModules, err := decodePlanModules(planModulesRaw)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Subscription plan has an invalid module contract", err))
+	}
+	provisionedAddonModules, unavailablePlanModules := classifyPlanModules(planModules)
+
+	// Explicit add-ons are user-controlled input. Reject any planned, internal
+	// or unknown key instead of silently creating a tenant with dead modules.
+	requestedAddons, invalidRequestedAddons := classifyRequestedAddons(req.PremiumModules)
+	if len(invalidRequestedAddons) > 0 {
+		return response.Error(c, fiber.StatusBadRequest,
+			"Estos módulos todavía no están disponibles para producción: "+strings.Join(invalidRequestedAddons, ", "))
+	}
+	for _, moduleKey := range requestedAddons {
+		alreadyIncluded := false
+		for _, includedKey := range provisionedAddonModules {
+			if includedKey == moduleKey {
+				alreadyIncluded = true
+				break
+			}
+		}
+		if !alreadyIncluded {
+			provisionedAddonModules = append(provisionedAddonModules, moduleKey)
+		}
 	}
 
 	// 2. Normalize + validate slug (subdominio de la escuela)
@@ -464,22 +654,9 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		adminFirstName = nameParts[0]
 		adminLastName = strings.Join(nameParts[1:], " ")
 	}
-	defaultPassword := cleanProvisioningSecret(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
-	autoGenerated := false
-	if defaultPassword == "" {
-		// Auto-generate a secure password when env var is not set
-		buf := make([]byte, 8)
-		if _, randErr := rand.Read(buf); randErr == nil {
-			defaultPassword = "Edu" + hex.EncodeToString(buf)[:13]
-		} else {
-			defaultPassword = "EduCore2026!tmp"
-		}
-		autoGenerated = true
-	} else {
-		minPasswordLength := minimumProvisioningPasswordLength()
-		if len(defaultPassword) < minPasswordLength {
-			return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD must be at least %d characters", minPasswordLength))
-		}
+	defaultPassword, err := generateSchoolAdminPassword()
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error generating one-time admin password")
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -489,26 +666,28 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 	if database.IsMySQL(h.db.Driver()) {
 		step = "create_admin_user_mysql"
 		_, err = tx.Exec(c.UserContext(),
-			`INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active)
-			 VALUES (?, ?, ?, ?, ?, ?, 'SCHOOL_ADMIN', true)
+			`INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active, password_must_change)
+			 VALUES (?, ?, ?, ?, ?, ?, 'SCHOOL_ADMIN', true, true)
 			 ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash),
 			                         first_name = VALUES(first_name),
 			                         last_name = VALUES(last_name),
 			                         role = 'SCHOOL_ADMIN',
 			                         is_active = true,
+			                         password_must_change = true,
 			                         updated_at = CURRENT_TIMESTAMP`,
 			database.NewID(), tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
 	} else {
 		step = "create_admin_user_postgres"
 		_, err = tx.Exec(c.UserContext(),
-			`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
-			 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true)
+			`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active, password_must_change)
+			 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true, true)
 			 ON CONFLICT (tenant_id, email)
 			 DO UPDATE SET password_hash = EXCLUDED.password_hash,
 			               first_name = EXCLUDED.first_name,
 			               last_name = EXCLUDED.last_name,
 			               role = 'SCHOOL_ADMIN',
 			               is_active = true,
+			               password_must_change = true,
 			               updated_at = NOW()`,
 			tenantID, adminEmail, string(hashedPassword), adminFirstName, adminLastName)
 	}
@@ -517,30 +696,29 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		return response.Error(c, fiber.StatusInternalServerError, internalError("Error creating admin user", err))
 	}
 
-	if database.IsMySQL(h.db.Driver()) {
-		step = "seed_roles_mysql"
-		_, err = tx.Exec(c.UserContext(), `
-			INSERT INTO tenant_roles (id, tenant_id, `+"`key`"+`, name, description, permissions, is_system)
-			VALUES
-				(?, ?, 'admin', 'Administrador', 'Control operativo de la escuela', '["users:*","academic:*","database:tenant"]', true),
-				(?, ?, 'teacher', 'Profesor', 'Gestion docente y captura academica', '["groups:read","attendance:write","grades:write"]', true),
-				(?, ?, 'parent', 'Padre/Tutor', 'Consulta de hijos y comunicacion escolar', '["children:read","messages:write"]', true),
-				(?, ?, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]', true)
-			ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), permissions = VALUES(permissions), is_system = true`,
-			database.NewID(), tenantID, database.NewID(), tenantID, database.NewID(), tenantID, database.NewID(), tenantID)
-	} else {
-		step = "seed_roles_postgres"
-		_, err = tx.Exec(c.UserContext(), `
-			INSERT INTO tenant_roles (tenant_id, key, name, description, permissions, is_system)
-			VALUES
-				($1, 'admin', 'Administrador', 'Control operativo de la escuela', '["users:*","academic:*","database:tenant"]'::jsonb, true),
-				($1, 'teacher', 'Profesor', 'Gestion docente y captura academica', '["groups:read","attendance:write","grades:write"]'::jsonb, true),
-				($1, 'parent', 'Padre/Tutor', 'Consulta de hijos y comunicacion escolar', '["children:read","messages:write"]'::jsonb, true),
-				($1, 'student', 'Alumno', 'Consulta de informacion academica propia', '["profile:read","grades:read"]'::jsonb, true)
-			ON CONFLICT (tenant_id, key) DO NOTHING`, tenantID)
-	}
+	roleSeeds, err := productionTenantRoleSeeds()
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding tenant roles", err))
+		return response.Error(c, fiber.StatusInternalServerError, internalError("Error preparing tenant roles", err))
+	}
+	for _, seed := range roleSeeds {
+		step = "seed_role:" + seed.Key
+		if database.IsMySQL(h.db.Driver()) {
+			_, err = tx.Exec(c.UserContext(), `
+				INSERT INTO tenant_roles (id, tenant_id, `+"`key`"+`, name, description, permissions, is_system, policy_version)
+				VALUES (?, ?, ?, ?, ?, ?, true, 2)
+				ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), is_system = true,
+				                        policy_version = GREATEST(policy_version, VALUES(policy_version))`,
+				database.NewID(), tenantID, seed.Key, seed.Name, seed.Description, seed.Permissions)
+		} else {
+			_, err = tx.Exec(c.UserContext(), `
+				INSERT INTO tenant_roles (tenant_id, key, name, description, permissions, is_system, policy_version)
+				VALUES ($1, $2, $3, $4, $5::jsonb, true, 2)
+				ON CONFLICT (tenant_id, key) DO NOTHING`,
+				tenantID, seed.Key, seed.Name, seed.Description, seed.Permissions)
+		}
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, internalError("Error seeding tenant role: "+seed.Key, err))
+		}
 	}
 
 	// 4. Activate core modules and selected premium modules
@@ -548,7 +726,9 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		step = "activate_core_modules_mysql"
 		_, err = tx.Exec(c.UserContext(),
 			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-			 SELECT ?, `+"`key`"+`, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
+			 SELECT ?, `+"`key`"+`, true, true, true, 'core'
+			 FROM modules_catalog
+			 WHERE is_core = true AND status = 'active' AND global_enabled = true
 			 ON DUPLICATE KEY UPDATE is_active = true,
 			                         enabled = true,
 			                         is_required = true,
@@ -559,7 +739,9 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		step = "activate_core_modules_postgres"
 		_, err = tx.Exec(c.UserContext(),
 			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-			 SELECT $1, `+h.moduleCatalogKey("")+`, true, true, true, 'core' FROM modules_catalog WHERE is_core = true
+			 SELECT $1, `+h.moduleCatalogKey("")+`, true, true, true, 'core'
+			 FROM modules_catalog
+			 WHERE is_core = true AND status = 'active' AND global_enabled = true
 			 ON CONFLICT (tenant_id, module_key)
 			 DO UPDATE SET is_active = true, enabled = true, is_required = true, updated_at = NOW()`,
 			tenantID)
@@ -601,7 +783,7 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
-	for _, mod := range req.PremiumModules {
+	for _, mod := range provisionedAddonModules {
 		if database.IsMySQL(h.db.Driver()) {
 			step = "activate_premium_module_mysql:" + mod
 			if _, err := tx.Exec(c.UserContext(),
@@ -763,45 +945,55 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 		}
 	}
 
-	// 6. Activate the 4 portal modules (school_admin, parents, teachers, students)
-	step = "activate_portal_modules"
-	portalMods := []string{"portal_school_admin", "portal_parents", "portal_teachers", "portal_students"}
-	for _, mod := range portalMods {
-		if database.IsMySQL(h.db.Driver()) {
-			_, _ = tx.Exec(c.UserContext(),
-				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-				 VALUES (?, ?, true, true, true, 'core')
-				 ON DUPLICATE KEY UPDATE is_active = true, enabled = true, updated_at = CURRENT_TIMESTAMP`,
-				tenantID, mod)
-		} else {
-			_, _ = tx.Exec(c.UserContext(),
-				`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, is_required, source)
-				 VALUES ($1, $2, true, true, true, 'core')
-				 ON CONFLICT (tenant_id, module_key) DO NOTHING`,
-				tenantID, mod)
-		}
-	}
-
 	step = "commit"
 	if err := tx.Commit(c.UserContext()); err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, internalError("Could not commit transaction", err))
 	}
 	committed = true
 
-	// Include generated password in response so admin can save it
-	adminPw := ""
-	if autoGenerated {
-		adminPw = defaultPassword
+	// Provision the Hostinger subdomain after the database transaction is
+	// durable. This is an external side effect, so a provider outage must not
+	// roll back an otherwise valid tenant. The persisted status makes the
+	// partial outcome explicit and retryable instead of claiming the host works.
+	domainProvisioningStatus := "not_configured"
+	domainReady := false
+	domainProvisioningWarning := "Configura la API de Hostinger para crear el subdominio automáticamente."
+	if provisioner, configErr := schooldomain.NewFromEnv(); configErr == nil {
+		domainProvisioningStatus = "pending"
+		domainProvisioningWarning = "La escuela fue creada, pero Hostinger todavía no confirmó el subdominio."
+		provisionContext, cancelProvision := context.WithTimeout(context.Background(), 20*time.Second)
+		provisionResult, provisionErr := provisioner.Ensure(provisionContext, req.Slug)
+		cancelProvision()
+		if provisionErr != nil {
+			log.Printf("CreateSchool domain provisioning failed request_id=%s tenant_id=%s slug=%s err=%v", requestID, tenantID, req.Slug, provisionErr)
+		} else {
+			domainProvisioningStatus = provisionResult.Status
+			domainReady = provisionResult.Status == "created" || provisionResult.Status == "existing"
+			domainProvisioningWarning = ""
+		}
+	}
+	if recordErr := h.recordDomainProvisioningStatus(context.Background(), tenantID, domainProvisioningStatus, domainReady); recordErr != nil {
+		log.Printf("CreateSchool could not persist domain status request_id=%s tenant_id=%s err=%v", requestID, tenantID, recordErr)
 	}
 
+	// This is the only response that exposes the one-time credential. Prevent
+	// browser/proxy caching and never persist or log the plaintext value.
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	c.Set(fiber.HeaderPragma, "no-cache")
 	return response.Success(c, fiber.Map{
-		"id":                      tenantID,
-		"tenant_id":               tenantID,
-		"admin_email":             adminEmail,
-		"subdomain":               subdomain,
-		"admin_ready":             true,
-		"admin_password":          adminPw,
-		"generated_admin_password": autoGenerated,
+		"id":                          tenantID,
+		"tenant_id":                   tenantID,
+		"admin_email":                 adminEmail,
+		"subdomain":                   subdomain,
+		"admin_ready":                 true,
+		"admin_password":              defaultPassword,
+		"generated_admin_password":    true,
+		"password_must_change":        true,
+		"enabled_addon_modules":       provisionedAddonModules,
+		"unavailable_plan_modules":    unavailablePlanModules,
+		"domain_provisioning_status":  domainProvisioningStatus,
+		"domain_ready":                domainReady,
+		"domain_provisioning_warning": domainProvisioningWarning,
 		"portals": fiber.Map{
 			"school_admin": "/school-portal/school-admin?slug=" + req.Slug,
 			"parents":      "/school-portal/parents?slug=" + req.Slug,
@@ -811,30 +1003,157 @@ func (h *Handler) CreateSchool(c *fiber.Ctx) (err error) {
 	}, "School created successfully")
 }
 
+func (h *Handler) recordDomainProvisioningStatus(ctx context.Context, tenantID, status string, ready bool) error {
+	if database.IsMySQL(h.db.Driver()) {
+		_, err := h.db.Exec(ctx, `
+			UPDATE tenants
+			SET settings = JSON_SET(COALESCE(settings, JSON_OBJECT()),
+			  '$.domain_provisioning_status', ?, '$.domain_ready', ?),
+			  updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?`, status, ready, tenantID)
+		return err
+	}
+	_, err := h.db.Exec(ctx, `
+		UPDATE tenants
+		SET settings = jsonb_set(
+		  jsonb_set(COALESCE(settings, '{}'::jsonb), '{domain_provisioning_status}', to_jsonb($1::text), true),
+		  '{domain_ready}', to_jsonb($2::boolean), true
+		), updated_at = NOW()
+		WHERE id = $3`, status, ready, tenantID)
+	return err
+}
+
+func (h *Handler) ProvisionSchoolDomain(c *fiber.Ctx) error {
+	tenantID := strings.TrimSpace(c.Params("id"))
+	var schoolSlug string
+	if err := h.db.QueryRow(c.UserContext(), "SELECT slug FROM tenants WHERE id = $1 AND deleted_at IS NULL", tenantID).Scan(&schoolSlug); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "School not found")
+	}
+
+	provisioner, err := schooldomain.NewFromEnv()
+	if err != nil {
+		_ = h.recordDomainProvisioningStatus(context.Background(), tenantID, "not_configured", false)
+		return response.Error(c, fiber.StatusServiceUnavailable, "Hostinger provisioning is not configured")
+	}
+
+	provisionContext, cancelProvision := context.WithTimeout(context.Background(), 20*time.Second)
+	result, err := provisioner.Ensure(provisionContext, schoolSlug)
+	cancelProvision()
+	if err != nil {
+		_ = h.recordDomainProvisioningStatus(context.Background(), tenantID, "pending", false)
+		log.Printf("ProvisionSchoolDomain failed tenant_id=%s slug=%s err=%v", tenantID, schoolSlug, err)
+		return response.Error(c, fiber.StatusBadGateway, "Hostinger did not confirm the subdomain; it remains pending")
+	}
+
+	ready := result.Status == "created" || result.Status == "existing"
+	if err := h.recordDomainProvisioningStatus(context.Background(), tenantID, result.Status, ready); err != nil {
+		log.Printf("ProvisionSchoolDomain could not persist status tenant_id=%s err=%v", tenantID, err)
+		return response.Error(c, fiber.StatusInternalServerError, "Subdomain was provisioned but its status could not be saved")
+	}
+
+	h.auditSuperAdmin(c, "school.domain.provision", "tenants", tenantID, "warning", fiber.Map{
+		"host": result.Host, "status": result.Status,
+	}, "")
+	return response.Success(c, fiber.Map{
+		"host": result.Host, "status": result.Status, "domain_ready": ready,
+	}, "School subdomain provisioned")
+}
+
+type updateSchoolRequest struct {
+	Name    *string `json:"name"`
+	LogoURL *string `json:"logo_url"`
+}
+
+func (h *Handler) UpdateSchool(c *fiber.Ctx) error {
+	tenantID := strings.TrimSpace(c.Params("id"))
+	var req updateSchoolRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Solicitud de escuela inválida")
+	}
+	if req.Name == nil && req.LogoURL == nil {
+		return response.Error(c, fiber.StatusBadRequest, "No hay cambios para guardar")
+	}
+
+	setParts := []string{}
+	args := []interface{}{}
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if len([]rune(name)) < 2 || len([]rune(name)) > 255 {
+			return response.Error(c, fiber.StatusBadRequest, "El nombre debe tener entre 2 y 255 caracteres")
+		}
+		args = append(args, name)
+		setParts = append(setParts, fmt.Sprintf("name = $%d", len(args)))
+	}
+	if req.LogoURL != nil {
+		logo := strings.TrimSpace(*req.LogoURL)
+		if logo != "" {
+			parsed, err := url.ParseRequestURI(logo)
+			if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+				return response.Error(c, fiber.StatusBadRequest, "El logo debe ser una URL pública HTTPS válida")
+			}
+		}
+		args = append(args, logo)
+		setParts = append(setParts, fmt.Sprintf("logo_url = NULLIF($%d, '')", len(args)))
+	}
+	args = append(args, tenantID)
+	query := fmt.Sprintf(
+		"UPDATE tenants SET %s, updated_at = NOW() WHERE id::text = $%d AND deleted_at IS NULL",
+		strings.Join(setParts, ", "), len(args),
+	)
+	result, err := h.db.Exec(c.UserContext(), query, args...)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo actualizar la escuela")
+	}
+	if result.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Escuela no encontrada")
+	}
+	h.auditSuperAdmin(c, "school.update", "tenants", tenantID, "warning", fiber.Map{
+		"name_changed": req.Name != nil, "logo_changed": req.LogoURL != nil,
+	}, "")
+	return response.Success(c, fiber.Map{"id": tenantID}, "Escuela actualizada")
+}
+
 func (h *Handler) GetSchool(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	var slug, name, status, plan string
+	var slug, name, status, plan, planID string
 	var logoURL *string
 	var createdAt, updatedAt interface{}
 
-	err := h.db.QueryRow(c.UserContext(),
-		"SELECT slug, name, logo_url, status, plan, created_at, updated_at FROM tenants WHERE id = $1", id).
-		Scan(&slug, &name, &logoURL, &status, &plan, &createdAt, &updatedAt)
+	err := h.db.QueryRow(c.UserContext(), `
+		SELECT t.slug, t.name, t.logo_url, t.status,
+		       COALESCE(sp.name, t.plan), t.plan, t.created_at, t.updated_at
+		FROM tenants t
+		LEFT JOIN subscription_plans sp ON sp.id::text = t.plan
+		WHERE t.id = $1 AND t.deleted_at IS NULL`, id).
+		Scan(&slug, &name, &logoURL, &status, &plan, &planID, &createdAt, &updatedAt)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "School not found")
 	}
 
 	var studentCount, teacherCount, parentCount int
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM students WHERE tenant_id = $1", id).Scan(&studentCount); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM students WHERE tenant_id = $1 AND deleted_at IS NULL", id).Scan(&studentCount); err != nil {
 		studentCount = 0
 	}
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'TEACHER'", id).Scan(&teacherCount); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'TEACHER' AND is_active = true AND deleted_at IS NULL", id).Scan(&teacherCount); err != nil {
 		teacherCount = 0
 	}
-	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'PARENT'", id).Scan(&parentCount); err != nil {
+	if err := h.db.QueryRow(c.UserContext(), "SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND role = 'PARENT' AND is_active = true AND deleted_at IS NULL", id).Scan(&parentCount); err != nil {
 		parentCount = 0
+	}
+	domainProvisioningStatus := "unknown"
+	domainReady := false
+	if database.IsMySQL(h.db.Driver()) {
+		_ = h.db.QueryRow(c.UserContext(), `
+			SELECT COALESCE(JSON_UNQUOTE(JSON_EXTRACT(settings, '$.domain_provisioning_status')), 'unknown'),
+			       COALESCE(JSON_EXTRACT(settings, '$.domain_ready') = true, false)
+			FROM tenants WHERE id = ?`, id).Scan(&domainProvisioningStatus, &domainReady)
+	} else {
+		_ = h.db.QueryRow(c.UserContext(), `
+			SELECT COALESCE(settings->>'domain_provisioning_status', 'unknown'),
+			       COALESCE((settings->>'domain_ready')::boolean, false)
+			FROM tenants WHERE id = $1`, id).Scan(&domainProvisioningStatus, &domainReady)
 	}
 
 	logo := ""
@@ -844,9 +1163,10 @@ func (h *Handler) GetSchool(c *fiber.Ctx) error {
 
 	return response.Success(c, fiber.Map{
 		"id": id, "slug": slug, "name": name, "logo_url": logo,
-		"status": status, "plan": plan,
+		"status": status, "plan": plan, "plan_id": planID,
 		"created_at": createdAt, "updated_at": updatedAt,
 		"total_students": studentCount, "total_teachers": teacherCount, "total_parents": parentCount,
+		"domain_provisioning_status": domainProvisioningStatus, "domain_ready": domainReady,
 	}, "School retrieved")
 }
 
@@ -856,6 +1176,7 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(c.UserContext(),
 		`SELECT `+moduleKey+`, mc.name, mc.description, mc.is_core, mc.price_monthly_mxn,
+		 mc.status, mc.global_enabled,
 		 COALESCE(tm.is_active, false) as is_active,
 		 COALESCE(tm.enabled, tm.is_active, false) as enabled,
 		 COALESCE(tm.level, '') as level,
@@ -874,11 +1195,13 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 	for rows.Next() {
 		var key, name string
 		var description *string
-		var isCore, isActive, enabled, isRequired bool
-		var level, source string
+		var isCore, globallyEnabled, isActive, enabled, isRequired bool
+		var level, source, status string
 		var price float64
 
-		rows.Scan(&key, &name, &description, &isCore, &price, &isActive, &enabled, &level, &isRequired, &source)
+		if err := rows.Scan(&key, &name, &description, &isCore, &price, &status, &globallyEnabled, &isActive, &enabled, &level, &isRequired, &source); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error reading module catalog")
+		}
 
 		desc := ""
 		if description != nil {
@@ -889,6 +1212,9 @@ func (h *Handler) GetSchoolModules(c *fiber.Ctx) error {
 			"key": key, "name": name, "description": desc,
 			"is_core": isCore, "price_monthly_mxn": price, "is_active": isActive,
 			"enabled": enabled, "level": level, "is_required": isRequired, "source": source,
+			"status": status, "global_enabled": globallyEnabled,
+			"production_ready": isProductionReadyTenantModule(key) && status == "active" && globallyEnabled,
+			"selectable":       isTenantSelectableProductionModule(key) && status == "active" && globallyEnabled,
 		})
 	}
 	if modules == nil {
@@ -910,15 +1236,29 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
 	}
 
+	req.ModuleKey = strings.ToLower(strings.TrimSpace(req.ModuleKey))
+	if !isProductionReadyTenantModule(req.ModuleKey) {
+		return response.Error(c, fiber.StatusConflict, "Module is not available for production")
+	}
+
 	// Required modules are protected because they are part of the tenant's base contract.
-	var isCore bool
-	if err := h.db.QueryRow(c.UserContext(), "SELECT is_core FROM modules_catalog WHERE "+h.moduleCatalogKey("")+" = $1", req.ModuleKey).Scan(&isCore); err != nil {
+	var isCore, globallyEnabled bool
+	var status string
+	if err := h.db.QueryRow(c.UserContext(),
+		"SELECT is_core, status, global_enabled FROM modules_catalog WHERE "+h.moduleCatalogKey("")+" = $1",
+		req.ModuleKey).Scan(&isCore, &status, &globallyEnabled); err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Module not found in catalog")
+	}
+	if status != "active" || !globallyEnabled {
+		return response.Error(c, fiber.StatusConflict, "Module is not enabled in the production catalog")
 	}
 	var isRequired bool
 	_ = h.db.QueryRow(c.UserContext(), "SELECT COALESCE(is_required, false) FROM tenant_modules WHERE tenant_id = $1 AND module_key = $2", id, req.ModuleKey).Scan(&isRequired)
 	if isCore || isRequired {
 		return response.Error(c, fiber.StatusForbidden, "Cannot toggle core modules")
+	}
+	if !isTenantSelectableProductionModule(req.ModuleKey) {
+		return response.Error(c, fiber.StatusForbidden, "Module is managed by the tenant level contract")
 	}
 
 	nextActive := true
@@ -948,7 +1288,7 @@ func (h *Handler) ToggleModule(c *fiber.Ctx) error {
 func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
 	moduleKey := h.moduleCatalogKey("")
 	rows, err := h.db.Query(c.UserContext(),
-		"SELECT "+moduleKey+", name, description, is_core, price_monthly_mxn FROM modules_catalog ORDER BY is_core DESC, name")
+		"SELECT "+moduleKey+", name, description, is_core, price_monthly_mxn, status, global_enabled FROM modules_catalog ORDER BY is_core DESC, name")
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error fetching catalog")
 	}
@@ -958,9 +1298,12 @@ func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
 	for rows.Next() {
 		var key, name string
 		var description *string
-		var isCore bool
+		var isCore, globallyEnabled bool
+		var status string
 		var price float64
-		rows.Scan(&key, &name, &description, &isCore, &price)
+		if err := rows.Scan(&key, &name, &description, &isCore, &price, &status, &globallyEnabled); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error reading catalog")
+		}
 
 		desc := ""
 		if description != nil {
@@ -969,6 +1312,9 @@ func (h *Handler) GetModulesCatalog(c *fiber.Ctx) error {
 		modules = append(modules, fiber.Map{
 			"key": key, "name": name, "description": desc,
 			"is_core": isCore, "price_monthly_mxn": price,
+			"status": status, "global_enabled": globallyEnabled,
+			"production_ready": isProductionReadyTenantModule(key) && status == "active" && globallyEnabled,
+			"selectable":       isTenantSelectableProductionModule(key) && status == "active" && globallyEnabled,
 		})
 	}
 	if modules == nil {
@@ -987,29 +1333,4 @@ func (h *Handler) moduleCatalogKey(alias string) string {
 		return prefix + "`key`"
 	}
 	return prefix + "key"
-}
-
-func (h *Handler) UploadLogo(c *fiber.Ctx) error {
-	file, err := c.FormFile("logo")
-	if err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "No file uploaded")
-	}
-
-	// Ensure uploads directory exists
-	if _, err := os.Stat("./uploads"); os.IsNotExist(err) {
-		os.Mkdir("./uploads", 0755)
-	}
-
-	filename := "logo_" + file.Filename
-	if err := c.SaveFile(file, "./uploads/"+filename); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error saving file")
-	}
-
-	protocol := "http"
-	if c.Protocol() == "https" {
-		protocol = "https"
-	}
-	url := protocol + "://" + c.Hostname() + "/uploads/" + filename
-
-	return response.Success(c, fiber.Map{"url": url}, "Logo uploaded")
 }

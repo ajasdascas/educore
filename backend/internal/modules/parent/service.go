@@ -185,7 +185,18 @@ func (s *Service) GetDocuments(ctx context.Context, tenantID, userID string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to get parent documents: %w", err)
 	}
+	for i := range documents {
+		documents[i].FileURL = ""
+	}
 	return documents, nil
+}
+
+func (s *Service) GetPaymentReceipt(ctx context.Context, tenantID, userID, paymentID string) (*ParentPaymentReceiptResponse, error) {
+	receipt, err := s.repo.GetPaymentReceipt(ctx, tenantID, userID, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payment receipt: %w", err)
+	}
+	return receipt, nil
 }
 
 func (s *Service) GetPayments(ctx context.Context, tenantID, userID string) (*ParentPaymentsResponse, error) {

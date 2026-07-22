@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"educore/internal/middleware"
 	"educore/internal/pkg/response"
 	"github.com/gofiber/fiber/v2"
 )
@@ -23,6 +24,13 @@ func quotaStatus(err error) int {
 	var qe *QuotaExceededError
 	if errors.As(err, &qe) {
 		return fiber.StatusPaymentRequired
+	}
+	return fiber.StatusBadRequest
+}
+
+func productionCapabilityStatus(err error) int {
+	if errors.Is(err, ErrDocumentStorageUnavailable) || errors.Is(err, ErrCardPaymentsUnavailable) {
+		return fiber.StatusServiceUnavailable
 	}
 	return fiber.StatusBadRequest
 }
@@ -51,7 +59,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	h.registerDatabaseExplorerRoutes(api)
 
 	// Academic management
-	academic := api.Group("/academic")
+	academic := api.Group("/academic", h.RequireModule("academic_core"))
 	academic.Get("/school-years", h.GetSchoolYears)
 	academic.Post("/school-years", h.CreateSchoolYear)
 	academic.Put("/school-years/:id", h.UpdateSchoolYear)
@@ -83,33 +91,33 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	academic.Put("/subjects/:id", h.UpdateSubject)
 	academic.Delete("/subjects/:id", h.DeleteSubject)
 
-	academic.Get("/schedule", h.GetSchedule)
-	academic.Get("/students/:id/schedule", h.GetStudentSchedule)
-	academic.Post("/schedule", h.CreateScheduleBlock)
-	academic.Get("/schedule/:id", h.GetScheduleBlock)
-	academic.Put("/schedule/:id", h.UpdateScheduleBlock)
-	academic.Delete("/schedule/:id", h.DeleteScheduleBlock)
+	academic.Get("/schedule", h.RequireModule("schedules"), h.GetSchedule)
+	academic.Get("/students/:id/schedule", h.RequireModule("schedules"), h.GetStudentSchedule)
+	academic.Post("/schedule", h.RequireModule("schedules"), h.CreateScheduleBlock)
+	academic.Get("/schedule/:id", h.RequireModule("schedules"), h.GetScheduleBlock)
+	academic.Put("/schedule/:id", h.RequireModule("schedules"), h.UpdateScheduleBlock)
+	academic.Delete("/schedule/:id", h.RequireModule("schedules"), h.DeleteScheduleBlock)
 
 	// Attendance management
-	attendance := api.Group("/attendance")
+	attendance := api.Group("/attendance", h.RequireModule("attendance"))
 	attendance.Get("/groups/:groupId/today", h.GetTodayAttendance)
 	attendance.Post("/groups/:groupId/bulk", h.BulkUpdateAttendance)
 	attendance.Get("/students/:studentId/history", h.GetStudentAttendanceHistory)
 	attendance.Get("/reports/monthly", h.GetMonthlyAttendanceReport)
 
 	// Grades management
-	grades := api.Group("/grades")
+	grades := api.Group("/grades", h.RequireModule("grading"))
 	grades.Get("/groups/:groupId/subjects/:subjectId", h.GetGroupGrades)
 	grades.Post("/grades/bulk", h.BulkUpdateGrades)
 	grades.Get("/students/:studentId/report-card", h.GetStudentReportCard)
 	grades.Get("/groups/:groupId/final-grades", h.GetGroupFinalGrades)
 
-	api.Post("/documents", h.CreateStudentDocument)
-	api.Get("/documents/:studentId", h.GetStudentDocuments)
-	api.Put("/documents/:documentId", h.UpdateStudentDocument)
-	api.Patch("/documents/:documentId/verify", h.VerifyStudentDocument)
-	api.Delete("/documents/:documentId", h.DeleteStudentDocument)
-	api.Post("/report-cards/generate", h.GenerateReportCard)
+	api.Post("/documents", h.RequireModule("documents"), h.CreateStudentDocument)
+	api.Get("/documents/:studentId", h.RequireModule("documents"), h.GetStudentDocuments)
+	api.Put("/documents/:documentId", h.RequireModule("documents"), h.UpdateStudentDocument)
+	api.Patch("/documents/:documentId/verify", h.RequireModule("documents"), h.VerifyStudentDocument)
+	api.Delete("/documents/:documentId", h.RequireModule("documents"), h.DeleteStudentDocument)
+	api.Post("/report-cards/generate", h.RequireModule("report_cards"), h.GenerateReportCard)
 
 	payments := api.Group("/payments", h.RequireModule("payments"))
 	payments.Get("", h.GetPayments)
@@ -120,7 +128,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	payments.Get("/:id/receipt", h.GetPaymentReceipt)
 
 	// Communications
-	comms := api.Group("/communications")
+	comms := api.Group("/communications", h.RequireModule("communications"))
 	comms.Get("", h.GetCommunications)
 	comms.Get("/stats", h.GetCommunicationStats)
 	comms.Post("", h.CreateCommunication)
@@ -130,7 +138,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	comms.Delete("/:id", h.DeleteCommunication)
 
 	// Reports
-	rpts := api.Group("/reports")
+	rpts := api.Group("/reports", h.RequireModule("reports"))
 	rpts.Get("", h.GetReports)
 	rpts.Post("/generate", h.GenerateReport)
 	rpts.Get("/:id", h.GetReport)
@@ -156,6 +164,9 @@ func (h *Handler) GetNotifications(c *fiber.Ctx) error {
 
 func (h *Handler) RequireModule(moduleKey string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		if !middleware.IsProductionReadyTenantModule(moduleKey) {
+			return response.Error(c, fiber.StatusServiceUnavailable, "Module is disabled until its production readiness audit passes")
+		}
 		tenantID, ok := c.Locals("tenant_id").(string)
 		if !ok || tenantID == "" {
 			return response.Error(c, fiber.StatusUnauthorized, "Tenant context required")
@@ -899,7 +910,7 @@ func (h *Handler) GenerateReportCard(c *fiber.Ctx) error {
 	}
 	reportCard, err := h.service.GenerateReportCard(c.Context(), tenantID, userID, req)
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, productionCapabilityStatus(err), err)
 	}
 	return response.Success(c, reportCard, "Success")
 }
@@ -923,13 +934,9 @@ func (h *Handler) CreateStudentDocument(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusForbidden, err.Error())
 	}
 	userID := c.Locals("user_id").(string)
-	var req CreateStudentDocumentRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
-	}
-	document, err := h.service.CreateStudentDocument(c.Context(), tenantID, userID, req)
+	document, err := h.service.CreateStudentDocument(c.Context(), tenantID, userID, CreateStudentDocumentRequest{})
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, productionCapabilityStatus(err), err)
 	}
 	return response.Success(c, document, "Success")
 }
@@ -941,13 +948,9 @@ func (h *Handler) UpdateStudentDocument(c *fiber.Ctx) error {
 	}
 	userID := c.Locals("user_id").(string)
 	documentID := c.Params("documentId")
-	var req CreateStudentDocumentRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
-	}
-	document, err := h.service.UpdateStudentDocument(c.Context(), tenantID, userID, documentID, req)
+	document, err := h.service.UpdateStudentDocument(c.Context(), tenantID, userID, documentID, CreateStudentDocumentRequest{})
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, productionCapabilityStatus(err), err)
 	}
 	return response.Success(c, document, "Success")
 }
@@ -961,7 +964,7 @@ func (h *Handler) VerifyStudentDocument(c *fiber.Ctx) error {
 	documentID := c.Params("documentId")
 	document, err := h.service.VerifyStudentDocument(c.Context(), tenantID, userID, documentID)
 	if err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, productionCapabilityStatus(err), err)
 	}
 	return response.Success(c, document, "Success")
 }
@@ -974,7 +977,7 @@ func (h *Handler) DeleteStudentDocument(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 	documentID := c.Params("documentId")
 	if err := h.service.DeleteStudentDocument(c.Context(), tenantID, userID, documentID); err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
+		return response.ErrorFromErr(c, productionCapabilityStatus(err), err)
 	}
 	return response.SuccessMessage(c, "Document deleted successfully")
 }
@@ -1025,6 +1028,9 @@ func (h *Handler) RecordStudentPayment(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
 	}
+	if req.IdempotencyKey == "" {
+		req.IdempotencyKey = c.Get("Idempotency-Key")
+	}
 	payment, err := h.service.RecordStudentPayment(c.Context(), tenantID, userID, c.Params("id"), req)
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
@@ -1050,11 +1056,7 @@ func (h *Handler) CreatePaymentCheckoutSession(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusForbidden, err.Error())
 	}
 	userID := c.Locals("user_id").(string)
-	var req CreateCardCheckoutSessionRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.ErrorFromErr(c, fiber.StatusBadRequest, err)
-	}
-	session, err := h.service.CreateStripeCheckoutSession(c.Context(), tenantID, userID, c.Params("id"), req)
+	session, err := h.service.CreateStripeCheckoutSession(c.Context(), tenantID, userID, c.Params("id"), CreateCardCheckoutSessionRequest{})
 	if err != nil {
 		return response.ErrorFromErr(c, fiber.StatusServiceUnavailable, err)
 	}

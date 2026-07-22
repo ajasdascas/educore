@@ -1,11 +1,11 @@
 package auth
 
 import (
-	"crypto/rand"
 	"educore/internal/pkg/jwt"
+	"educore/internal/pkg/passwordpolicy"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
-	"encoding/hex"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +21,10 @@ type Handler struct {
 	jwtExpiry     time.Duration
 	refreshExpiry time.Duration
 	redis         *redis.Client
+	resetSender   passwordResetEmailSender
+	appBaseURL    string
+	rateLimiter   *authRateLimiter
+	rateLimits    authRateLimitConfig
 }
 
 func NewHandler(db *database.DB, secret string, expiry, refreshExpiry time.Duration, redisClient *redis.Client) *Handler {
@@ -30,15 +34,28 @@ func NewHandler(db *database.DB, secret string, expiry, refreshExpiry time.Durat
 		jwtExpiry:     expiry,
 		refreshExpiry: refreshExpiry,
 		redis:         redisClient,
+		resetSender:   newResendEmailSenderFromEnv(),
+		appBaseURL:    strings.TrimSpace(os.Getenv("APP_BASE_URL")),
+		rateLimiter:   newAuthRateLimiter(redisClient),
+		rateLimits:    loadAuthRateLimitConfig(),
 	}
 }
 
 func (h *Handler) RegisterRoutes(router fiber.Router) {
-	router.Post("/login", h.Login)
+	router.Post("/login", h.rateLimiter.middleware(authRateLimitRule{
+		name: "login", ipLimit: h.rateLimits.LoginIPLimit, subjectLimit: h.rateLimits.LoginSubjectLimit,
+		window: h.rateLimits.Window, subject: loginRateLimitSubject,
+	}), h.Login)
 	router.Post("/refresh", h.Refresh)
 	router.Post("/logout", h.Logout)
-	router.Post("/forgot-password", h.ForgotPassword)
-	router.Post("/reset-password", h.ResetPassword)
+	router.Post("/forgot-password", h.rateLimiter.middleware(authRateLimitRule{
+		name: "forgot", ipLimit: h.rateLimits.ForgotIPLimit, subjectLimit: h.rateLimits.ForgotSubjectLimit,
+		window: h.rateLimits.Window, subject: forgotRateLimitSubject,
+	}), h.ForgotPassword)
+	router.Post("/reset-password", h.rateLimiter.middleware(authRateLimitRule{
+		name: "reset", ipLimit: h.rateLimits.ResetIPLimit, subjectLimit: h.rateLimits.ResetSubjectLimit,
+		window: h.rateLimits.Window, subject: resetRateLimitSubject,
+	}), h.ResetPassword)
 	router.Post("/accept-invitation", h.AcceptInvitation)
 }
 
@@ -62,12 +79,14 @@ type RefreshRequest struct {
 }
 
 type ForgotPasswordRequest struct {
-	Email string `json:"email"`
+	Email      string `json:"email"`
+	TenantSlug string `json:"tenant_slug"`
 }
 
 type ResetPasswordRequest struct {
 	Token       string `json:"token"`
 	NewPassword string `json:"new_password"`
+	TenantSlug  string `json:"tenant_slug"`
 }
 
 type AcceptInvitationRequest struct {
@@ -87,35 +106,49 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Email and password are required")
 	}
 
-	var id, role, hash, email string
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.TenantSlug = strings.ToLower(strings.TrimSpace(req.TenantSlug))
+
+	var id, role, hash, email, tenantSlug string
+	var authVersion int
+	var passwordMustChange bool
 	var tenantIDPtr *string
 	tenantScope := req.TenantID
 	if tenantScope == "" && req.TenantSlug != "" {
-		_ = h.db.QueryRow(c.Context(), "SELECT id FROM tenants WHERE slug = $1 AND status = 'active'", req.TenantSlug).Scan(&tenantScope)
+		if err := h.db.QueryRow(c.Context(), `
+			SELECT id FROM tenants
+			WHERE slug = $1 AND status IN ('active', 'trial') AND deleted_at IS NULL`, req.TenantSlug).Scan(&tenantScope); err != nil {
+			return response.Error(c, fiber.StatusUnauthorized, "Invalid credentials")
+		}
 	}
 
-	query := `SELECT id, tenant_id, role, password_hash, email
-		FROM users
-		WHERE email = $1 AND is_active = true`
+	query := `SELECT u.id, u.tenant_id, u.role, u.password_hash, u.email, u.auth_version,
+		       u.password_must_change, COALESCE(t.slug, '')
+		FROM users u
+		LEFT JOIN tenants t ON t.id = u.tenant_id
+		WHERE LOWER(u.email) = LOWER($1) AND u.is_active = true AND u.deleted_at IS NULL
+		  AND (u.tenant_id IS NULL OR (t.status IN ('active', 'trial') AND t.deleted_at IS NULL))`
 	args := []interface{}{req.Email}
 	argCount := 1
 	if req.Role != "" {
 		argCount++
-		query += ` AND role = $` + strconv.Itoa(argCount)
+		query += ` AND u.role = $` + strconv.Itoa(argCount)
 		args = append(args, req.Role)
 	}
 	if tenantScope != "" {
 		argCount++
-		query += ` AND tenant_id = $` + strconv.Itoa(argCount)
+		query += ` AND u.tenant_id = $` + strconv.Itoa(argCount)
 		args = append(args, tenantScope)
-	} else if req.Role == "SUPER_ADMIN" {
-		query += ` AND tenant_id IS NULL`
-	} else if req.Role != "" && req.Role != "SUPER_ADMIN" {
-		query += ` AND tenant_id IS NOT NULL`
+	} else {
+		// The main-domain login is the global scope. School accounts must carry
+		// an explicit, active tenant slug so duplicate emails cannot cross tenants.
+		query += ` AND u.tenant_id IS NULL AND u.role = 'SUPER_ADMIN'`
 	}
-	query += ` ORDER BY CASE WHEN tenant_id IS NULL THEN 0 ELSE 1 END, created_at DESC LIMIT 1`
+	query += ` ORDER BY u.created_at DESC LIMIT 1`
 
-	err := h.db.QueryRow(c.Context(), query, args...).Scan(&id, &tenantIDPtr, &role, &hash, &email)
+	err := h.db.QueryRow(c.Context(), query, args...).Scan(
+		&id, &tenantIDPtr, &role, &hash, &email, &authVersion, &passwordMustChange, &tenantSlug,
+	)
 
 	if err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Invalid credentials")
@@ -182,30 +215,39 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		tenantID = *tenantIDPtr
 	}
 
+	// Record the successful login before issuing tokens so the returned session
+	// reflects the latest persisted account state.
+	if _, err := h.db.Exec(c.Context(), "UPDATE users SET last_login_at = NOW() WHERE id = $1", id); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error recording login")
+	}
+
 	// Generate access token
-	accessToken, err := jwt.GenerateToken(id, tenantID, role, email, h.jwtSecret, h.jwtExpiry)
+	accessToken, err := jwt.GenerateToken(id, tenantID, role, email, authVersion, jwt.TokenTypeAccess, h.jwtSecret, h.jwtExpiry)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error generating token")
 	}
 
 	// Generate refresh token
-	refreshToken, err := jwt.GenerateToken(id, tenantID, role, email, h.jwtSecret, h.refreshExpiry)
+	refreshToken, err := jwt.GenerateToken(id, tenantID, role, email, authVersion, jwt.TokenTypeRefresh, h.jwtSecret, h.refreshExpiry)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error generating refresh token")
 	}
 
-	// Update last_login_at
-	_, _ = h.db.Exec(c.Context(), "UPDATE users SET last_login_at = NOW() WHERE id = $1", id)
-
 	// Set refresh token as httpOnly cookie
 	secureCookie := c.Protocol() == "https" || c.Get("X-Forwarded-Proto") == "https"
+	sameSite := "Lax"
+	if secureCookie {
+		// The static frontend and API may use different HTTPS origins in
+		// production. SameSite=None is required for credentialed refresh calls.
+		sameSite = "None"
+	}
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Expires:  time.Now().Add(h.refreshExpiry),
 		HTTPOnly: true,
 		Secure:   secureCookie,
-		SameSite: "Lax",
+		SameSite: sameSite,
 		Path:     "/",
 	})
 
@@ -213,10 +255,12 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		"access_token": accessToken,
 		"expires_in":   int(h.jwtExpiry.Seconds()),
 		"user": fiber.Map{
-			"id":        id,
-			"role":      role,
-			"email":     email,
-			"tenant_id": tenantID,
+			"id":                   id,
+			"role":                 role,
+			"email":                email,
+			"tenant_id":            tenantID,
+			"tenant_slug":          tenantSlug,
+			"password_must_change": passwordMustChange,
 		},
 	}, "Login successful")
 }
@@ -227,12 +271,39 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "No refresh token")
 	}
 
-	claims, err := jwt.ValidateToken(refreshToken, h.jwtSecret)
+	claims, err := jwt.ValidateToken(refreshToken, h.jwtSecret, jwt.TokenTypeRefresh)
 	if err != nil {
 		return response.Error(c, fiber.StatusUnauthorized, "Invalid refresh token")
 	}
+	var role, email string
+	var authVersion int
+	var passwordMustChange bool
+	var tenantIDPtr *string
+	if err := h.db.QueryRow(c.Context(), `
+		SELECT role, email, tenant_id, auth_version, password_must_change
+		FROM users WHERE id = $1 AND is_active = true AND deleted_at IS NULL
+		  AND (tenant_id IS NULL OR EXISTS (
+		    SELECT 1 FROM tenants t WHERE t.id = users.tenant_id AND t.status IN ('active', 'trial') AND t.deleted_at IS NULL
+		  ))`, claims.UserID).
+		Scan(&role, &email, &tenantIDPtr, &authVersion, &passwordMustChange); err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Account is inactive or no longer exists")
+	}
+	tenantID := ""
+	if tenantIDPtr != nil {
+		tenantID = *tenantIDPtr
+	}
+	if !strings.EqualFold(role, claims.Role) || !strings.EqualFold(email, claims.Email) || tenantID != claims.TenantID || claims.AuthVersion <= 0 || authVersion != claims.AuthVersion {
+		return response.Error(c, fiber.StatusUnauthorized, "Session was revoked; sign in again")
+	}
+	if passwordMustChange {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"success": false,
+			"code":    "PASSWORD_CHANGE_REQUIRED",
+			"error":   "Debes cambiar tu contrasena temporal antes de continuar",
+		})
+	}
 
-	accessToken, err := jwt.GenerateToken(claims.UserID, claims.TenantID, claims.Role, claims.Email, h.jwtSecret, h.jwtExpiry)
+	accessToken, err := jwt.GenerateToken(claims.UserID, tenantID, role, email, authVersion, jwt.TokenTypeAccess, h.jwtSecret, h.jwtExpiry)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error generating token")
 	}
@@ -245,68 +316,28 @@ func (h *Handler) Refresh(c *fiber.Ctx) error {
 
 func (h *Handler) Logout(c *fiber.Ctx) error {
 	secureCookie := c.Protocol() == "https" || c.Get("X-Forwarded-Proto") == "https"
+	sameSite := "Lax"
+	if secureCookie {
+		sameSite = "None"
+	}
 	c.Cookie(&fiber.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour),
 		HTTPOnly: true,
 		Secure:   secureCookie,
-		SameSite: "Lax",
+		SameSite: sameSite,
 		Path:     "/",
 	})
 	return response.Success(c, nil, "Logged out")
 }
 
 func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
-	var req ForgotPasswordRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
-	}
-
-	// Generate reset token
-	tokenBytes := make([]byte, 32)
-	_, _ = rand.Read(tokenBytes)
-	token := hex.EncodeToString(tokenBytes)
-
-	// Save token in DB
-	_, err := h.db.Exec(c.Context(),
-		"UPDATE users SET invitation_token = $1, invitation_expires_at = NOW() + INTERVAL '1 hour' WHERE email = $2",
-		token, req.Email)
-
-	if err != nil {
-		// Don't reveal if email exists
-		return response.Success(c, nil, "If the email exists, a reset link has been sent")
-	}
-
-	// TODO: Send email via Resend with link: APP_BASE_URL/reset-password?token=<token>
-
-	return response.Success(c, nil, "If the email exists, a reset link has been sent")
+	return h.handleForgotPassword(c)
 }
 
 func (h *Handler) ResetPassword(c *fiber.Ctx) error {
-	var req ResetPasswordRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
-	}
-
-	if len(req.NewPassword) < 8 {
-		return response.Error(c, fiber.StatusBadRequest, "Password must be at least 8 characters")
-	}
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error processing password")
-	}
-
-	result, err := h.db.Exec(c.Context(),
-		"UPDATE users SET password_hash = $1, invitation_token = NULL, invitation_expires_at = NULL WHERE invitation_token = $2 AND invitation_expires_at > NOW()",
-		string(hash), req.Token)
-
-	if err != nil || result.RowsAffected() == 0 {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid or expired token")
-	}
-
-	return response.Success(c, nil, "Password updated successfully")
+	return h.handleResetPassword(c)
 }
 
 type ChangePasswordRequest struct {
@@ -324,25 +355,46 @@ func (h *Handler) ChangePassword(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
 	}
-	if len(req.NewPassword) < 8 {
-		return response.Error(c, fiber.StatusBadRequest, "New password must be at least 8 characters")
+	if strings.TrimSpace(req.CurrentPassword) == "" {
+		return response.Error(c, fiber.StatusBadRequest, "Current password is required")
 	}
-
-	var currentHash string
-	row := h.db.QueryRow(c.UserContext(), `SELECT password_hash FROM users WHERE id = $1`, userID)
-	if err := row.Scan(&currentHash); err != nil {
-		return response.Error(c, fiber.StatusNotFound, "User not found")
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
-		return response.Error(c, fiber.StatusUnauthorized, "Current password is incorrect")
+	if err := passwordpolicy.Validate(req.NewPassword); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error processing password")
 	}
-	if _, err := h.db.Exec(c.UserContext(), `UPDATE users SET password_hash = $1 WHERE id = $2`, string(newHash), userID); err != nil {
+	tx, err := h.db.Begin(c.UserContext())
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error starting password change")
+	}
+	defer tx.Rollback(c.UserContext())
+	var currentHash string
+	if err := tx.QueryRow(c.UserContext(), `
+		SELECT password_hash FROM users
+		WHERE id = $1 AND is_active = true AND deleted_at IS NULL
+		FOR UPDATE`, userID).Scan(&currentHash); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "User not found")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+		return response.Error(c, fiber.StatusUnauthorized, "Current password is incorrect")
+	}
+	result, err := tx.Exec(c.UserContext(), `
+		UPDATE users SET password_hash = $1, password_must_change = false,
+			auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND is_active = true AND deleted_at IS NULL`, string(newHash), userID)
+	if err != nil || result.RowsAffected() != 1 {
 		return response.Error(c, fiber.StatusInternalServerError, "Error updating password")
+	}
+	if _, err := tx.Exec(c.UserContext(), `
+		UPDATE password_reset_tokens SET revoked_at = CURRENT_TIMESTAMP
+		WHERE user_id = $1 AND used_at IS NULL AND revoked_at IS NULL`, userID); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error revoking password recovery links")
+	}
+	if err := tx.Commit(c.UserContext()); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error saving password")
 	}
 	return response.Success(c, nil, "Password updated successfully")
 }
@@ -353,8 +405,8 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request")
 	}
 
-	if len(req.Password) < 8 {
-		return response.Error(c, fiber.StatusBadRequest, "Password must be at least 8 characters")
+	if err := passwordpolicy.Validate(req.Password); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, err.Error())
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -362,14 +414,35 @@ func (h *Handler) AcceptInvitation(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusInternalServerError, "Error processing password")
 	}
 
-	result, err := h.db.Exec(c.Context(),
-		`UPDATE users SET password_hash = $1, invitation_token = NULL, invitation_expires_at = NULL, 
-		 email_verified_at = NOW(), is_active = true 
-		 WHERE invitation_token = $2 AND invitation_expires_at > NOW()`,
-		string(hash), req.Token)
-
-	if err != nil || result.RowsAffected() == 0 {
+	tx, err := h.db.Begin(c.UserContext())
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error starting account activation")
+	}
+	defer tx.Rollback(c.UserContext())
+	var userID string
+	if err := tx.QueryRow(c.UserContext(), `
+		SELECT id::text FROM users
+		WHERE invitation_token = $1 AND invitation_expires_at > NOW()
+		FOR UPDATE`, req.Token).Scan(&userID); err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid or expired invitation")
+	}
+	result, err := tx.Exec(c.UserContext(),
+		`UPDATE users SET password_hash = $1, invitation_token = NULL, invitation_expires_at = NULL,
+		 email_verified_at = NOW(), is_active = true, password_must_change = false,
+		 auth_version = auth_version + 1, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = $2 AND invitation_token = $3 AND invitation_expires_at > NOW()`,
+		string(hash), userID, req.Token)
+
+	if err != nil || result.RowsAffected() != 1 {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid or expired invitation")
+	}
+	if _, err := tx.Exec(c.UserContext(), `
+		UPDATE password_reset_tokens SET revoked_at = CURRENT_TIMESTAMP
+		WHERE user_id = $1 AND used_at IS NULL AND revoked_at IS NULL`, userID); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error revoking password recovery links")
+	}
+	if err := tx.Commit(c.UserContext()); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error saving account activation")
 	}
 
 	return response.Success(c, nil, "Account activated successfully")

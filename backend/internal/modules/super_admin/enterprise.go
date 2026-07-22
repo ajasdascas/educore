@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type confirmationRequest struct {
@@ -107,11 +107,12 @@ func (h *Handler) RegisterEnterpriseRoutes(router fiber.Router) {
 	router.Delete("/schools/:id", h.SoftDeleteSchool)
 
 	router.Get("/global-users", h.ListAllUsers)
+	router.Get("/global-users/options", h.GlobalUserOptions)
 	router.Post("/global-users", h.CreateScopedUser)
 	router.Put("/global-users/:id", h.UpdateScopedUser)
 	router.Patch("/global-users/:id/status", h.ToggleScopedUserStatus)
+	router.Put("/global-users/roles/:role/permissions", h.UpdateTenantRolePermissions)
 	router.Post("/global-users/:id/reset-password", h.ResetScopedUserPassword)
-	router.Post("/global-users/:id/force-logout", h.ForceLogoutUser)
 
 	router.Post("/impersonation/start", h.StartImpersonation)
 	router.Post("/impersonation/stop", h.StopImpersonation)
@@ -247,7 +248,9 @@ func (h *Handler) ListEnterpriseModules(c *fiber.Ctx) error {
 		var isCore, globalEnabled bool
 		var price float64
 		var dependencies, featureFlags, metadata []byte
-		_ = rows.Scan(&key, &name, &description, &isCore, &price, &status, &version, &dependencies, &requiredLevel, &featureFlags, &globalEnabled, &metadata)
+		if err := rows.Scan(&key, &name, &description, &isCore, &price, &status, &version, &dependencies, &requiredLevel, &featureFlags, &globalEnabled, &metadata); err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error reading modules")
+		}
 		modules = append(modules, fiber.Map{
 			"key": key, "name": name, "description": description, "is_core": isCore,
 			"price_monthly_mxn": price, "status": status, "version": version,
@@ -255,6 +258,9 @@ func (h *Handler) ListEnterpriseModules(c *fiber.Ctx) error {
 			"feature_flags": json.RawMessage(featureFlags), "global_enabled": globalEnabled,
 			"metadata": json.RawMessage(metadata),
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "Error reading modules")
 	}
 	return response.Success(c, fiber.Map{"modules": modules}, "Modules retrieved")
 }
@@ -277,9 +283,39 @@ func (h *Handler) UpsertEnterpriseModule(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil || req.Key == "" || req.Name == "" {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid module payload")
 	}
-	if req.Status == "" {
-		req.Status = "active"
+	req.Key = strings.ToLower(strings.TrimSpace(req.Key))
+	req.Name = strings.TrimSpace(req.Name)
+	if len(req.Key) > 80 || len([]rune(req.Name)) > 120 || len([]rune(req.Description)) > 1000 {
+		return response.Error(c, fiber.StatusBadRequest, "Module fields exceed their allowed length")
 	}
+	if req.PriceMonthlyMXN < 0 || math.IsNaN(req.PriceMonthlyMXN) || math.IsInf(req.PriceMonthlyMXN, 0) {
+		return response.Error(c, fiber.StatusBadRequest, "Module price must be a finite non-negative value")
+	}
+	for _, char := range req.Key {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '_' {
+			return response.Error(c, fiber.StatusBadRequest, "Module key must use lowercase letters, numbers and underscores")
+		}
+	}
+	if req.Status == "" {
+		req.Status = "planned"
+	}
+	req.Status = strings.ToLower(strings.TrimSpace(req.Status))
+	allowedStatuses := map[string]bool{"active": true, "planned": true, "readiness_blocked": true, "deprecated": true}
+	if !allowedStatuses[req.Status] {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid module status")
+	}
+	productionReady := isProductionReadyTenantModule(req.Key)
+	if !productionReady && (req.Status == "active" || req.GlobalEnabled || req.IsCore) {
+		return response.Error(c, fiber.StatusConflict, "Module cannot be activated until its production readiness audit passes")
+	}
+	if productionReady && req.IsCore != isProductionCoreTenantModule(req.Key) {
+		return response.Error(c, fiber.StatusConflict, "Core status is controlled by the production module contract")
+	}
+	if req.Metadata == nil {
+		req.Metadata = map[string]interface{}{}
+	}
+	req.Metadata["production_ready"] = productionReady
+	req.Metadata["readiness_gate"] = "2026-07-21"
 	if req.Version == "" {
 		req.Version = "1.0.0"
 	}
@@ -300,82 +336,87 @@ func (h *Handler) UpsertEnterpriseModule(c *fiber.Ctx) error {
 }
 
 func (h *Handler) ToggleGlobalModule(c *fiber.Ctx) error {
-	key := c.Params("key")
+	key := strings.ToLower(strings.TrimSpace(c.Params("key")))
 	var req struct {
 		Enabled bool `json:"enabled"`
 	}
 	_ = c.BodyParser(&req)
-	_, err := h.db.Exec(c.UserContext(), "UPDATE modules_catalog SET global_enabled = $1, updated_at = NOW() WHERE key = $2", req.Enabled, key)
+	if req.Enabled && !isProductionReadyTenantModule(key) {
+		return response.Error(c, fiber.StatusConflict, "Module cannot be enabled until its production readiness audit passes")
+	}
+	result, err := h.db.Exec(c.UserContext(), `
+		UPDATE modules_catalog
+		SET global_enabled = $1, updated_at = NOW()
+		WHERE key = $2 AND ($1 = false OR status = 'active')`, req.Enabled, key)
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, "Error updating module")
+	}
+	if result.RowsAffected() == 0 {
+		return response.Error(c, fiber.StatusNotFound, "Production-active module not found")
 	}
 	h.auditSuperAdmin(c, "module.global_toggle", "modules_catalog", "", "warning", fiber.Map{"module_key": key, "enabled": req.Enabled}, "")
 	return response.Success(c, nil, "Module global state updated")
 }
 
 func (h *Handler) ToggleSchoolModuleV2(c *fiber.Ctx) error {
-	tenantID := c.Params("id")
-	key := c.Params("key")
+	tenantID := strings.TrimSpace(c.Params("id"))
+	key := strings.ToLower(strings.TrimSpace(c.Params("key")))
 	var req struct {
 		Enabled bool   `json:"enabled"`
 		Source  string `json:"source"`
 	}
-	_ = c.BodyParser(&req)
-	if req.Source == "" {
-		req.Source = "manual"
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, fiber.StatusBadRequest, "Invalid module toggle payload")
 	}
-	_, err := h.db.Exec(c.UserContext(),
-		`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, source, override_source)
-		 VALUES ($1, $2, $3, $3, $4, 'superadmin')
+	var catalogStatus string
+	var globallyEnabled, isCore bool
+	if err := h.db.QueryRow(c.UserContext(), "SELECT status, global_enabled, is_core FROM modules_catalog WHERE key = $1", key).Scan(&catalogStatus, &globallyEnabled, &isCore); err != nil {
+		return response.Error(c, fiber.StatusNotFound, "Module not found in catalog")
+	}
+	var tenantExists bool
+	if err := h.db.QueryRow(c.UserContext(), "SELECT EXISTS(SELECT 1 FROM tenants WHERE id::text = $1 AND deleted_at IS NULL)", tenantID).Scan(&tenantExists); err != nil || !tenantExists {
+		return response.Error(c, fiber.StatusNotFound, "School not found")
+	}
+	if req.Enabled {
+		if !isProductionReadyTenantModule(key) || !isTenantSelectableProductionModule(key) || catalogStatus != "active" || !globallyEnabled || isCore {
+			return response.Error(c, fiber.StatusConflict, "Module is not a selectable production module")
+		}
+		_, err := h.db.Exec(c.UserContext(),
+			`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, source, override_source)
+		 VALUES ($1, $2, true, true, 'manual', 'superadmin')
 		 ON CONFLICT (tenant_id, module_key)
 		 DO UPDATE SET is_active = EXCLUDED.is_active, enabled = EXCLUDED.enabled, source = EXCLUDED.source, override_source = 'superadmin', updated_at = NOW(), deleted_at = NULL`,
-		tenantID, key, req.Enabled, req.Source)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error updating tenant module")
+			tenantID, key)
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error updating tenant module")
+		}
+	} else {
+		var required bool
+		_ = h.db.QueryRow(c.UserContext(), "SELECT COALESCE(is_required, false) FROM tenant_modules WHERE tenant_id::text = $1 AND module_key = $2", tenantID, key).Scan(&required)
+		if isCore || required || !isTenantSelectableProductionModule(key) {
+			return response.Error(c, fiber.StatusForbidden, "Core and level-required modules cannot be disabled")
+		}
+		result, err := h.db.Exec(c.UserContext(), `
+			UPDATE tenant_modules SET is_active = false, enabled = false,
+			       override_source = 'superadmin', updated_at = NOW()
+			WHERE tenant_id::text = $1 AND module_key = $2`, tenantID, key)
+		if err != nil {
+			return response.Error(c, fiber.StatusInternalServerError, "Error updating tenant module")
+		}
+		if result.RowsAffected() == 0 {
+			return response.Error(c, fiber.StatusNotFound, "School module not found")
+		}
 	}
 	h.auditSuperAdmin(c, "module.tenant_toggle", "tenant_modules", "", "warning", fiber.Map{"tenant_id": tenantID, "module_key": key, "enabled": req.Enabled}, "")
 	return response.Success(c, nil, "Tenant module updated")
 }
 
 func (h *Handler) CloneSchoolConfig(c *fiber.Ctx) error {
-	sourceID := c.Params("id")
-	var req struct {
-		TargetTenantID string `json:"target_tenant_id"`
-	}
-	if err := c.BodyParser(&req); err != nil || req.TargetTenantID == "" {
-		return response.Error(c, fiber.StatusBadRequest, "target_tenant_id is required")
-	}
-	tx, err := h.db.Begin(c.UserContext())
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not start transaction")
-	}
-	defer tx.Rollback(c.UserContext())
-	_, err = tx.Exec(c.UserContext(),
-		`INSERT INTO tenant_modules (tenant_id, module_key, is_active, enabled, level, is_required, source, config)
-		 SELECT $1, module_key, is_active, enabled, level, is_required, source, config
-		 FROM tenant_modules WHERE tenant_id = $2 AND deleted_at IS NULL
-		 ON CONFLICT (tenant_id, module_key) DO UPDATE SET is_active=EXCLUDED.is_active, enabled=EXCLUDED.enabled, level=EXCLUDED.level,
-		 is_required=EXCLUDED.is_required, source=EXCLUDED.source, config=EXCLUDED.config, updated_at=NOW()`,
-		req.TargetTenantID, sourceID)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error cloning modules")
-	}
-	_, _ = tx.Exec(c.UserContext(), "UPDATE tenants SET settings = (SELECT settings FROM tenants WHERE id = $2), updated_at = NOW() WHERE id = $1", req.TargetTenantID, sourceID)
-	if err := tx.Commit(c.UserContext()); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error saving cloned config")
-	}
-	h.auditSuperAdmin(c, "tenant.clone_config", "tenants", req.TargetTenantID, "warning", fiber.Map{"source_tenant_id": sourceID}, "")
-	return response.Success(c, nil, "Configuration cloned")
+	return response.Error(c, fiber.StatusServiceUnavailable, "Configuration cloning is disabled until level and module-contract validation is implemented")
 }
 
 func (h *Handler) ResetSchoolData(c *fiber.Ctx) error {
-	id := c.Params("id")
-	req, ok := requireConfirmation(c, "RESET "+id)
-	if !ok {
-		return response.Error(c, fiber.StatusBadRequest, "Confirmation text must be RESET "+id)
-	}
-	h.auditSuperAdmin(c, "tenant.reset_requested", "tenants", id, "critical", fiber.Map{"mode": "job_registered_only"}, req.ConfirmationText)
-	return response.Success(c, fiber.Map{"status": "queued", "note": "Reset is registered for manual execution"}, "Reset request registered")
+	return response.Error(c, fiber.StatusServiceUnavailable, "School data reset is disabled until a recoverable backup and execution worker exist")
 }
 
 func (h *Handler) SoftDeleteSchool(c *fiber.Ctx) error {
@@ -390,153 +431,6 @@ func (h *Handler) SoftDeleteSchool(c *fiber.Ctx) error {
 	}
 	h.auditSuperAdmin(c, "tenant.soft_delete", "tenants", id, "critical", fiber.Map{}, req.ConfirmationText)
 	return response.Success(c, nil, "School soft deleted")
-}
-
-func (h *Handler) ListAllUsers(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
-	offset := (page - 1) * limit
-	search := c.Query("search")
-	role := c.Query("role")
-	tenantID := c.Query("tenant_id")
-	status := c.Query("status")
-	query := `SELECT u.id, COALESCE(u.tenant_id::text, ''), COALESCE(t.name, 'EduCore'), u.email, u.first_name, u.last_name, u.role, u.is_active, u.last_login_at, u.created_at
-		FROM users u LEFT JOIN tenants t ON t.id = u.tenant_id WHERE u.deleted_at IS NULL`
-	countQuery := `SELECT COUNT(*) FROM users u LEFT JOIN tenants t ON t.id = u.tenant_id WHERE u.deleted_at IS NULL`
-	args := []interface{}{}
-	idx := 1
-	add := func(clause string, value interface{}) {
-		query += fmt.Sprintf(clause, idx)
-		countQuery += fmt.Sprintf(clause, idx)
-		args = append(args, value)
-		idx++
-	}
-	if search != "" {
-		query += fmt.Sprintf(" AND (u.email ILIKE $%d OR u.first_name ILIKE $%d OR u.last_name ILIKE $%d)", idx, idx, idx)
-		countQuery += fmt.Sprintf(" AND (u.email ILIKE $%d OR u.first_name ILIKE $%d OR u.last_name ILIKE $%d)", idx, idx, idx)
-		args = append(args, "%"+search+"%")
-		idx++
-	}
-	if role != "" && role != "all" {
-		add(" AND u.role = $%d", role)
-	}
-	if tenantID != "" && tenantID != "all" {
-		add(" AND u.tenant_id = $%d", tenantID)
-	}
-	if status == "active" {
-		add(" AND u.is_active = $%d", true)
-	} else if status == "inactive" {
-		add(" AND u.is_active = $%d", false)
-	}
-	var total int
-	_ = h.db.QueryRow(c.UserContext(), countQuery, args...).Scan(&total)
-	query += fmt.Sprintf(" ORDER BY u.created_at DESC LIMIT $%d OFFSET $%d", idx, idx+1)
-	args = append(args, limit, offset)
-	rows, err := h.db.Query(c.UserContext(), query, args...)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error fetching users")
-	}
-	defer rows.Close()
-	users := []fiber.Map{}
-	for rows.Next() {
-		var id, tid, tenant, email, first, last, role string
-		var active bool
-		var lastLogin, created interface{}
-		_ = rows.Scan(&id, &tid, &tenant, &email, &first, &last, &role, &active, &lastLogin, &created)
-		users = append(users, fiber.Map{"id": id, "tenant_id": tid, "tenant_name": tenant, "email": email, "first_name": first, "last_name": last, "role": role, "is_active": active, "last_login_at": lastLogin, "created_at": created})
-	}
-	return response.SuccessWithMeta(c, fiber.Map{"users": users}, response.Meta{Page: page, PerPage: limit, Total: total})
-}
-
-func (h *Handler) CreateScopedUser(c *fiber.Ctx) error {
-	var req struct {
-		TenantID  string `json:"tenant_id"`
-		Email     string `json:"email"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Role      string `json:"role"`
-		Password  string `json:"password"`
-	}
-	if err := c.BodyParser(&req); err != nil || req.Email == "" || req.Role == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid user payload")
-	}
-	if req.Password == "" {
-		req.Password = "EduCore2026!"
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error hashing password")
-	}
-	var id string
-	err = h.db.QueryRow(c.UserContext(),
-		`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
-		 VALUES (NULLIF($1, '')::uuid, $2, $3, $4, $5, $6, true) RETURNING id`,
-		req.TenantID, req.Email, string(hash), req.FirstName, req.LastName, req.Role).Scan(&id)
-	if err != nil {
-		return response.Error(c, fiber.StatusConflict, "Could not create user")
-	}
-	h.auditSuperAdmin(c, "user.create", "users", id, "info", fiber.Map{"role": req.Role, "tenant_id": req.TenantID}, "")
-	return response.Success(c, fiber.Map{"id": id}, "User created")
-}
-
-func (h *Handler) UpdateScopedUser(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var req struct {
-		TenantID  string `json:"tenant_id"`
-		Email     string `json:"email"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Role      string `json:"role"`
-	}
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid user payload")
-	}
-	_, err := h.db.Exec(c.UserContext(),
-		`UPDATE users SET tenant_id = NULLIF($1, '')::uuid, email = $2, first_name = $3, last_name = $4, role = $5, updated_at = NOW() WHERE id = $6`,
-		req.TenantID, req.Email, req.FirstName, req.LastName, req.Role, id)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not update user")
-	}
-	h.auditSuperAdmin(c, "user.update", "users", id, "warning", fiber.Map{"role": req.Role, "tenant_id": req.TenantID}, "")
-	return response.Success(c, nil, "User updated")
-}
-
-func (h *Handler) ToggleScopedUserStatus(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var req struct {
-		IsActive bool `json:"is_active"`
-	}
-	_ = c.BodyParser(&req)
-	_, err := h.db.Exec(c.UserContext(), "UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2", req.IsActive, id)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not update user")
-	}
-	h.auditSuperAdmin(c, "user.status", "users", id, "warning", fiber.Map{"is_active": req.IsActive}, "")
-	return response.Success(c, nil, "User status updated")
-}
-
-func (h *Handler) ResetScopedUserPassword(c *fiber.Ctx) error {
-	id := c.Params("id")
-	tokenBytes := make([]byte, 12)
-	_, _ = rand.Read(tokenBytes)
-	temp := "Edu-" + hex.EncodeToString(tokenBytes)
-	hash, _ := bcrypt.GenerateFromPassword([]byte(temp), bcrypt.DefaultCost)
-	_, err := h.db.Exec(c.UserContext(), "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2", string(hash), id)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not reset password")
-	}
-	h.auditSuperAdmin(c, "user.reset_password", "users", id, "critical", fiber.Map{}, "")
-	return response.Success(c, fiber.Map{"temporary_password": temp}, "Password reset")
-}
-
-func (h *Handler) ForceLogoutUser(c *fiber.Ctx) error {
-	id := c.Params("id")
-	_, err := h.db.Exec(c.UserContext(), "UPDATE user_sessions SET is_active = false WHERE user_id = $1", id)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Could not force logout")
-	}
-	h.auditSuperAdmin(c, "user.force_logout", "users", id, "critical", fiber.Map{}, "")
-	return response.Success(c, nil, "User sessions closed")
 }
 
 func (h *Handler) StartImpersonation(c *fiber.Ctx) error {

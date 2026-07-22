@@ -3,7 +3,9 @@ package ownerseed
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -40,10 +42,15 @@ func SeedFromEnv(ctx context.Context, db *database.DB, appEnv string) error {
 	}
 
 	for _, email := range emails {
-		if err := upsertOwner(ctx, db, email, string(hash)); err != nil {
+		created, err := ensureOwnerCreateOnce(ctx, db, email, string(hash))
+		if err != nil {
 			return fmt.Errorf("seed owner %s: %w", email, err)
 		}
-		log.Printf("Owner SuperAdmin ready: %s", email)
+		if created {
+			log.Printf("Owner SuperAdmin created once: %s", email)
+		} else {
+			log.Printf("Owner SuperAdmin already exists and was left unchanged: %s", email)
+		}
 	}
 	return nil
 }
@@ -62,51 +69,67 @@ func minimumOwnerPasswordLength(appEnv string) int {
 	return 12
 }
 
-func upsertOwner(ctx context.Context, db *database.DB, email, hash string) error {
+func ensureOwnerCreateOnce(ctx context.Context, db *database.DB, email, hash string) (bool, error) {
+	if err := validateExistingOwner(ctx, db, email); err == nil {
+		return false, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+
 	firstName, lastName := ownerName(email)
 	id := uuidV4()
 
 	if database.IsMySQL(db.Driver()) {
-		_, err := db.Exec(ctx, `
-			INSERT INTO users (
+		result, err := db.Exec(ctx, `
+			INSERT IGNORE INTO users (
 				id, tenant_id, email, password_hash, first_name, last_name, role,
 				is_active, password_must_change, email_verified_at, global_tenant_key, created_at, updated_at
 			)
 			VALUES ($1, NULL, $2, $3, $4, $5, 'SUPER_ADMIN', TRUE, FALSE, NOW(), '__global__', NOW(), NOW())
-			ON DUPLICATE KEY UPDATE
-				password_hash = VALUES(password_hash),
-				first_name = VALUES(first_name),
-				last_name = VALUES(last_name),
-				role = 'SUPER_ADMIN',
-				is_active = TRUE,
-				password_must_change = FALSE,
-				global_tenant_key = '__global__',
-				email_verified_at = COALESCE(email_verified_at, NOW()),
-				deleted_at = NULL,
-				updated_at = NOW()
 		`, id, email, hash, firstName, lastName)
-		return err
+		if err != nil {
+			return false, err
+		}
+		if result.RowsAffected() == 0 {
+			return false, validateExistingOwner(ctx, db, email)
+		}
+		return true, nil
 	}
 
-	_, err := db.Exec(ctx, `
+	result, err := db.Exec(ctx, `
 		INSERT INTO users (
 			id, tenant_id, email, password_hash, first_name, last_name, role,
 			is_active, password_must_change, email_verified_at, created_at, updated_at, deleted_at
 		)
 		VALUES ($1, NULL, $2, $3, $4, $5, 'SUPER_ADMIN', TRUE, FALSE, NOW(), NOW(), NOW(), NULL)
 		ON CONFLICT (LOWER(email)) WHERE tenant_id IS NULL
-		DO UPDATE SET
-			password_hash = EXCLUDED.password_hash,
-			first_name = EXCLUDED.first_name,
-			last_name = EXCLUDED.last_name,
-			role = 'SUPER_ADMIN',
-			is_active = TRUE,
-			password_must_change = FALSE,
-			email_verified_at = COALESCE(users.email_verified_at, NOW()),
-			deleted_at = NULL,
-			updated_at = NOW()
+		DO NOTHING
 	`, id, email, hash, firstName, lastName)
-	return err
+	if err != nil {
+		return false, err
+	}
+	if result.RowsAffected() == 0 {
+		return false, validateExistingOwner(ctx, db, email)
+	}
+	return true, nil
+}
+
+func validateExistingOwner(ctx context.Context, db *database.DB, email string) error {
+	var tenantID, role string
+	var active, notDeleted bool
+	err := db.QueryRow(ctx, `
+		SELECT COALESCE(tenant_id::text, ''), role, is_active, deleted_at IS NULL
+		FROM users
+		WHERE LOWER(email) = LOWER($1)
+		LIMIT 1
+	`, email).Scan(&tenantID, &role, &active, &notDeleted)
+	if err != nil {
+		return err
+	}
+	if tenantID != "" || role != "SUPER_ADMIN" || !active || !notDeleted {
+		return fmt.Errorf("existing owner account is not an active global SUPER_ADMIN; repair it manually")
+	}
+	return nil
 }
 
 func ownerName(email string) (string, string) {

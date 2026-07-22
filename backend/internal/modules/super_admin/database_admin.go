@@ -51,18 +51,21 @@ type databaseColumnChange struct {
 }
 
 func (h *Handler) RegisterDatabaseAdminRoutes(router fiber.Router) {
-	router.Get("/database/tables", h.ListDatabaseTables)
-	router.Get("/database/tables/:table/schema", h.GetDatabaseTableSchema)
-	router.Get("/database/tables/:table/rows", h.ListDatabaseTableRows)
-	router.Post("/database/tables/:table/rows", h.InsertDatabaseTableRow)
-	router.Put("/database/tables/:table/rows/:id", h.UpdateDatabaseTableRow)
-	router.Delete("/database/tables/:table/rows/:id", h.SoftDeleteDatabaseTableRow)
-	router.Post("/database/tables", h.CreateDatabaseTable)
-	router.Put("/database/tables/:table/structure", h.UpdateDatabaseTableStructure)
-	router.Patch("/database/tables/:table/soft-delete", h.SoftDeleteDatabaseTable)
-	router.Get("/database/export/full", h.ExportDatabaseSnapshot)
-	router.Get("/database/export/tables/:tables", h.ExportDatabaseTables)
-	router.Post("/database/import/validate", h.ValidateDatabaseImport)
+	blocked := router.Group("", func(c *fiber.Ctx) error {
+		return response.Error(c, fiber.StatusServiceUnavailable, "Database Admin is disabled until its security and recovery audit passes")
+	})
+	blocked.Get("/database/tables", h.ListDatabaseTables)
+	blocked.Get("/database/tables/:table/schema", h.GetDatabaseTableSchema)
+	blocked.Get("/database/tables/:table/rows", h.ListDatabaseTableRows)
+	blocked.Post("/database/tables/:table/rows", h.InsertDatabaseTableRow)
+	blocked.Put("/database/tables/:table/rows/:id", h.UpdateDatabaseTableRow)
+	blocked.Delete("/database/tables/:table/rows/:id", h.SoftDeleteDatabaseTableRow)
+	blocked.Post("/database/tables", h.CreateDatabaseTable)
+	blocked.Put("/database/tables/:table/structure", h.UpdateDatabaseTableStructure)
+	blocked.Patch("/database/tables/:table/soft-delete", h.SoftDeleteDatabaseTable)
+	blocked.Get("/database/export/full", h.ExportDatabaseSnapshot)
+	blocked.Get("/database/export/tables/:tables", h.ExportDatabaseTables)
+	blocked.Post("/database/import/validate", h.ValidateDatabaseImport)
 }
 
 func (h *Handler) ListDatabaseTables(c *fiber.Ctx) error {

@@ -15,10 +15,10 @@ type StudentProfile struct {
 }
 
 type StudentDashboardResponse struct {
-	Student        StudentProfile    `json:"student"`
-	RecentGrades   []GradeSummary    `json:"recent_grades"`
+	Student           StudentProfile    `json:"student"`
+	RecentGrades      []GradeSummary    `json:"recent_grades"`
 	AttendanceSummary AttendanceSummary `json:"attendance_summary"`
-	RecentMessages []MessageSummary  `json:"recent_messages"`
+	RecentMessages    []MessageSummary  `json:"recent_messages"`
 }
 
 type GradeSummary struct {
@@ -30,11 +30,11 @@ type GradeSummary struct {
 }
 
 type AttendanceSummary struct {
-	TotalDays   int     `json:"total_days"`
-	Present     int     `json:"present"`
-	Absent      int     `json:"absent"`
-	Late        int     `json:"late"`
-	Rate        float64 `json:"rate"`
+	TotalDays int     `json:"total_days"`
+	Present   int     `json:"present"`
+	Absent    int     `json:"absent"`
+	Late      int     `json:"late"`
+	Rate      float64 `json:"rate"`
 }
 
 type MessageSummary struct {
