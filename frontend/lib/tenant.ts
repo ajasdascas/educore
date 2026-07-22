@@ -8,6 +8,7 @@
  * Used by: /escuela page, login page, school-admin layout, middleware
  */
 
+// Alineado con backend/internal/pkg/slug (Reserved) y htaccess-subdomain-root.
 const EXCLUDED_SUBDOMAINS = new Set([
   "www",
   "mail",
@@ -18,6 +19,21 @@ const EXCLUDED_SUBDOMAINS = new Set([
   "admin",
   "dev",
   "staging",
+  "dashboard",
+  "app",
+  "educore",
+  "onlineu",
+  "support",
+  "status",
+  "static",
+  "assets",
+  "cdn",
+  "cpanel",
+  "webdisk",
+  "portal",
+  "login",
+  "auth",
+  "public",
 ]);
 
 const ROOT_DOMAINS = ["onlineu.mx", "localhost"];

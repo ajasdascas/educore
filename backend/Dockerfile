@@ -1,5 +1,8 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+# NOTA: este Dockerfile (contexto = backend/) queda como alternativo.
+# El Dockerfile canónico para Railway es el de la raíz (railway.toml).
+# La versión de Go debe coincidir con go.mod (go 1.26.x).
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 

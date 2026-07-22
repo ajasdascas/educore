@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Eye, EyeOff, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { apiRequest, API_URL } from "@/lib/api";
+import { apiRequest, API_URL, ApiError, warmup } from "@/lib/api";
 import { getDashboardPath } from "@/lib/auth";
 import { getTenantFromHost } from "@/lib/tenant";
 
@@ -56,6 +56,11 @@ function LoginInner() {
     setSlug(resolved);
     setFromSubdomain(sub);
   }, [params]);
+
+  // "Despierta" el backend gratuito al abrir el login para evitar el cold start.
+  useEffect(() => {
+    warmup();
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -141,10 +146,24 @@ function LoginInner() {
           router.push(getDashboardPath(userRole));
         }
       } else {
-        setError(response.message || response.error || "Credenciales incorrectas.");
+        // Error de negocio devuelto por el backend (JSON success:false).
+        // El 401 del backend devuelve {error:"Invalid credentials"}.
+        const backendMsg = (response.message || response.error || "") as string;
+        const isBadCreds = /invalid credentials/i.test(backendMsg);
+        setError(
+          isBadCreds
+            ? "Correo o contraseña incorrectos."
+            : backendMsg || "No se pudo iniciar sesión. Inténtalo de nuevo."
+        );
       }
-    } catch {
-      setError("Error conectando con el servidor. Intenta de nuevo.");
+    } catch (err) {
+      // Fallo de infraestructura (red, timeout, CORS, servicio caído,
+      // respuesta no-JSON). ApiError trae un mensaje amigable y diferenciado.
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Error conectando con el servidor. Intenta de nuevo.");
+      }
     } finally {
       setLoading(false);
     }

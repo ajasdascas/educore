@@ -1,5 +1,20 @@
 # Contexto Actual — EduCore SaaS
-**Fecha:** 05-05-2026
+**Fecha:** 21-07-2026 (actualizado)
+
+## 🟢 Recuperación de producción (21-07-2026)
+- **Dominio canónico definitivo:** `https://onlineu.mx/educore/` (NO migrar a `educore.onlineu.mx`).
+- **Arquitectura de producción actual:**
+  - Frontend: estático en Hostinger `/domains/onlineu.mx/public_html/educore/` (deploy vía GitHub Actions).
+  - Backend: **Render** `https://educore-api-1va5.onrender.com` (Docker, Free).
+  - DB: **PostgreSQL en Neon** (us-east-2, Free). Railway (trial expirado) y MySQL Hostinger: NO activos.
+- **Login: restaurado a nivel backend** (health 200, CORS ok, 401 controlado, admin sembrado).
+- Rama `recovery/production-login` (sobre `origin/master`) con todos los fixes; PR pendiente de merge.
+- **Siguiente:** merge del PR → deploy automático del frontend a Hostinger.
+- Ver `docs/LOGIN_INCIDENT_REPORT.md`, `docs/HOSTINGER_DEPLOYMENT.md`, `docs/PRODUCTION_RUNBOOK.md`.
+
+---
+
+**Fecha (bloque anterior):** 05-05-2026
 
 ## 🚀 Estado del Proyecto
 Estamos en la **Fase 2: Manager Maestro (Super Admin)**. Se ha establecido la base para la gestión comercial del SaaS.

@@ -35,7 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOMAIN: onlineu.mx
-      NEXT_PUBLIC_API_URL: https://educore-production-beef.up.railway.app
+      # URL del backend desde secret (la de Railway anterior ya no existe).
+      NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
 
     steps:
       - name: Checkout code
