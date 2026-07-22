@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Eye, EyeOff, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { apiRequest, API_URL, ApiError } from "@/lib/api";
+import { apiRequest, API_URL, ApiError, warmup } from "@/lib/api";
 import { getDashboardPath } from "@/lib/auth";
 import { getTenantFromHost } from "@/lib/tenant";
 
@@ -56,6 +56,11 @@ function LoginInner() {
     setSlug(resolved);
     setFromSubdomain(sub);
   }, [params]);
+
+  // "Despierta" el backend gratuito al abrir el login para evitar el cold start.
+  useEffect(() => {
+    warmup();
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

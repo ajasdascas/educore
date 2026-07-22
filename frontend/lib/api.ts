@@ -97,7 +97,19 @@ export class ApiError extends Error {
   }
 }
 
-const DEFAULT_TIMEOUT_MS = 15000;
+// 30s tolera el cold start del backend en hosting gratuito (Render free duerme
+// tras inactividad y el primer request puede tardar ~50s). El warmup del login
+// suele evitar la espera, pero dejamos margen para el primer golpe en frío.
+const DEFAULT_TIMEOUT_MS = 30000;
+
+/**
+ * warmup — "despierta" el backend (fire-and-forget). Útil al montar la pantalla
+ * de login para que la instancia gratuita ya esté activa cuando el usuario envíe.
+ */
+export const warmup = () => {
+  if (API_MISCONFIGURED) return;
+  fetch(`${API_URL}/api/v1/health`, { method: "GET", cache: "no-store" }).catch(() => {});
+};
 
 /**
  * apiRequest — llamada al backend con manejo de errores diferenciado.
