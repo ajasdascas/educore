@@ -289,4 +289,3 @@ automático del frontend a `/domains/onlineu.mx/public_html/educore/` vía GitHu
 > La cookie `refresh_token` es cross-site (frontend `onlineu.mx` ↔ backend `onrender.com`)
 > con `SameSite=Lax` → no viaja. El login funciona (access_token en el body); el refresh
 > por cookie queda como mejora posterior (pasar a `SameSite=None; Secure` o Bearer).
-

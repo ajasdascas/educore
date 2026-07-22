@@ -122,22 +122,50 @@ jobs:
           set net:timeout 30
           set net:max-retries 2
           set net:reconnect-interval-base 5
-
-          open_explicit_ftps() { set ftp:ssl-force true;  set ftp:ssl-protect-data true;  open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"; }
-          open_plain_ftp()     { set ftp:ssl-force false; set ftp:ssl-protect-data false; open -u "${FTP_USER},${FTP_PASS}" "ftp://${FTP_HOST}:21"; }
-          open_implicit_ftps() { set ftp:ssl-force true;  set ftp:ssl-protect-data true;  open -u "${FTP_USER},${FTP_PASS}" "ftps://${FTP_HOST}:990"; }
-          open_sftp()          { open -u "${FTP_USER},${FTP_PASS}" "sftp://${FTP_HOST}:22"; }
-
-          try_deploy() {
-            cd "${FTP_TARGET_DIR}"
-            mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .
-          }
           EOF
+
+          run_deploy() {
+            mode="$1"
+            case "${mode}" in
+              explicit_ftps)
+                url="ftp://${FTP_HOST}:21"
+                ssl_force=true
+                ssl_protect=true
+                ;;
+              plain_ftp)
+                url="ftp://${FTP_HOST}:21"
+                ssl_force=false
+                ssl_protect=false
+                ;;
+              implicit_ftps)
+                url="ftps://${FTP_HOST}:990"
+                ssl_force=true
+                ssl_protect=true
+                ;;
+              sftp)
+                url="sftp://${FTP_HOST}:22"
+                ssl_force=false
+                ssl_protect=false
+                ;;
+            esac
+
+            # lftp toma la contraseña desde el entorno; nunca se incluye en
+            # el archivo de comandos ni en los argumentos del proceso.
+            LFTP_PASSWORD="${FTP_PASS}" timeout 240s lftp --norc -e "
+              source ftp-deploy.lftp;
+              set ftp:ssl-force ${ssl_force};
+              set ftp:ssl-protect-data ${ssl_protect};
+              open --user \"${FTP_USER}\" --env-password \"${url}\";
+              cd \"${FTP_TARGET_DIR}\";
+              mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .;
+              bye
+            "
+          }
 
           for mode in explicit_ftps plain_ftp implicit_ftps sftp; do
             for attempt in 1 2; do
               echo "Deploy mode=${mode} attempt=${attempt}/2"
-              if timeout 240s lftp -e "source ftp-deploy.lftp; open_${mode}; try_deploy; bye"; then
+              if run_deploy "${mode}"; then
                 echo "Deploy OK (mode=${mode})"
                 exit 0
               fi
