@@ -158,6 +158,7 @@ jobs:
               set ftp:ssl-force ${ssl_force};
               set ftp:ssl-protect-data ${ssl_protect};
               open --user ${FTP_USER} --env-password ${url};
+              mkdir -p ${FTP_TARGET_DIR};
               cd ${FTP_TARGET_DIR};
               mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .;
               bye
