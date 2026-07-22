@@ -1,5 +1,5 @@
 -- EduCore MVP — Schema Update for educore_dev
--- Run this AFTER the initial 001_up.sql migration
+-- Run this AFTER the canonical 001_initial.sql migration.
 
 -- Add missing tables and columns
 
