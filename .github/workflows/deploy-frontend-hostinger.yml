@@ -115,6 +115,20 @@ jobs:
             exit 1
           fi
 
+          # hPanel puede mostrar el servidor como host, IP o URL con puerto.
+          # Normalizamos el formato sin imprimir nunca el valor del secret.
+          ftp_endpoint="$(printf '%s' "${FTP_HOST}" | tr -d '\r\n' | sed -E \
+            's/^[[:space:]]+//; s/[[:space:]]+$//; s#^(ftp|ftps|sftp)://##; s#/.*$##')"
+          if [[ "${ftp_endpoint}" =~ ^(.+):[0-9]+$ ]]; then
+            ftp_endpoint="${BASH_REMATCH[1]}"
+          fi
+          case "${ftp_endpoint}" in
+            ""|*[!A-Za-z0-9._-]*)
+              echo "::error::HOSTINGER_FTP_SERVER debe contener solo un host o IP (sin usuario ni ruta)."
+              exit 1
+              ;;
+          esac
+
           cat <<'EOF' > ftp-deploy.lftp
           set cmd:fail-exit yes
           set ftp:passive-mode yes
@@ -128,7 +142,15 @@ jobs:
 
           run_deploy() {
             mode="$1"
-            target_dir="${FTP_TARGET_DIR%/}"
+            case "${FTP_TARGET_DIR%/}" in
+              educore|/educore|/public_html/educore|/domains/onlineu.mx/public_html/educore)
+                target_dir="/educore"
+                ;;
+              *)
+                echo "::error::HOSTINGER_FTP_TARGET_DIR debe apuntar exclusivamente a /educore/."
+                return 1
+                ;;
+            esac
             target_parent="${target_dir%/*}"
             target_leaf="${target_dir##*/}"
             if [ -z "${target_leaf}" ]; then
@@ -139,22 +161,22 @@ jobs:
 
             case "${mode}" in
               explicit_ftps)
-                url="ftp://${FTP_HOST}:21"
+                url="ftp://${ftp_endpoint}:21"
                 ssl_force=true
                 ssl_protect=true
                 ;;
               plain_ftp)
-                url="ftp://${FTP_HOST}:21"
+                url="ftp://${ftp_endpoint}:21"
                 ssl_force=false
                 ssl_protect=false
                 ;;
               implicit_ftps)
-                url="ftps://${FTP_HOST}:990"
+                url="ftps://${ftp_endpoint}:990"
                 ssl_force=true
                 ssl_protect=true
                 ;;
               sftp)
-                url="sftp://${FTP_HOST}:22"
+                url="sftp://${ftp_endpoint}:22"
                 ssl_force=false
                 ssl_protect=false
                 ;;
