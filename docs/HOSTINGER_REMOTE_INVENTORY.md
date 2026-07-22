@@ -12,16 +12,16 @@
 | Dato | Valor |
 |---|---|
 | **Ruta en File Manager** | `/domains/onlineu.mx/public_html/educore/` ✅ confirmada |
-| **Ruta visible por la cuenta FTP** | `/public_html/educore/` ✅ confirmada |
+| **Ruta visible por la cuenta FTP** | `/educore/` ✅ confirmada; la raíz de esta cuenta ya es `public_html/` |
 | Estado inicial de la carpeta | Vacía (el dueño eliminó el contenido al desactivar el proyecto) |
 | Dominio servido | `https://onlineu.mx/educore/` |
 | Acceso | Cuenta general de **Business Web Hosting** (NO el File Manager del sitio `educore.onlineu.mx`) |
 
 La ruta visible por FTP **coincide** con el default del workflow
 `deploy-frontend-hostinger.yml` (`HOSTINGER_FTP_TARGET_DIR` por defecto
-`/public_html/educore/`), por lo que no es obligatorio definir ese secret.
-La ruta con `/domains/onlineu.mx/` corresponde al File Manager y no debe
-usarse como `cd` con esta cuenta FTP aislada.
+`/educore/`), por lo que no es obligatorio definir ese secret.
+Las rutas con `/public_html/` o `/domains/onlineu.mx/` corresponden a vistas
+externas del hosting y no deben usarse como `cd` con esta cuenta FTP aislada.
 
 Como la carpeta estaba **vacía**, el primer despliegue simplemente crea/rellena
 su contenido. No se requiere backup previo (no había archivos). El workflow

@@ -20,7 +20,7 @@
 //   FTP_HOST              host FTP de Hostinger (p. ej. ftp.onlineu.mx)
 //   FTP_USER              usuario FTP
 //   FTP_PASSWORD          contraseña FTP
-//   FTP_TARGET_DIR        opcional; default /public_html/educore (raíz visible por FTP)
+//   FTP_TARGET_DIR        opcional; default /educore (la raíz FTP ya es public_html)
 // ============================================================
 const ftp = require("basic-ftp");
 const path = require("path");
@@ -32,7 +32,7 @@ const FTP_HOST = process.env.FTP_HOST || "ftp.onlineu.mx";
 const FTP_USER = process.env.FTP_USER;
 const FTP_PASSWORD = process.env.FTP_PASSWORD;
 const FTP_TARGET_DIR =
-    process.env.FTP_TARGET_DIR || "/public_html/educore";
+    process.env.FTP_TARGET_DIR || "/educore";
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").trim();
 
 async function uploadDir(client, localDir, remoteDir) {
