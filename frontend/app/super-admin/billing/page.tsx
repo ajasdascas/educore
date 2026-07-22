@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, CreditCard, Download, FileSpreadsheet, Loader2, RefreshCw, Send } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 type Subscription = {
   id: string;
@@ -80,7 +81,7 @@ export default function BillingPage() {
     return { pending, paid, mrr };
   }, [subscriptions, invoices]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [subsRes, invoicesRes, reportsRes] = await Promise.all([
@@ -93,16 +94,16 @@ export default function BillingPage() {
       setSubscriptions(subsRes.data?.subscriptions || []);
       setInvoices(invoicesRes.data?.invoices || []);
       setReports(reportsRes.success ? reportsRes.data?.reports || [] : []);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo cargar cobranza", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo cargar cobranza"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const runAction = async (key: string, endpoint: string, body: Record<string, unknown> = {}) => {
     setActionLoading(key);
@@ -111,8 +112,8 @@ export default function BillingPage() {
       if (!res.success) throw new Error(res.message || res.error || "No se pudo completar la accion");
       toast({ title: "Listo", description: res.message || "Accion completada." });
       await load();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo completar la accion", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo completar la accion"), variant: "destructive" });
     } finally {
       setActionLoading(null);
     }

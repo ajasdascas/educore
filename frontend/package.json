@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/prepare-static-hosting.cjs",
     "start": "next start",
-    "lint": "next lint"
+    "typecheck": "tsc --noEmit --incremental false",
+    "lint": "next lint",
+    "test:global-users": "node --test app/super-admin/users/password-policy.test.ts",
+    "check:production-readiness": "node ../scripts/check-production-module-readiness.js && node ../scripts/check-school-provisioning.js && node ../scripts/check-auth-routing.js && node ../scripts/check-school-portals.js && node ../scripts/check-school-routing.js && node ../scripts/check-support-role-portals.js && node ../scripts/check-school-grading-scale-backfill.test.js && node ../scripts/provision-school-domain.test.js"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

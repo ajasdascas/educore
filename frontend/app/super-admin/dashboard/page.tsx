@@ -11,8 +11,16 @@ interface StatsData {
   trial_tenants: number;
   total_students: number;
   mrr_mxn: number;
-  recent_schools: any[];
-  alerts: any[];
+  recent_schools: Array<{
+    id: string;
+    status: string;
+    name: string;
+    plan: string;
+    created_at: string;
+  }>;
+  alerts: Array<{
+    message: string;
+  }>;
 }
 
 export default function SuperAdminDashboard() {
@@ -29,7 +37,7 @@ export default function SuperAdminDashboard() {
         } else {
           setError(response.message || "Error al cargar estadísticas");
         }
-      } catch (err) {
+      } catch {
         setError("Error de conexión");
       } finally {
         setLoading(false);

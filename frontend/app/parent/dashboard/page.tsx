@@ -22,8 +22,37 @@ type ChildSummary = {
   next_class?: string;
 };
 
+interface ParentDashboardData {
+  children?: ChildSummary[];
+  quick_stats?: {
+    total_children?: number;
+    overall_attendance?: number;
+    overall_gpa?: number;
+    pending_assignments?: number;
+  };
+  recent_activity?: Array<{
+    id: string;
+    action_url?: string;
+    title: string;
+    child_name?: string;
+    description: string;
+  }>;
+  upcoming_events?: Array<{
+    id: string;
+    title: string;
+    date: string;
+    time?: string;
+    child_name?: string;
+  }>;
+  recent_notifications?: Array<{
+    id: string;
+    title: string;
+    is_read: boolean;
+  }>;
+}
+
 export default function ParentDashboard() {
-  const [dashboard, setDashboard] = useState<any>(null);
+  const [dashboard, setDashboard] = useState<ParentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -111,7 +140,7 @@ export default function ParentDashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             {activity.length === 0 && <p className="text-sm text-muted-foreground">Sin actividad reciente.</p>}
-            {activity.map((item: any) => (
+            {activity.map((item) => (
               <Link key={item.id} href={item.action_url || "/parent/dashboard"} className="flex items-start gap-3 rounded-md border p-3 hover:bg-muted/50">
                 <BookOpen className="mt-0.5 h-4 w-4 text-primary" />
                 <div className="min-w-0">
@@ -135,7 +164,7 @@ export default function ParentDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {events.length === 0 && <p className="text-sm text-muted-foreground">No hay eventos proximos.</p>}
-            {events.map((event: any) => (
+            {events.map((event) => (
               <div key={event.id} className="rounded-md border p-3">
                 <p className="text-sm font-medium">{event.title}</p>
                 <p className="text-xs text-muted-foreground">{event.date} {event.time}</p>
@@ -169,7 +198,7 @@ export default function ParentDashboard() {
         </CardHeader>
         <CardContent className="space-y-3">
           {notifications.length === 0 && <p className="text-sm text-muted-foreground">No hay notificaciones pendientes.</p>}
-          {notifications.map((notification: any) => (
+          {notifications.map((notification) => (
             <Link key={notification.id} href="/parent/notifications" className="flex items-start gap-3 rounded-md border p-3 hover:bg-muted/50">
               <AlertCircle className="mt-0.5 h-4 w-4 text-amber-600" />
               <div>

@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 /**
  * check-school-portals.js
- * QA: Verifica portales internos, subdominio experimental y código fuente.
+ * QA: Verifica portales internos, subdominio administrado y código fuente.
  *
  * Uso:
  *   node scripts/check-school-portals.js
- *   TEST_SLUG=kinder1 node scripts/check-school-portals.js
+ *   TEST_SLUG=kinder1 node scripts/check-school-portals.js --live
  */
 
 const fs = require("fs");
 const path = require("path");
 
 const FRONTEND_BASE = (process.env.FRONTEND_BASE_URL || "https://onlineu.mx/educore").replace(/\/$/, "");
-const API_BASE = process.env.API_BASE_URL || "https://api.onlineu.mx";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.API_BASE_URL || "").replace(/\/$/, "");
 const TEST_SLUG = process.env.TEST_SLUG || "";
+const LIVE = process.argv.includes("--live");
 const ROOT = path.resolve(__dirname, "..");
 const FRONTEND = path.join(ROOT, "frontend");
 
@@ -39,7 +40,7 @@ async function checkRoute(label, url) {
     if (err.name === "TimeoutError") {
       fail(`${label} → TIMEOUT (${url})`);
     } else if (err.message?.includes("NXDOMAIN") || err.message?.includes("ENOTFOUND")) {
-      info(`${label} → DNS no configurado (esperado para subdominio) ${url}`);
+      fail(`${label} → DNS no configurado ${url}`);
     } else {
       fail(`${label} → NETWORK ERROR: ${err.message}`);
     }
@@ -61,25 +62,25 @@ function checkStatic() {
     fail("Portales internos NO usan rutas Next internas /login?slug=");
   }
 
-  // Sección subdominio renombrada
-  if (/Subdominio experimental/.test(detail)) {
-    ok('"Subdominio experimental" presente (renombrado correctamente)');
+  // Sección de subdominio administrado
+  if (/Subdominio de la escuela/.test(detail)) {
+    ok('"Subdominio de la escuela" presente');
   } else {
-    fail('"Subdominio experimental" NO encontrado — sección no renombrada');
+    fail('"Subdominio de la escuela" NO encontrado');
   }
 
-  // Botones experimentales dicen "Probar"
-  if (/Probar subdominio/.test(detail)) {
-    ok('Botones experimentales dicen "Probar subdominio"');
+  if (/Reintentar configuración/.test(detail) && /domain_ready/.test(detail)) {
+    ok("Estado y reintento de Hostinger presentes");
   } else {
-    fail('Botones experimentales NO dicen "Probar subdominio"');
+    fail("Falta estado o reintento de Hostinger");
   }
 
-  // Alerta de Hostinger/basePath presente
-  if (/basePath/.test(detail) && /Hostinger/.test(detail)) {
-    ok("Alerta Hostinger/basePath presente en subdominio experimental");
+  const htaccessFile = path.join(FRONTEND, "htaccess-subdomain-app-root");
+  const packageFile = path.join(FRONTEND, "package.json");
+  if (fs.existsSync(htaccessFile) && /prepare-static-hosting/.test(fs.readFileSync(packageFile, "utf8"))) {
+    ok("Router basePath se incluye en el build estático");
   } else {
-    fail("Alerta Hostinger/basePath FALTA en subdominio experimental");
+    fail("Router basePath no está conectado al build estático");
   }
 
   // Endpoint resolve en backend
@@ -97,10 +98,10 @@ function checkStatic() {
   const escuelaFile = path.join(FRONTEND, "app/escuela/page.tsx");
   if (fs.existsSync(escuelaFile)) {
     const esc = fs.readFileSync(escuelaFile, "utf8");
-    if (/onlineu\.mx\/educore\/escuela\/\?slug=/.test(esc)) {
-      ok("Portal selector muestra URL interna /escuela/?slug= (no subdominio)");
+    if (/getActiveTenantSlug/.test(esc) && /public\/schools\/resolve/.test(esc)) {
+      ok("Portal selector resuelve y valida el tenant activo");
     } else {
-      fail("Portal selector NO muestra URL interna como identificador visible");
+      fail("Portal selector NO valida el tenant activo");
     }
   }
 
@@ -138,14 +139,17 @@ async function checkNetwork() {
     await checkRoute(`Login Padre slug=${TEST_SLUG}`,     `${FRONTEND_BASE}/login?slug=${TEST_SLUG}&role=parent`);
     await checkRoute(`Login Alumno slug=${TEST_SLUG}`,    `${FRONTEND_BASE}/login?slug=${TEST_SLUG}&role=student`);
 
-    section(`Endpoint resolve slug=${TEST_SLUG}`);
-    await checkRoute(`GET /public/schools/resolve?slug=${TEST_SLUG}`,
-      `${API_BASE}/api/v1/public/schools/resolve?slug=${TEST_SLUG}`);
+    if (API_BASE) {
+      section(`Endpoint resolve slug=${TEST_SLUG}`);
+      await checkRoute(`GET /public/schools/resolve?slug=${TEST_SLUG}`,
+        `${API_BASE}/api/v1/public/schools/resolve?slug=${TEST_SLUG}`);
+    } else {
+      fail("Define NEXT_PUBLIC_API_URL para comprobar el endpoint resolve");
+    }
 
-    section(`Subdominio experimental (informativo, puede fallar en Hostinger)`);
-    info(`Probando ${TEST_SLUG}.onlineu.mx — se espera pantalla en blanco o error DNS en Hostinger shared`);
+    section("Subdominio escolar");
     await checkRoute(`Subdominio ${TEST_SLUG}.onlineu.mx`,
-      `https://${TEST_SLUG}.onlineu.mx`);
+      `https://${TEST_SLUG}.onlineu.mx/educore/escuela/`);
   } else {
     info("Define TEST_SLUG para verificar portales de una escuela. Ej: TEST_SLUG=kinder1 node scripts/check-school-portals.js");
   }
@@ -154,7 +158,11 @@ async function checkNetwork() {
 async function main() {
   console.log(`\n🔍 EduCore — School Portals QA Check\n`);
   checkStatic();
-  await checkNetwork();
+  if (LIVE) {
+    await checkNetwork();
+  } else {
+    info("Pruebas de red omitidas; usa --live para verificar producciÃ³n de forma explÃ­cita.");
+  }
 
   console.log(`\n── Resultado: ${passed} passed / ${failed} failed ──\n`);
   if (failed > 0) process.exit(1);

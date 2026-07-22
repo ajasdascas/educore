@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, CalendarClock, Copy, Eye, Loader2, Mail, MessageSquare, Plus, RefreshCw, Search, Send, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray, responseRecord } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type CommunicationStatus = "sent" | "scheduled" | "draft";
@@ -96,18 +97,16 @@ const priorityOptions = [
   { value: "urgent", label: "Urgente" },
 ];
 
-function normalizeCommunications(response: any): SchoolCommunication[] {
-  const raw = response?.data?.communications || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeCommunications(response: unknown): SchoolCommunication[] {
+  return responseArray<SchoolCommunication>(response, "communications");
 }
 
-function normalizeGroups(response: any): SchoolGroup[] {
-  const raw = response?.data?.groups || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeGroups(response: unknown): SchoolGroup[] {
+  return responseArray<SchoolGroup>(response, "groups");
 }
 
-function normalizeStats(response: any): CommunicationStats {
-  const data = response?.data || {};
+function normalizeStats(response: unknown): CommunicationStats {
+  const data = responseRecord(response);
   return {
     total_messages: Number(data.total_messages || 0),
     sent_messages: Number(data.sent_messages || 0),
@@ -201,7 +200,7 @@ function SchoolAdminCommunicationsContent() {
   const [selectedCommunication, setSelectedCommunication] = useState<SchoolCommunication | null>(null);
   const [form, setForm] = useState<CommunicationForm>(emptyForm);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [communicationsResponse, statsResponse, groupsResponse] = await Promise.all([
@@ -221,11 +220,11 @@ function SchoolAdminCommunicationsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const filteredCommunications = useMemo(() => {
     const term = search.trim().toLowerCase();

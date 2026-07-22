@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
 import {
   Users,
   GraduationCap,
   Calendar,
   TrendingUp,
-  AlertCircle,
   CheckCircle2,
   Clock,
   MessageCircle
@@ -23,8 +21,14 @@ interface PlanLimits {
   current_teachers: number;
 }
 
+interface DashboardActivity {
+  id?: number;
+  type?: string;
+  description?: string;
+  title?: string;
+}
+
 export default function SchoolAdminDashboard() {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{
     totalStudents: number;
@@ -58,7 +62,7 @@ export default function SchoolAdminDashboard() {
 
         if (Array.isArray(data?.recent_activity)) {
           setRecentActivity(
-            data.recent_activity.slice(0, 4).map((item: any, index: number) => ({
+            data.recent_activity.slice(0, 4).map((item: DashboardActivity, index: number) => ({
               id: item.id || index + 1,
               type: item.type || "student",
               message: item.description || item.title || "Actividad escolar registrada",
@@ -78,13 +82,6 @@ export default function SchoolAdminDashboard() {
       mounted = false;
     };
   }, []);
-
-  const showQueuedModule = (moduleName: string) => {
-    toast({
-      title: `${moduleName} esta en la siguiente fase`,
-      description: "Profesores se terminara primero para mantener cada modulo estable.",
-    });
-  };
 
   return (
     <div className="space-y-6">

@@ -11,12 +11,11 @@ type DashboardResponse struct {
 }
 
 type DashboardStats struct {
-	TotalGroups       int     `json:"total_groups"`
-	TotalStudents     int     `json:"total_students"`
-	TodayClasses      int     `json:"today_classes"`
-	PendingAttendance int     `json:"pending_attendance"`
-	PendingGrades     int     `json:"pending_grades"`
-	AverageGrade      float64 `json:"average_grade"`
+	TotalGroups       int      `json:"total_groups"`
+	TotalStudents     int      `json:"total_students"`
+	TodayClasses      int      `json:"today_classes"`
+	PendingAttendance int      `json:"pending_attendance"`
+	AverageGrade      *float64 `json:"average_grade"`
 }
 
 type TeacherClass struct {
@@ -97,19 +96,20 @@ type GradesResponse struct {
 }
 
 type GradeStudent struct {
-	StudentID    string  `json:"student_id"`
-	StudentName  string  `json:"student_name"`
-	EnrollmentID string  `json:"enrollment_id"`
-	Score        float64 `json:"score"`
-	Status       string  `json:"status"`
-	Notes        string  `json:"notes"`
+	StudentID    string   `json:"student_id"`
+	StudentName  string   `json:"student_name"`
+	EnrollmentID string   `json:"enrollment_id"`
+	Score        *float64 `json:"score"`
+	Status       string   `json:"status"`
+	Notes        string   `json:"notes"`
 }
 
 type GradesSummary struct {
-	Total   int     `json:"total"`
-	Average float64 `json:"average"`
-	Passing int     `json:"passing"`
-	AtRisk  int     `json:"at_risk"`
+	Total            int      `json:"total"`
+	Average          float64  `json:"average"`
+	Passing          int      `json:"passing"`
+	AtRisk           int      `json:"at_risk"`
+	PassingThreshold *float64 `json:"passing_threshold"`
 }
 
 type GradeRecordRequest struct {

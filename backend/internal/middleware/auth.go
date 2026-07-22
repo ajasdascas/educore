@@ -17,23 +17,25 @@ func Protected(secret string) fiber.Handler {
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		claims, err := jwt.ValidateToken(tokenString, secret)
+		claims, err := jwt.ValidateToken(tokenString, secret, jwt.TokenTypeAccess)
 		if err != nil {
 			return response.Error(c, fiber.StatusUnauthorized, "Invalid or expired token")
 		}
 
 		// Store user data as map for compatibility with new RBAC system
 		user := map[string]interface{}{
-			"user_id":   claims.UserID,
-			"role":      claims.Role,
-			"email":     claims.Email,
-			"tenant_id": claims.TenantID,
+			"user_id":      claims.UserID,
+			"role":         claims.Role,
+			"email":        claims.Email,
+			"tenant_id":    claims.TenantID,
+			"auth_version": claims.AuthVersion,
 		}
 
 		c.Locals("user", user)
 		c.Locals("user_id", claims.UserID)
 		c.Locals("user_role", claims.Role)
 		c.Locals("user_email", claims.Email)
+		c.Locals("auth_version", claims.AuthVersion)
 
 		if claims.TenantID != "" {
 			// Override tenant with JWT tenant for security
@@ -60,11 +62,17 @@ func RequireRoles(roles ...string) fiber.Handler {
 			return response.Error(c, fiber.StatusForbidden, "Role not found in context")
 		}
 
-		// SUPER_ADMIN in support mode (X-Support-Tenant-ID present) passes any role gate.
-		// They are previewing portals as read-only soporte — not performing mutations as the role.
+		// A SUPER_ADMIN may preview tenant routes in support mode, but the support
+		// context is always read-only. Including SUPER_ADMIN in a route's normal
+		// role list must never turn support mode into a mutation bypass.
 		if userRole == "SUPER_ADMIN" {
 			if _, isSupport := c.Locals("support_mode").(bool); isSupport {
-				return c.Next()
+				switch c.Method() {
+				case fiber.MethodGet, fiber.MethodHead, fiber.MethodOptions:
+					return c.Next()
+				default:
+					return response.Error(c, fiber.StatusForbidden, "Support mode is read-only")
+				}
 			}
 		}
 

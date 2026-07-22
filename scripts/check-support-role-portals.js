@@ -8,7 +8,7 @@
  * - SupportModeBanner: muestra el rol de soporte
  * - super-admin/schools/details/page.tsx: botones "Ver como..." + enterSupportRoleMode
  * - teacher/parent/student layout.tsx: hidratación de URL params + gate SUPER_ADMIN + SupportModeBanner
- * - middleware/auth.go: SUPER_ADMIN en support_mode pasa RequireRoles
+ * - middleware/auth.go: SUPER_ADMIN en support_mode solo puede leer
  *
  * Uso:
  *   node scripts/check-support-role-portals.js
@@ -84,9 +84,8 @@ section("super-admin/schools/details/page.tsx — portales de rol");
     src.includes("/teacher/dashboard")           ? ok("Ruta /teacher/dashboard en enterSupportRoleMode") : fail("Falta ruta /teacher/dashboard");
     src.includes("/parent/dashboard")            ? ok("Ruta /parent/dashboard en enterSupportRoleMode")  : fail("Falta ruta /parent/dashboard");
     src.includes("/student/dashboard")           ? ok("Ruta /student/dashboard en enterSupportRoleMode") : fail("Falta ruta /student/dashboard");
-    // Subdominio experimental sigue siendo experimental
-    src.includes("Subdominio experimental")      ? ok("Subdominio experimental sigue siendo sección separada") : fail("Falta sección subdominio experimental");
-    src.includes("Probar subdominio")            ? ok("Botón 'Probar subdominio' presente")           : fail("Falta 'Probar subdominio'");
+    src.includes("Subdominio de la escuela")     ? ok("Subdominio escolar en sección separada")       : fail("Falta sección de subdominio escolar");
+    src.includes("Reintentar configuración")     ? ok("Reintento de provisión presente")              : fail("Falta reintento de provisión");
   }
 }
 
@@ -112,20 +111,20 @@ section("Layouts teacher / parent / student — soporte");
   }
 }
 
-// ─── Backend middleware — SUPER_ADMIN en support_mode ────────────────────────
-section("Backend middleware/auth.go — SUPER_ADMIN pasa RequireRoles en support_mode");
+// ─── Backend middleware — support_mode de solo lectura ───────────────────────
+section("Backend middleware/auth.go — support_mode estrictamente de solo lectura");
 {
   const src = read("backend/internal/middleware/auth.go");
   if (!src) { fail("middleware/auth.go no encontrado"); }
   else {
     src.includes("support_mode")               ? ok("support_mode activado cuando X-Support-Tenant-ID presente") : fail("Falta lógica support_mode");
     src.includes("SUPER_ADMIN")                ? ok("SUPER_ADMIN verificado en RequireRoles")  : fail("SUPER_ADMIN no verificado");
-    (src.includes("isSupport") || src.includes("support_mode"))
-      ? ok("SUPER_ADMIN en support_mode pasa RequireRoles")                                    : fail("SUPER_ADMIN no pasa RequireRoles en support_mode");
+    src.includes("Support mode is read-only")
+      ? ok("support_mode bloquea toda mutación, incluso rutas SUPER_ADMIN")                    : fail("Falta bloqueo incondicional de mutaciones en support_mode");
   }
 }
 
-// ─── Migración 011 backfill ───────────────────────────────────────────────────
+// ─── Migración histórica 011 ──────────────────────────────────────────────────
 section("Migración 011_backfill_school_provisioning.sql");
 {
   const src = read("backend/migrations_mysql/011_backfill_school_provisioning.sql");
@@ -133,9 +132,21 @@ section("Migración 011_backfill_school_provisioning.sql");
   else {
     src.includes("school_levels")             ? ok("Backfill school_levels")    : fail("Falta backfill school_levels");
     src.includes("school_portals")            ? ok("Backfill school_portals")   : fail("Falta backfill school_portals");
-    src.includes("school_grading_scales")     ? ok("Backfill school_grading_scales") : fail("Falta backfill grading_scales");
     src.includes("school_provisioning_events") ? ok("Registra evento backfill_011") : fail("Falta registro evento provisioning");
     src.includes("INSERT IGNORE")             ? ok("Usa INSERT IGNORE (idempotente)") : fail("No es idempotente (falta INSERT IGNORE)");
+  }
+}
+
+// ─── Reparación aditiva de escalas de calificación ────────────────────────────
+section("Migración 014_backfill_school_grading_scales.sql");
+{
+  const src = read("backend/migrations_mysql/014_backfill_school_grading_scales.sql");
+  if (!src) { fail("014_backfill_school_grading_scales.sql no encontrado"); }
+  else {
+    src.includes("INSERT IGNORE INTO school_grading_scales") ? ok("Backfill school_grading_scales") : fail("Falta backfill grading_scales");
+    src.includes("WHERE sg.tenant_id = t.id")                 ? ok("Backfill aislado por tenant") : fail("Backfill no está aislado por tenant");
+    src.includes("NOT EXISTS")                                ? ok("No sobrescribe escalas existentes") : fail("Falta guardia NOT EXISTS");
+    src.includes("backfill_grading_scales_014")               ? ok("Registra evento idempotente de reparación") : fail("Falta evento backfill_grading_scales_014");
   }
 }
 

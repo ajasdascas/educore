@@ -119,6 +119,13 @@ func NewPortable(ctx context.Context, driver, postgresURL, mysqlDSN string) (*DB
 	return &DB{driver: NormalizeDriver(driver), sqlDB: sqlDB}, nil
 }
 
+// NewPortableFromSQLDB adapts an already-open database/sql connection. It is
+// useful for transaction-level integration tests and for embedders that own
+// the connection lifecycle themselves.
+func NewPortableFromSQLDB(driver string, sqlDB *sql.DB) *DB {
+	return &DB{driver: NormalizeDriver(driver), sqlDB: sqlDB}
+}
+
 func (db *DB) Close() {
 	if db != nil && db.sqlDB != nil {
 		_ = db.sqlDB.Close()

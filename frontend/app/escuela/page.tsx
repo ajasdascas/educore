@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { ArrowRight, BookOpen, Loader2, ChevronRight, GraduationCap } from "lucide-react";
 import { API_URL } from "@/lib/api";
+import { getActiveTenantSlug, parseTenantSlug } from "@/lib/tenant";
 
 function formatSlug(s: string) {
   return s.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -19,44 +20,49 @@ interface PortalDef {
   gradient: string;
   ring: string;
   badge: string;
+  available: boolean;
 }
 
 const PORTALS: PortalDef[] = [
   {
     role: "school_admin",
     label: "Director / Coordinador",
-    desc: "Gestión académica completa: alumnos, profesores, grupos, horarios y reportes.",
+    desc: "Gestión del núcleo académico y de los módulos liberados para la escuela.",
     icon: "🏫",
     gradient: "from-blue-600/20 to-indigo-600/20",
     ring: "ring-blue-500/30 hover:ring-blue-400/60",
     badge: "bg-blue-500/15 text-blue-300 border-blue-500/25",
+    available: true,
   },
   {
     role: "teacher",
     label: "Profesor",
-    desc: "Registro de asistencias, captura de calificaciones y comunicación con padres.",
+    desc: "En auditoría PostgreSQL, aislamiento entre escuelas y E2E publicado.",
     icon: "👨‍🏫",
     gradient: "from-violet-600/20 to-purple-600/20",
     ring: "ring-violet-500/30 hover:ring-violet-400/60",
     badge: "bg-violet-500/15 text-violet-300 border-violet-500/25",
+    available: false,
   },
   {
     role: "parent",
     label: "Padre de familia",
-    desc: "Seguimiento escolar de tus hijos: calificaciones, asistencia, pagos y mensajes.",
+    desc: "En auditoría de aislamiento padre-hijo y dependencias externas.",
     icon: "👨‍👩‍👧",
     gradient: "from-emerald-600/20 to-teal-600/20",
     ring: "ring-emerald-500/30 hover:ring-emerald-400/60",
     badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+    available: false,
   },
   {
     role: "student",
     label: "Estudiante",
-    desc: "Consulta tus calificaciones, asistencia, horarios y tareas.",
+    desc: "En auditoría PostgreSQL, aislamiento entre escuelas y E2E publicado.",
     icon: "🎒",
     gradient: "from-amber-600/20 to-orange-600/20",
     ring: "ring-amber-500/30 hover:ring-amber-400/60",
     badge: "bg-amber-500/15 text-amber-300 border-amber-500/25",
+    available: false,
   },
 ];
 
@@ -89,7 +95,7 @@ const cardVariant: Variants = {
 };
 
 // --- Sub-components ---
-function SchoolLogo({ name }: { name: string }) {
+function SchoolLogo() {
   return (
     <motion.div
       initial={{ scale: 0.7, opacity: 0 }}
@@ -116,6 +122,21 @@ function DirectRoleCard({
 }) {
   const portal = PORTALS.find((p) => p.role === role);
 
+  if (portal && !portal.available) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4">
+        <section className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-slate-900 p-7 text-center shadow-2xl">
+          <span className="text-4xl" aria-hidden>{portal.icon}</span>
+          <h1 className="mt-4 text-xl font-bold text-white">{portal.label} en auditoría</h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-400">{portal.desc} El acceso permanece cerrado para no exponer un flujo incompleto como si estuviera listo.</p>
+          <Link href={`/escuela/?slug=${slug}`} className="mt-6 inline-flex h-10 items-center justify-center rounded-xl bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-700">
+            Volver al portal disponible
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-4">
       {/* Background blobs */}
@@ -130,7 +151,7 @@ function DirectRoleCard({
         transition={{ duration: 0.45, ease: [0, 0, 0.2, 1] }}
         className="relative z-10 w-full max-w-sm"
       >
-        <SchoolLogo name={displayName} />
+        <SchoolLogo />
 
         <div className="mb-1 text-center">
           {slug && (
@@ -225,7 +246,7 @@ function PortalSelector({
 
       <div className="relative z-10 w-full max-w-md">
         {/* Header */}
-        <SchoolLogo name={displayName} />
+        <SchoolLogo />
 
         <motion.div
           className="mb-8 text-center"
@@ -269,7 +290,7 @@ function PortalSelector({
           transition={{ delay: 0.3, duration: 0.3 }}
           className="mb-3 pl-1 text-[11px] font-semibold uppercase tracking-widest text-slate-600"
         >
-          ¿Con qué perfil deseas ingresar?
+          Perfil disponible para ingresar
         </motion.p>
 
         {/* Portal cards */}
@@ -279,7 +300,7 @@ function PortalSelector({
           animate="visible"
           variants={{ visible: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } } }}
         >
-          {PORTALS.map((portal, i) => (
+          {PORTALS.filter((portal) => portal.available).map((portal, i) => (
             <motion.div key={portal.role} variants={cardVariant} custom={i}>
               <Link
                 href={`/login?slug=${slug}&role=${portal.role}`}
@@ -338,42 +359,84 @@ function PortalSelector({
 // ─── Inner (reads URL params + detects subdomain) ───────────────────────────
 function EscuelaInner() {
   const params = useSearchParams();
-  const [slug, setSlug] = useState(params.get("slug") || "");
+  const [slug, setSlug] = useState(parseTenantSlug(params.get("slug")) || "");
   const role = params.get("role") || "";
   const [schoolName, setSchoolName] = useState("");
-  const [loadingName, setLoadingName] = useState(false);
+  const [resolution, setResolution] = useState<"loading" | "ready" | "missing" | "error">("loading");
 
-  // Detect school slug from subdomain (kinder1.onlineu.mx)
+  // A valid school hostname is authoritative. ?slug= is only the main-domain fallback.
   useEffect(() => {
-    if (!slug && typeof window !== "undefined") {
-      const host = window.location.hostname;
-      const parts = host.split(".");
-      if (
-        parts.length >= 3 &&
-        parts[parts.length - 2] === "onlineu" &&
-        parts[parts.length - 1] === "mx"
-      ) {
-        const sub = parts[0];
-        const excluded = ["www", "mail", "ftp", "api", "smtp", "webmail"];
-        if (!excluded.includes(sub)) setSlug(sub);
-      }
-    }
-  }, [slug]);
+    setSlug(getActiveTenantSlug(params) || "");
+  }, [params]);
 
   // Fetch real school name via resolve endpoint
   useEffect(() => {
-    if (!slug) return;
-    setLoadingName(true);
+    setSchoolName("");
+    if (!slug) {
+      setResolution("missing");
+      return;
+    }
+    setResolution("loading");
     fetch(`${API_URL}/api/v1/public/schools/resolve?slug=${encodeURIComponent(slug)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.data?.name) setSchoolName(d.data.name);
+      .then(async (r) => {
+        if (r.status === 403 || r.status === 404) {
+          setResolution("missing");
+          return null;
+        }
+        if (!r.ok) throw new Error(`resolve failed: ${r.status}`);
+        return r.json();
       })
-      .catch(() => {})
-      .finally(() => setLoadingName(false));
+      .then((d) => {
+        if (d?.data?.name) {
+          setSchoolName(d.data.name);
+          setResolution("ready");
+        } else if (d) {
+          setResolution("error");
+        }
+      })
+      .catch(() => setResolution("error"));
   }, [slug]);
 
   const displayName = schoolName || (slug ? formatSlug(slug) : "Tu Institución");
+
+  if (resolution === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-3 h-7 w-7 animate-spin" />
+          <p className="text-sm">Verificando la escuela...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (resolution === "missing" || resolution === "error") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-100">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/80 p-7 text-center shadow-2xl">
+          <BookOpen className="mx-auto mb-4 h-9 w-9 text-slate-500" />
+          <h1 className="text-xl font-semibold">
+            {resolution === "missing" ? "Escuela no disponible" : "No pudimos verificar la escuela"}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            {resolution === "missing"
+              ? "Revisa la dirección. La escuela puede no existir o estar suspendida."
+              : "El servicio está temporalmente inaccesible. Intenta nuevamente en unos momentos."}
+          </p>
+          <div className="mt-5 flex justify-center gap-3">
+            {resolution === "error" && (
+              <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium" onClick={() => window.location.reload()}>
+                Reintentar
+              </button>
+            )}
+            <a className="rounded-lg border border-slate-700 px-4 py-2 text-sm" href="https://onlineu.mx/educore/">
+              Ir a EduCore
+            </a>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (role && ROLE_LABELS[role]) {
     return (
@@ -381,13 +444,13 @@ function EscuelaInner() {
         slug={slug}
         role={role}
         displayName={displayName}
-        loadingName={loadingName}
+        loadingName={false}
       />
     );
   }
 
   return (
-    <PortalSelector slug={slug} displayName={displayName} loadingName={loadingName} />
+    <PortalSelector slug={slug} displayName={displayName} loadingName={false} />
   );
 }
 

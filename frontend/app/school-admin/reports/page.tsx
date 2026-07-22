@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart3, Calendar, Download, Eye, FileText, Loader2, Plus, RefreshCw, Search, Trash2, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type ReportStatus = "completed" | "scheduled" | "failed" | "pending";
@@ -84,14 +85,12 @@ const emptyForm: ReportFormState = {
   include_details: true,
 };
 
-function normalizeReports(response: any): SchoolReport[] {
-  const raw = response?.data?.reports || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeReports(response: unknown): SchoolReport[] {
+  return responseArray<SchoolReport>(response, "reports");
 }
 
-function normalizeGroups(response: any): SchoolGroup[] {
-  const raw = response?.data?.groups || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeGroups(response: unknown): SchoolGroup[] {
+  return responseArray<SchoolGroup>(response, "groups");
 }
 
 function reportTypeLabel(type: string) {
@@ -143,7 +142,7 @@ function SchoolReportsContent() {
   const [selectedReport, setSelectedReport] = useState<SchoolReport | null>(null);
   const [form, setForm] = useState<ReportFormState>(emptyForm);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [reportsResponse, groupsResponse] = await Promise.all([
@@ -161,11 +160,11 @@ function SchoolReportsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const filteredReports = useMemo(() => {
     const term = search.trim().toLowerCase();

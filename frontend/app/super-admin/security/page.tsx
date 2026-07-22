@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle, Clock, Loader2, Lock, Monitor, RefreshCw, Shield, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 type PlatformSetting = {
   key: string;
@@ -51,7 +52,7 @@ export default function SecurityPage() {
     [sessions]
   );
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [settingsRes, sessionsRes] = await Promise.all([
@@ -70,16 +71,16 @@ export default function SecurityPage() {
       if (sessionsRes.success) {
         setSessions(Array.isArray(sessionsRes.data?.sessions) ? sessionsRes.data.sessions : []);
       }
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo cargar seguridad", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo cargar seguridad"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const save = async () => {
     setSaving(true);
@@ -95,8 +96,8 @@ export default function SecurityPage() {
       });
       if (!res.success) throw new Error(res.error || res.message || "No se pudo guardar seguridad");
       toast({ title: "Listo", description: "Configuracion de seguridad guardada." });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo guardar seguridad", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo guardar seguridad"), variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -111,8 +112,8 @@ export default function SecurityPage() {
       if (!res.success) throw new Error(res.error || res.message || "No se pudieron cerrar sesiones");
       toast({ title: "Listo", description: `${res.data?.affected || 0} sesiones cerradas.` });
       await load();
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudieron cerrar sesiones", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudieron cerrar sesiones"), variant: "destructive" });
     } finally {
       setSaving(false);
     }

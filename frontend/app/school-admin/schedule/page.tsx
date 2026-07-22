@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, Clock, Eye, Filter, Loader2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type ScheduleStatus = "active" | "inactive";
@@ -92,24 +93,20 @@ const emptyForm: ScheduleFormState = {
   notes: "",
 };
 
-function normalizeBlocks(response: any): ScheduleBlock[] {
-  const raw = response?.data?.schedule || response?.data?.blocks || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeBlocks(response: unknown): ScheduleBlock[] {
+  return responseArray<ScheduleBlock>(response, "schedule", "blocks");
 }
 
-function normalizeGroups(response: any): SchoolGroup[] {
-  const raw = response?.data?.groups || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeGroups(response: unknown): SchoolGroup[] {
+  return responseArray<SchoolGroup>(response, "groups");
 }
 
-function normalizeTeachers(response: any): Teacher[] {
-  const raw = response?.data?.teachers || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeTeachers(response: unknown): Teacher[] {
+  return responseArray<Teacher>(response, "teachers");
 }
 
-function normalizeSubjects(response: any): Subject[] {
-  const raw = response?.data?.subjects || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeSubjects(response: unknown): Subject[] {
+  return responseArray<Subject>(response, "subjects");
 }
 
 function dayLabel(day: string) {
@@ -182,7 +179,7 @@ function SchoolScheduleContent() {
   const [selectedBlock, setSelectedBlock] = useState<ScheduleBlock | null>(null);
   const [form, setForm] = useState<ScheduleFormState>(emptyForm);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [scheduleResponse, groupsResponse, teachersResponse, subjectsResponse] = await Promise.all([
@@ -204,11 +201,11 @@ function SchoolScheduleContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const filteredBlocks = useMemo(() => {
     const term = search.trim().toLowerCase();

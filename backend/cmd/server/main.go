@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -16,16 +17,17 @@ import (
 	"educore/internal/modules/parent"
 	"educore/internal/modules/reports"
 	"educore/internal/modules/school_admin"
-	superadmin "educore/internal/modules/super_admin"
 	"educore/internal/modules/student"
+	superadmin "educore/internal/modules/super_admin"
 	"educore/internal/modules/teacher"
-	"educore/internal/modules/webhook"
 	"educore/internal/modules/tenants"
+	"educore/internal/modules/webhook"
 	"educore/internal/pkg/database"
 	"educore/internal/pkg/mysqlrepair"
 	"educore/internal/pkg/ownerseed"
 	"educore/internal/pkg/redis"
 	"educore/internal/pkg/response"
+	tenantslug "educore/internal/pkg/slug"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -36,7 +38,10 @@ import (
 
 func main() {
 	// 1. Load config
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
 
 	// 2. Init Database
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -89,7 +94,7 @@ func main() {
 		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
 	}))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000, http://localhost:3001, http://localhost:3002, http://localhost:3003, https://onlineu.mx, https://www.onlineu.mx, https://educore-production-beef.up.railway.app, https://academic.lat, https://www.academic.lat",
+		AllowOriginsFunc: isAllowedBrowserOrigin,
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, ngrok-skip-browser-warning, X-Support-Tenant-ID",
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowCredentials: true,
@@ -125,23 +130,24 @@ func main() {
 	authHandler.RegisterProtectedRoutes(api.Group("/auth", middleware.Protected(cfg.JWTSecret)))
 
 	// Webhooks (public, signature-verified)
-	webhook.RegisterRoutes(api.Group("/webhooks"), db)
+	webhook.RegisterRoutes(api.Group("/webhooks", middleware.RequireProductionModule("versioning")), db)
 
 	// Internal deployment events (public route, shared-secret verified).
 	superadmin.RegisterInternalDeploymentRoutes(api.Group("/internal"), db, os.Getenv("EDUCORE_DEPLOY_WEBHOOK_SECRET"))
 
 	// Public school info (used by school landing page — no auth)
 	api.Get("/public/school-info", func(c *fiber.Ctx) error {
-		slug := c.Query("slug")
-		if slug == "" {
-			return response.Error(c, fiber.StatusBadRequest, "slug required")
+		slug, valid := resolvePublicSchoolSlug(c.Query("slug"), "")
+		if !valid {
+			return response.Error(c, fiber.StatusBadRequest, "valid school slug required")
 		}
 		var name, logoURL string
-		var status string
 		err := db.QueryRow(c.UserContext(),
-			`SELECT name, COALESCE(logo_url, ''), status FROM tenants WHERE slug = $1 LIMIT 1`, slug).
-			Scan(&name, &logoURL, &status)
-		if err != nil || status == "suspended" {
+			database.RebindPlaceholders(db.Driver(), `
+				SELECT name, COALESCE(logo_url, '') FROM tenants
+				WHERE slug = $1 AND status IN ('active', 'trial') AND deleted_at IS NULL LIMIT 1`), slug).
+			Scan(&name, &logoURL)
+		if err != nil {
 			return response.Error(c, fiber.StatusNotFound, "School not found")
 		}
 		return response.Success(c, fiber.Map{
@@ -155,33 +161,24 @@ func main() {
 	// GET /api/v1/public/schools/resolve?slug=kinder1
 	// GET /api/v1/public/schools/resolve?host=kinder1.onlineu.mx
 	api.Get("/public/schools/resolve", func(c *fiber.Ctx) error {
-		slug := c.Query("slug")
-		host := c.Query("host")
-
-		// Derive slug from host (kinder1.onlineu.mx → kinder1)
-		if slug == "" && host != "" {
-			parts := strings.Split(host, ".")
-			if len(parts) >= 3 {
-				slug = parts[0]
-			}
-		}
-		if slug == "" {
-			return response.Error(c, fiber.StatusBadRequest, "slug or host query param required")
+		slug, valid := resolvePublicSchoolSlug(c.Query("slug"), c.Query("host"))
+		if !valid {
+			return response.Error(c, fiber.StatusBadRequest, "valid school slug or onlineu.mx school host required")
 		}
 
 		var tenantID, name, status, plan string
 		var logoURL *string
 		err := db.QueryRow(c.UserContext(),
 			database.RebindPlaceholders(db.Driver(),
-				"SELECT id, name, COALESCE(logo_url, ''), status, COALESCE(plan, 'starter') FROM tenants WHERE slug = $1 LIMIT 1"),
+				"SELECT id, name, COALESCE(logo_url, ''), status, COALESCE(plan, 'starter') FROM tenants WHERE slug = $1 AND deleted_at IS NULL LIMIT 1"),
 			slug).Scan(&tenantID, &name, &logoURL, &status, &plan)
 		if err != nil {
 			return response.Error(c, fiber.StatusNotFound, "School not found")
 		}
-		if status == "suspended" {
+		if status != "active" && status != "trial" {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"success": false,
-				"error":   fiber.Map{"code": "TENANT_SUSPENDED", "message": "Esta institución está suspendida."},
+				"error":   fiber.Map{"code": "TENANT_UNAVAILABLE", "message": "Esta institución no está disponible."},
 			})
 		}
 
@@ -194,15 +191,21 @@ func main() {
 		var enabledModules []string
 		rows, qErr := db.Query(c.UserContext(),
 			database.RebindPlaceholders(db.Driver(),
-				"SELECT module_key FROM tenant_modules WHERE tenant_id = $1 AND is_active = true AND enabled = true"),
+				`SELECT tm.module_key
+				 FROM tenant_modules tm
+				 JOIN modules_catalog mc ON mc.key = tm.module_key
+				 WHERE tm.tenant_id = $1 AND tm.is_active = true AND tm.enabled = true
+				   AND mc.status = 'active' AND mc.global_enabled = true`),
 			tenantID)
 		if qErr == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var mk string
 				if rows.Scan(&mk) == nil {
-					// Only expose non-sensitive module keys
-					enabledModules = append(enabledModules, mk)
+					if isPublicProductionModuleKey(mk) {
+						// Only expose audited, non-sensitive module keys.
+						enabledModules = append(enabledModules, mk)
+					}
 				}
 			}
 		}
@@ -212,6 +215,8 @@ func main() {
 
 		// Fetch levels from settings JSON (non-fatal)
 		var levels []string
+		domainProvisioningStatus := "unknown"
+		domainReady := false
 		var settingsRaw []byte
 		if sErr := db.QueryRow(c.UserContext(),
 			database.RebindPlaceholders(db.Driver(), "SELECT COALESCE(settings, '{}') FROM tenants WHERE id = $1"),
@@ -225,6 +230,12 @@ func main() {
 						}
 					}
 				}
+				if rawStatus, ok := settingsMap["domain_provisioning_status"].(string); ok && rawStatus != "" {
+					domainProvisioningStatus = rawStatus
+				}
+				if rawReady, ok := settingsMap["domain_ready"].(bool); ok {
+					domainReady = rawReady
+				}
 			}
 		}
 		if levels == nil {
@@ -232,30 +243,34 @@ func main() {
 		}
 
 		return response.Success(c, fiber.Map{
-			"school_id":               tenantID,
-			"name":                    name,
-			"slug":                    slug,
-			"status":                  status,
-			"plan":                    plan,
-			"logo_url":                logo,
-			"portal_enabled":          true,
-			"levels":                  levels,
-			"enabled_modules_public":  enabledModules,
-			"portal_internal_url":     "https://onlineu.mx/educore/escuela/?slug=" + slug,
-			"portal_subdomain_url":    "https://" + slug + ".onlineu.mx",
-			"dns_status":              "unknown",
-			"hosting_status":          "basepath_conflict",
-			"ssl_status":              "unknown",
+			"school_id":                  tenantID,
+			"name":                       name,
+			"slug":                       slug,
+			"status":                     status,
+			"plan":                       plan,
+			"logo_url":                   logo,
+			"portal_enabled":             true,
+			"levels":                     levels,
+			"enabled_modules_public":     enabledModules,
+			"portal_internal_url":        "https://onlineu.mx/educore/escuela/?slug=" + slug,
+			"portal_subdomain_url":       "https://" + slug + ".onlineu.mx",
+			"dns_status":                 "unknown",
+			"hosting_status":             "static_router_ready",
+			"ssl_status":                 "unknown",
+			"routing_mode":               "hostinger_subdomain_api",
+			"base_path":                  "/educore",
+			"domain_provisioning_status": domainProvisioningStatus,
+			"domain_ready":               domainReady,
 		}, "ok")
 	})
 
 	// Tenants module (protected, SUPER_ADMIN only)
 	tenantHandler := tenants.NewHandler(db)
-	tenantGroup := api.Group("/tenants", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SUPER_ADMIN"))
+	tenantGroup := api.Group("/tenants", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("SUPER_ADMIN"))
 	tenantHandler.RegisterRoutes(tenantGroup)
 
 	// Super Admin module
-	superAdminGroup := api.Group("/super-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SUPER_ADMIN"))
+	superAdminGroup := api.Group("/super-admin", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("SUPER_ADMIN"))
 	superAdminHandler := superadmin.NewHandler(db)
 	superAdminHandler.RegisterRoutes(superAdminGroup)
 	superAdminHandler.RegisterDeploymentRoutes(superAdminGroup)
@@ -266,46 +281,46 @@ func main() {
 	schoolAdminRepo := school_admin.NewRepository(db)
 	schoolAdminService := school_admin.NewService(schoolAdminRepo, eventBus)
 	schoolAdminHandler := school_admin.NewHandler(schoolAdminService)
-	schoolAdminGroup := api.Group("/school-admin", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "SUPER_ADMIN"))
+	schoolAdminGroup := api.Group("/school-admin", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("SCHOOL_ADMIN", "SUPER_ADMIN"))
 	schoolAdminHandler.RegisterRoutes(schoolAdminGroup)
 
 	// Parent module
 	parentRepo := parent.NewRepository(db)
 	parentService := parent.NewService(parentRepo, eventBus)
 	parentHandler := parent.NewHandler(parentService)
-	parentGroupActive := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("PARENT"))
+	parentGroupActive := api.Group("/parent", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("PARENT"), middleware.RequireProductionModule("parent_portal"))
 	parentHandler.RegisterRoutes(parentGroupActive)
 
 	// Teacher module
 	teacherRepo := teacher.NewRepository(db)
 	teacherService := teacher.NewService(teacherRepo, eventBus)
 	teacherHandler := teacher.NewHandler(teacherService)
-	teacherGroup := api.Group("/teacher", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("TEACHER"))
+	teacherGroup := api.Group("/teacher", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("TEACHER"), middleware.RequireProductionModule("teacher_portal"))
 	teacherHandler.RegisterRoutes(teacherGroup)
 
 	// Reports module (SCHOOL_ADMIN, TEACHER)
 	reportsRepo := reports.NewRepository(db)
 	reportsService := reports.NewService(reportsRepo, eventBus)
 	reportsHandler := reports.NewHandler(reportsService)
-	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	reportsGroup := api.Group("/reports", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"), middleware.RequireProductionModule("reports"))
 	reportsHandler.RegisterRoutes(reportsGroup)
 
 	// Student module (STUDENT role — tenant-scoped)
 	studentRepo := student.NewRepository(db)
 	studentService := student.NewService(studentRepo)
 	studentHandler := student.NewHandler(studentService)
-	studentGroup := api.Group("/student", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("STUDENT"))
+	studentGroup := api.Group("/student", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("STUDENT"), middleware.RequireProductionModule("portal_students"))
 	studentHandler.RegisterRoutes(studentGroup)
 
 	// Communications module (All authenticated users)
 	communicationsRepo := communications.NewRepository(db)
 	communicationsService := communications.NewService(communicationsRepo, eventBus)
 	communicationsHandler := communications.NewHandler(communicationsService)
-	communicationsGroup := api.Group("/communications", middleware.Protected(cfg.JWTSecret))
+	communicationsGroup := api.Group("/communications", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireProductionModule("communications"))
 	communicationsHandler.RegisterRoutes(communicationsGroup)
 
 	// Academic module (placeholder)
-	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
+	academicGroup := api.Group("/academic", middleware.Protected(cfg.JWTSecret), middleware.AuthorizeCurrentUser(db), middleware.RequireRoles("SCHOOL_ADMIN", "TEACHER"))
 	_ = academicGroup
 
 	// 5. Start server
@@ -313,6 +328,68 @@ func main() {
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
+}
+
+func resolvePublicSchoolSlug(rawSlug, rawHost string) (string, bool) {
+	candidate := strings.ToLower(strings.TrimSpace(rawSlug))
+	if candidate == "" {
+		host := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(rawHost), "."))
+		parts := strings.Split(host, ".")
+		if len(parts) != 3 || parts[1] != "onlineu" || parts[2] != "mx" {
+			return "", false
+		}
+		candidate = parts[0]
+	}
+	if tenantslug.Validate(candidate) != nil {
+		return "", false
+	}
+	return candidate, true
+}
+
+func isPublicProductionModuleKey(moduleKey string) bool {
+	productionKeys := map[string]struct{}{
+		"auth": {}, "users": {}, "academic_core": {}, "grading": {},
+		"students": {}, "groups": {}, "grades": {}, "schedules": {}, "attendance": {},
+	}
+	_, ok := productionKeys[strings.ToLower(strings.TrimSpace(moduleKey))]
+	return ok
+}
+
+// isAllowedBrowserOrigin keeps credentialed CORS restricted to known platform
+// origins and one valid, non-reserved school label under onlineu.mx.
+func isAllowedBrowserOrigin(origin string) bool {
+	fixedOrigins := map[string]struct{}{
+		"http://localhost:3000":    {},
+		"http://localhost:3001":    {},
+		"http://localhost:3002":    {},
+		"http://localhost:3003":    {},
+		"https://onlineu.mx":       {},
+		"https://www.onlineu.mx":   {},
+		"https://academic.lat":     {},
+		"https://www.academic.lat": {},
+	}
+	if _, ok := fixedOrigins[strings.ToLower(origin)]; ok {
+		return true
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || !strings.EqualFold(parsed.Scheme, "https") || parsed.Host == "" {
+		return false
+	}
+	if parsed.User != nil || parsed.Port() != "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+
+	hostname := strings.ToLower(parsed.Hostname())
+	const suffix = ".onlineu.mx"
+	if !strings.HasSuffix(hostname, suffix) {
+		return false
+	}
+	schoolSlug := strings.TrimSuffix(hostname, suffix)
+	if schoolSlug == "" || strings.Contains(schoolSlug, ".") {
+		return false
+	}
+	return tenantslug.Validate(schoolSlug) == nil
 }
 
 func customErrorHandler(c *fiber.Ctx, err error) error {

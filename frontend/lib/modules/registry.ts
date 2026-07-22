@@ -84,6 +84,23 @@ export const CORE_MODULES: EnabledModule[] = [
   { key: "grading", name: "Grading System", layer: "core", is_core: true, is_required: true, enabled: true },
 ];
 
+export const PRODUCTION_READY_TENANT_MODULES = new Set<ModuleKey>([
+  "auth",
+  "users",
+  "academic_core",
+  "grading",
+  "students",
+  "groups",
+  "grades",
+  "schedules",
+  "attendance",
+]);
+
+export const SELECTABLE_PRODUCTION_MODULES = new Set<ModuleKey>([
+  "schedules",
+  "attendance",
+]);
+
 export const DEFAULT_ENABLED_MODULES: EnabledModule[] = [
   ...CORE_MODULES,
   { key: "schedules", name: "Horarios", layer: "extension", is_core: false, is_required: false, enabled: true, source: "demo-default" },
@@ -123,21 +140,71 @@ export const MODULE_ALIASES: Record<string, string[]> = {
 };
 
 export const MODULES_BY_LEVEL: Record<EducationLevel, ModuleKey[]> = {
-  babies:             ["academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"],
-  daycare:            ["academic_core", "users", "students", "documents", "communications", "daily_logs", "meals", "naps", "diapers", "mood", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"],
-  preescolar:         ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"],
-  kinder:             ["academic_core", "users", "students", "groups", "schedules", "attendance", "documents", "reports", "communications", "qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"],
-  primaria:           ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications", "subjects", "assignments", "exams"],
-  secundaria_general: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
-  secundaria_tecnica: ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
-  prepa_general:      ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
-  prepa_tecnica:      ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
-  universidad:        ["academic_core", "users", "students", "groups", "schedules", "attendance", "grades", "grading", "report_cards", "documents", "reports", "communications"],
+  babies:             ["students", "groups", "schedules", "attendance"],
+  daycare:            ["students", "groups", "schedules", "attendance"],
+  preescolar:         ["students", "groups", "schedules", "attendance"],
+  kinder:             ["students", "groups", "schedules", "attendance"],
+  primaria:           ["students", "groups", "schedules", "attendance", "grades"],
+  secundaria_general: ["students", "groups", "schedules", "attendance", "grades"],
+  secundaria_tecnica: ["students", "groups", "schedules", "attendance", "grades"],
+  prepa_general:      ["students", "groups", "schedules", "attendance", "grades"],
+  prepa_tecnica:      ["students", "groups", "schedules", "attendance", "grades"],
+  universidad:        ["students", "groups", "schedules", "attendance", "grades"],
 };
 
-export function normalizeEnabledModules(response: any): EnabledModule[] {
-  const raw = response?.data?.modules || response?.modules || response?.data || [];
-  return Array.isArray(raw) ? raw.filter((item) => item?.enabled !== false && item?.is_active !== false) : [];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readModuleArray(response: unknown): unknown[] {
+  if (!isRecord(response)) return [];
+  if (isRecord(response.data) && Array.isArray(response.data.modules)) {
+    return response.data.modules;
+  }
+  if (Array.isArray(response.modules)) return response.modules;
+  return Array.isArray(response.data) ? response.data : [];
+}
+
+function normalizeModule(item: unknown): EnabledModule | null {
+  if (!isRecord(item) || typeof item.key !== "string") return null;
+  if (item.enabled === false || item.is_active === false) return null;
+  if (!PRODUCTION_READY_TENANT_MODULES.has(item.key)) return null;
+
+  const layer: ModuleLayer =
+    item.layer === "core" || item.layer === "internal" || item.layer === "level"
+      ? item.layer
+      : "extension";
+  const dependencies = Array.isArray(item.dependencies)
+    ? item.dependencies.filter((value): value is string => typeof value === "string")
+    : undefined;
+
+  return {
+    key: item.key,
+    name: typeof item.name === "string" ? item.name : item.key,
+    description: typeof item.description === "string" ? item.description : undefined,
+    layer,
+    level: typeof item.level === "string" ? item.level as EducationLevel : undefined,
+    is_core: item.is_core === true,
+    is_required: item.is_required === true,
+    enabled: true,
+    visible: typeof item.visible === "boolean" ? item.visible : undefined,
+    supported_now: typeof item.supported_now === "boolean" ? item.supported_now : undefined,
+    educational_level:
+      typeof item.educational_level === "string"
+        ? item.educational_level as EducationLevel
+        : undefined,
+    plan_required: typeof item.plan_required === "string" ? item.plan_required : undefined,
+    dependencies,
+    source: typeof item.source === "string" ? item.source : undefined,
+    price_monthly_mxn:
+      typeof item.price_monthly_mxn === "number" ? item.price_monthly_mxn : undefined,
+  };
+}
+
+export function normalizeEnabledModules(response: unknown): EnabledModule[] {
+  return readModuleArray(response)
+    .map(normalizeModule)
+    .filter((module): module is EnabledModule => module !== null);
 }
 
 export function moduleMatches(enabled: EnabledModule[], moduleKey: ModuleKey) {
@@ -148,5 +215,9 @@ export function moduleMatches(enabled: EnabledModule[], moduleKey: ModuleKey) {
 export async function fetchEnabledModules() {
   const response = await authFetch("/api/v1/school-admin/modules/enabled");
   const modules = normalizeEnabledModules(response);
-  return modules.length > 0 ? modules : DEFAULT_ENABLED_MODULES;
+  if (modules.length > 0) return modules;
+  if (process.env.NEXT_PUBLIC_ENABLE_DEMO_MODULES === "true") {
+    return DEFAULT_ENABLED_MODULES;
+  }
+  throw new Error("La escuela no tiene una configuración modular válida.");
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Loader2, RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage as getErrorMessage } from "@/lib/api-response";
 
 export type EnterpriseColumn = {
   key: string;
@@ -79,7 +80,7 @@ export function EnterpriseResourcePage({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setErrorMessage("");
     try {
@@ -88,22 +89,23 @@ export function EnterpriseResourcePage({
       const data = res.data || {};
       setRawData(data);
       setRows(Array.isArray(data[collectionKey]) ? data[collectionKey] : []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, "No se pudo cargar la informacion");
       setRows([]);
-      setErrorMessage(error.message || "No se pudo cargar la informacion");
+      setErrorMessage(message);
       toast({
         title: "Error",
-        description: error.message || "No se pudo cargar la informacion",
+        description: message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [collectionKey, endpoint, toast]);
 
   useEffect(() => {
     load();
-  }, [endpoint]);
+  }, [load]);
 
   const filteredRows = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -124,10 +126,10 @@ export function EnterpriseResourcePage({
       if (!res.success) throw new Error(res.message || res.error || "No se pudo completar la accion");
       toast({ title: "Listo", description: `${action.label} completado.` });
       await load();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "No se pudo completar la accion",
+        description: getErrorMessage(error, "No se pudo completar la accion"),
         variant: "destructive",
       });
     } finally {

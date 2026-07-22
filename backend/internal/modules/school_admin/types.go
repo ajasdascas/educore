@@ -300,10 +300,11 @@ type CreateStudentChargeRequest struct {
 }
 
 type RecordStudentPaymentRequest struct {
-	Method    string  `json:"method" validate:"required"`
-	Amount    float64 `json:"amount" validate:"required,min=0"`
-	Reference string  `json:"reference"`
-	Notes     string  `json:"notes"`
+	Method         string  `json:"method" validate:"required"`
+	Amount         float64 `json:"amount" validate:"required,min=0"`
+	Reference      string  `json:"reference"`
+	Notes          string  `json:"notes"`
+	IdempotencyKey string  `json:"idempotency_key" validate:"required"`
 }
 
 type CreateCardCheckoutSessionRequest struct {
@@ -483,24 +484,46 @@ type ParentContact struct {
 }
 
 type StudentPaymentResponse struct {
-	ID            string     `json:"id"`
-	StudentID     string     `json:"student_id"`
-	StudentName   string     `json:"student_name"`
-	StudentCode   string     `json:"student_code"`
-	GroupID       string     `json:"group_id"`
-	GroupName     string     `json:"group_name"`
-	Concept       string     `json:"concept"`
-	Description   string     `json:"description"`
-	Amount        float64    `json:"amount"`
-	Currency      string     `json:"currency"`
-	DueDate       string     `json:"due_date"`
-	PaidAt        *time.Time `json:"paid_at,omitempty"`
-	PaymentMethod string     `json:"payment_method"`
-	ReceiptNumber string     `json:"receipt_number"`
-	ReceiptURL    string     `json:"receipt_url"`
-	Status        string     `json:"status"`
-	Notes         string     `json:"notes"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID              string     `json:"id"`
+	StudentID       string     `json:"student_id"`
+	StudentName     string     `json:"student_name"`
+	StudentCode     string     `json:"student_code"`
+	GroupID         string     `json:"group_id"`
+	GroupName       string     `json:"group_name"`
+	Concept         string     `json:"concept"`
+	Description     string     `json:"description"`
+	Amount          float64    `json:"amount"`
+	PaidAmount      float64    `json:"paid_amount"`
+	RemainingAmount float64    `json:"remaining_amount"`
+	Currency        string     `json:"currency"`
+	DueDate         string     `json:"due_date"`
+	PaidAt          *time.Time `json:"paid_at,omitempty"`
+	PaymentMethod   string     `json:"payment_method"`
+	ReceiptNumber   string     `json:"receipt_number"`
+	ReceiptURL      string     `json:"receipt_url"`
+	Status          string     `json:"status"`
+	Notes           string     `json:"notes"`
+	CreatedAt       time.Time  `json:"created_at"`
+}
+
+type PaymentReceiptResponse struct {
+	TransactionID   string    `json:"transaction_id"`
+	PaymentID       string    `json:"payment_id"`
+	Folio           string    `json:"folio"`
+	School          string    `json:"school"`
+	Student         string    `json:"student"`
+	StudentCode     string    `json:"student_code"`
+	Concept         string    `json:"concept"`
+	ChargeAmount    float64   `json:"charge_amount"`
+	Amount          float64   `json:"amount"`
+	PaidAmount      float64   `json:"paid_amount"`
+	RemainingAmount float64   `json:"remaining_amount"`
+	Currency        string    `json:"currency"`
+	Method          string    `json:"method"`
+	Reference       string    `json:"reference"`
+	Date            time.Time `json:"date"`
+	Status          string    `json:"status"`
+	Notes           string    `json:"notes"`
 }
 
 type StudentPaymentSummary struct {
@@ -753,16 +776,20 @@ type GradeSummary struct {
 }
 
 type ReportCardResponse struct {
-	StudentID      string           `json:"student_id"`
-	StudentName    string           `json:"student_name"`
-	GroupName      string           `json:"group_name"`
-	Period         string           `json:"period"`
-	OverallGPA     float64          `json:"overall_gpa"`
-	OverallGrade   string           `json:"overall_grade"`
-	AttendanceRate float64          `json:"attendance_rate"`
-	SubjectGrades  []SubjectGrade   `json:"subject_grades"`
-	Comments       []TeacherComment `json:"comments"`
-	GeneratedAt    time.Time        `json:"generated_at"`
+	SnapshotID          string           `json:"snapshot_id,omitempty"`
+	SnapshotSHA256      string           `json:"snapshot_sha256,omitempty"`
+	SnapshotPayloadJSON string           `json:"snapshot_payload_json,omitempty"`
+	SchoolName          string           `json:"school_name"`
+	StudentID           string           `json:"student_id"`
+	StudentName         string           `json:"student_name"`
+	GroupName           string           `json:"group_name"`
+	Period              string           `json:"period"`
+	OverallGPA          float64          `json:"overall_gpa"`
+	OverallGrade        string           `json:"overall_grade"`
+	AttendanceRate      float64          `json:"attendance_rate"`
+	SubjectGrades       []SubjectGrade   `json:"subject_grades"`
+	Comments            []TeacherComment `json:"comments"`
+	GeneratedAt         time.Time        `json:"generated_at"`
 }
 
 type SubjectGrade struct {

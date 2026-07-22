@@ -70,7 +70,7 @@ export default function ParentLayout({ children }: { children: ReactNode }) {
             <h2 className="text-xl font-bold">Selecciona una escuela</h2>
             <p className="text-muted-foreground mt-2 text-sm">
               Para ver el portal de padres en modo soporte, ve a
-              Super Admin → Escuelas → Detalles → Portales → "Ver como Padre de familia".
+              Super Admin → Escuelas → Detalles → Portales → &quot;Ver como Padre de familia&quot;.
             </p>
           </div>
           <Button onClick={() => router.push("/super-admin/schools")}>Ver escuelas</Button>

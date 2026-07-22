@@ -3,8 +3,9 @@ package school_admin
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
-	"fmt"
+	"database/sql"
+	"encoding/base64"
+	"errors"
 	"strings"
 
 	"educore/internal/pkg/database"
@@ -13,37 +14,95 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// generatePortalPassword returns a random password like "Edu<10hex>"
+const portalPasswordRandomBytes = 18
+
+var errPortalAccountAlreadyActive = errors.New("portal account already has a password")
+
+func markOneTimeCredentialResponse(c *fiber.Ctx) {
+	c.Set("Cache-Control", "no-store, max-age=0")
+	c.Set("Pragma", "no-cache")
+	c.Set("Expires", "0")
+}
+
+// generatePortalPassword creates a one-time, high-entropy credential. It is
+// returned only by the successful activation response and is never stored in
+// plain text.
 func generatePortalPassword() (string, error) {
-	buf := make([]byte, 6)
+	buf := make([]byte, portalPasswordRandomBytes)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
-	return "Edu" + hex.EncodeToString(buf)[:10], nil
+	return "Ec!7" + base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-// createUserForPortal inserts a new user row and returns the new user ID.
-// Returns ("", conflictErr) when the email already exists for that tenant.
-func createUserForPortal(ctx context.Context, repo *Repository, tenantID, email, passwordHash, firstName, lastName, role string) (string, error) {
-	db := repo.db
-	var newID string
-	if database.IsMySQL(db.Driver()) {
-		newID = database.NewID()
-		_, err := db.Exec(ctx,
-			"INSERT INTO users (id, tenant_id, email, password_hash, first_name, last_name, role, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, true)",
-			newID, tenantID, email, passwordHash, firstName, lastName, role)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		err := db.QueryRow(ctx,
-			"INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active) VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id",
-			tenantID, email, passwordHash, firstName, lastName, role).Scan(&newID)
-		if err != nil {
-			return "", err
-		}
+func generatePortalCredential() (password, passwordHash string, err error) {
+	password, err = generatePortalPassword()
+	if err != nil {
+		return "", "", err
 	}
-	return newID, nil
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", "", err
+	}
+	return password, string(hash), nil
+}
+
+func portalPasswordConfigured(hash sql.NullString) bool {
+	return hash.Valid && strings.TrimSpace(hash.String) != ""
+}
+
+func createUserForPortal(
+	ctx context.Context,
+	tx *database.Tx,
+	driver, tenantID, email, passwordHash, firstName, lastName, role string,
+) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if database.IsMySQL(driver) {
+		newID := database.NewID()
+		_, err := tx.Exec(ctx, `
+			INSERT INTO users (
+				id, tenant_id, email, password_hash, first_name, last_name,
+				role, is_active, password_must_change
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, true, true)
+		`, newID, tenantID, email, passwordHash, firstName, lastName, role)
+		return newID, err
+	}
+
+	var newID string
+	err := tx.QueryRow(ctx, `
+		INSERT INTO users (
+			tenant_id, email, password_hash, first_name, last_name,
+			role, is_active, password_must_change
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, true, true)
+		RETURNING id
+	`, tenantID, email, passwordHash, firstName, lastName, role).Scan(&newID)
+	return newID, err
+}
+
+func activateUserForPortal(
+	ctx context.Context,
+	tx *database.Tx,
+	tenantID, userID, passwordHash string,
+) error {
+	result, err := tx.Exec(ctx, `
+		UPDATE users
+		SET password_hash = $1,
+			password_must_change = true,
+			auth_version = auth_version + 1,
+			updated_at = NOW()
+		WHERE id = $2
+		  AND tenant_id = $3
+		  AND (password_hash IS NULL OR TRIM(password_hash) = '')
+	`, passwordHash, userID, tenantID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return errPortalAccountAlreadyActive
+	}
+	return nil
 }
 
 func isUniqueConflict(err error) bool {
@@ -54,172 +113,251 @@ func isUniqueConflict(err error) bool {
 	return strings.Contains(s, "duplicate") || strings.Contains(s, "unique") || strings.Contains(s, "already exists")
 }
 
-// CreateTeacherPortalAccess — POST /api/v1/school-admin/academic/teachers/:id/portal-access
+func portalAlreadyActiveResponse(c *fiber.Ctx, message, email string) error {
+	return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+		"success": false,
+		"message": message,
+		"data":    fiber.Map{"email": email},
+	})
+}
+
+// CreateTeacherPortalAccess activates the user row that owns the teacher profile.
 func (h *Handler) CreateTeacherPortalAccess(c *fiber.Ctx) error {
 	tenantID, err := getTenantID(c)
 	if err != nil {
 		return response.Error(c, fiber.StatusForbidden, err.Error())
 	}
-	teacherID := c.Params("id")
-	db := h.service.repo.DB()
 
-	var email, firstName, lastName string
-	err = db.QueryRow(c.UserContext(),
-		database.RebindPlaceholders(db.Driver(),
-			"SELECT COALESCE(email,''), COALESCE(first_name,''), COALESCE(last_name,'') FROM teachers WHERE id = $1 AND tenant_id = $2"),
-		teacherID, tenantID).Scan(&email, &firstName, &lastName)
+	ctx := c.UserContext()
+	db := h.service.repo.DB()
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo iniciar la activación del portal")
+	}
+	defer tx.Rollback(ctx)
+
+	var email string
+	var passwordHash sql.NullString
+	var isActive bool
+	err = tx.QueryRow(ctx, `
+		SELECT u.email, u.password_hash, u.is_active
+		FROM users u
+		INNER JOIN teacher_profiles tp ON tp.user_id = u.id
+		WHERE u.id = $1
+		  AND u.tenant_id = $2
+		  AND u.role = 'TEACHER'
+		  AND u.deleted_at IS NULL
+		FOR UPDATE
+	`, c.Params("id"), tenantID).Scan(&email, &passwordHash, &isActive)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Profesor no encontrado")
 	}
-	if email == "" {
+	if strings.TrimSpace(email) == "" {
 		return response.Error(c, fiber.StatusBadRequest, "El profesor no tiene correo. Agrega uno antes de crear el acceso al portal.")
 	}
-
-	var existingID string
-	_ = db.QueryRow(c.UserContext(),
-		database.RebindPlaceholders(db.Driver(),
-			"SELECT id FROM users WHERE tenant_id = $1 AND email = $2 AND role = 'TEACHER'"),
-		tenantID, email).Scan(&existingID)
-	if existingID != "" {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"success": false,
-			"message": "El usuario ya existe para este profesor.",
-			"data":    fiber.Map{"email": email},
-		})
+	if !isActive {
+		return response.Error(c, fiber.StatusBadRequest, "Activa al profesor antes de habilitar su acceso al portal.")
+	}
+	if portalPasswordConfigured(passwordHash) {
+		return portalAlreadyActiveResponse(c, "El profesor ya tiene acceso al portal.", email)
 	}
 
-	password, err := generatePortalPassword()
+	password, hash, err := generatePortalCredential()
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error generando contraseña")
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo generar la contraseña temporal")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error hasheando contraseña")
-	}
-
-	if _, err = createUserForPortal(c.UserContext(), h.service.repo, tenantID, email, string(hash), firstName, lastName, "TEACHER"); err != nil {
-		if isUniqueConflict(err) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"success": false, "message": "El usuario ya existe.", "data": fiber.Map{"email": email}})
+	if err := activateUserForPortal(ctx, tx, tenantID, c.Params("id"), hash); err != nil {
+		if errors.Is(err, errPortalAccountAlreadyActive) {
+			return portalAlreadyActiveResponse(c, "El profesor ya tiene acceso al portal.", email)
 		}
-		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("Error creando usuario: %v", err))
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo activar el acceso del profesor")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo confirmar el acceso del profesor")
 	}
 
-	return response.Success(c, fiber.Map{"email": email, "password": password, "role": "TEACHER"}, "Acceso portal profesor creado")
+	markOneTimeCredentialResponse(c)
+	return response.Success(c, fiber.Map{
+		"email":                strings.ToLower(strings.TrimSpace(email)),
+		"password":             password,
+		"password_must_change": true,
+		"role":                 "TEACHER",
+	}, "Acceso portal profesor creado")
 }
 
-// CreateStudentPortalAccess — POST /api/v1/school-admin/academic/students/:id/portal-access
+// CreateStudentPortalAccess creates or activates the STUDENT user linked to a student.
 func (h *Handler) CreateStudentPortalAccess(c *fiber.Ctx) error {
 	tenantID, err := getTenantID(c)
 	if err != nil {
 		return response.Error(c, fiber.StatusForbidden, err.Error())
 	}
-	studentID := c.Params("id")
-	db := h.service.repo.DB()
 
-	var email, firstName, lastName string
-	var userIDPtr *string
-	err = db.QueryRow(c.UserContext(),
-		database.RebindPlaceholders(db.Driver(),
-			"SELECT COALESCE(email,''), COALESCE(first_name,''), COALESCE(last_name,''), user_id FROM students WHERE id = $1 AND tenant_id = $2"),
-		studentID, tenantID).Scan(&email, &firstName, &lastName, &userIDPtr)
+	ctx := c.UserContext()
+	db := h.service.repo.DB()
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo iniciar la activación del portal")
+	}
+	defer tx.Rollback(ctx)
+
+	studentID := c.Params("id")
+	var email, firstName, lastName, status string
+	var userID sql.NullString
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(email, ''), first_name, last_name, status, user_id
+		FROM students
+		WHERE id = $1 AND tenant_id = $2
+		FOR UPDATE
+	`, studentID, tenantID).Scan(&email, &firstName, &lastName, &status, &userID)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Estudiante no encontrado")
 	}
-	if userIDPtr != nil && *userIDPtr != "" {
-		var linkedEmail string
-		_ = db.QueryRow(c.UserContext(),
-			database.RebindPlaceholders(db.Driver(), "SELECT email FROM users WHERE id = $1"),
-			*userIDPtr).Scan(&linkedEmail)
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"success": false,
-			"message": "El estudiante ya tiene acceso al portal.",
-			"data":    fiber.Map{"email": linkedEmail},
-		})
-	}
+	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
 		return response.Error(c, fiber.StatusBadRequest, "El estudiante no tiene correo. Agrega uno antes de crear el acceso al portal.")
 	}
-
-	password, err := generatePortalPassword()
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error generando contraseña")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error hasheando contraseña")
+	if status != "active" {
+		return response.Error(c, fiber.StatusBadRequest, "Activa al estudiante antes de habilitar su acceso al portal.")
 	}
 
-	newUserID, err := createUserForPortal(c.UserContext(), h.service.repo, tenantID, email, string(hash), firstName, lastName, "STUDENT")
+	password, hash, err := generatePortalCredential()
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo generar la contraseña temporal")
+	}
+
+	if userID.Valid && strings.TrimSpace(userID.String) != "" {
+		var linkedEmail, linkedRole string
+		var linkedHash sql.NullString
+		var linkedActive bool
+		err = tx.QueryRow(ctx, `
+			SELECT email, role, password_hash, is_active
+			FROM users
+			WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+			FOR UPDATE
+		`, userID.String, tenantID).Scan(&linkedEmail, &linkedRole, &linkedHash, &linkedActive)
+		if err == nil {
+			if linkedRole != "STUDENT" {
+				return response.Error(c, fiber.StatusConflict, "El expediente está vinculado a una cuenta con un rol incompatible.")
+			}
+			if !linkedActive {
+				return response.Error(c, fiber.StatusBadRequest, "Activa la cuenta del estudiante antes de habilitar su acceso al portal.")
+			}
+			if portalPasswordConfigured(linkedHash) {
+				return portalAlreadyActiveResponse(c, "El estudiante ya tiene acceso al portal.", linkedEmail)
+			}
+			if err := activateUserForPortal(ctx, tx, tenantID, userID.String, hash); err != nil {
+				if errors.Is(err, errPortalAccountAlreadyActive) {
+					return portalAlreadyActiveResponse(c, "El estudiante ya tiene acceso al portal.", linkedEmail)
+				}
+				return response.Error(c, fiber.StatusInternalServerError, "No se pudo activar el acceso del estudiante")
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return response.Error(c, fiber.StatusInternalServerError, "No se pudo confirmar el acceso del estudiante")
+			}
+			markOneTimeCredentialResponse(c)
+			return response.Success(c, fiber.Map{
+				"email":                linkedEmail,
+				"password":             password,
+				"password_must_change": true,
+				"role":                 "STUDENT",
+			}, "Acceso portal estudiante creado")
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return response.Error(c, fiber.StatusInternalServerError, "No se pudo revisar la cuenta del estudiante")
+		}
+	}
+
+	newUserID, err := createUserForPortal(ctx, tx, db.Driver(), tenantID, email, hash, firstName, lastName, "STUDENT")
 	if err != nil {
 		if isUniqueConflict(err) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"success": false, "message": "Ya existe un usuario con ese correo.", "data": fiber.Map{"email": email}})
+			return portalAlreadyActiveResponse(c, "Ya existe un usuario con ese correo en la escuela.", email)
 		}
-		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("Error creando usuario estudiante: %v", err))
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo crear la cuenta del estudiante")
 	}
 
-	if newUserID != "" {
-		_, _ = db.Exec(c.UserContext(),
-			database.RebindPlaceholders(db.Driver(),
-				"UPDATE students SET user_id = $1 WHERE id = $2 AND tenant_id = $3"),
-			newUserID, studentID, tenantID)
+	result, err := tx.Exec(ctx, `
+		UPDATE students
+		SET user_id = $1, updated_at = NOW()
+		WHERE id = $2 AND tenant_id = $3
+	`, newUserID, studentID, tenantID)
+	if err != nil || result.RowsAffected() != 1 {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo vincular la cuenta al estudiante")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo confirmar el acceso del estudiante")
 	}
 
-	return response.Success(c, fiber.Map{"email": email, "password": password, "role": "STUDENT"}, "Acceso portal estudiante creado")
+	markOneTimeCredentialResponse(c)
+	return response.Success(c, fiber.Map{
+		"email":                email,
+		"password":             password,
+		"password_must_change": true,
+		"role":                 "STUDENT",
+	}, "Acceso portal estudiante creado")
 }
 
-// CreateParentPortalAccess — POST /api/v1/school-admin/academic/students/:id/parent-portal-access
+// CreateParentPortalAccess activates the primary parent already linked to the student.
 func (h *Handler) CreateParentPortalAccess(c *fiber.Ctx) error {
 	tenantID, err := getTenantID(c)
 	if err != nil {
 		return response.Error(c, fiber.StatusForbidden, err.Error())
 	}
-	studentID := c.Params("id")
+
+	ctx := c.UserContext()
 	db := h.service.repo.DB()
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo iniciar la activación del portal")
+	}
+	defer tx.Rollback(ctx)
 
-	var parentEmail, parentFirstName, parentLastName string
-	err = db.QueryRow(c.UserContext(),
-		database.RebindPlaceholders(db.Driver(),
-			`SELECT COALESCE(pc.email,''),
-			        COALESCE(pc.first_name,''),
-			        COALESCE(NULLIF(pc.last_name,''), COALESCE(pc.paternal_last_name,''), '')
-			 FROM parent_contacts pc
-			 WHERE pc.student_id = $1 AND pc.tenant_id = $2
-			 ORDER BY pc.is_primary DESC, pc.created_at ASC LIMIT 1`),
-		studentID, tenantID).Scan(&parentEmail, &parentFirstName, &parentLastName)
-
-	if err != nil || parentEmail == "" {
+	var parentID, parentEmail string
+	var passwordHash sql.NullString
+	var isActive bool
+	err = tx.QueryRow(ctx, `
+		SELECT u.id, u.email, u.password_hash, u.is_active
+		FROM parent_student ps
+		INNER JOIN students s ON s.id = ps.student_id
+		INNER JOIN users u ON u.id = ps.parent_id
+		WHERE s.id = $1
+		  AND s.tenant_id = $2
+		  AND u.tenant_id = $2
+		  AND u.role = 'PARENT'
+		  AND u.deleted_at IS NULL
+		ORDER BY ps.is_primary DESC, ps.created_at ASC, u.created_at ASC
+		LIMIT 1
+		FOR UPDATE
+	`, c.Params("id"), tenantID).Scan(&parentID, &parentEmail, &passwordHash, &isActive)
+	if err != nil || strings.TrimSpace(parentEmail) == "" {
 		return response.Error(c, fiber.StatusNotFound,
-			"No se encontró un padre/tutor con correo para este estudiante. Registra el contacto primario primero.")
+			"No se encontró un padre/tutor con correo para este estudiante. Registra el contacto principal primero.")
+	}
+	if !isActive {
+		return response.Error(c, fiber.StatusBadRequest, "Activa la cuenta del padre/tutor antes de habilitar su acceso al portal.")
+	}
+	if portalPasswordConfigured(passwordHash) {
+		return portalAlreadyActiveResponse(c, "El padre/tutor ya tiene acceso al portal.", parentEmail)
 	}
 
-	var existingID string
-	_ = db.QueryRow(c.UserContext(),
-		database.RebindPlaceholders(db.Driver(),
-			"SELECT id FROM users WHERE tenant_id = $1 AND email = $2 AND role = 'PARENT'"),
-		tenantID, parentEmail).Scan(&existingID)
-	if existingID != "" {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"success": false,
-			"message": "El padre/tutor ya tiene acceso al portal.",
-			"data":    fiber.Map{"email": parentEmail},
-		})
-	}
-
-	password, err := generatePortalPassword()
+	password, hash, err := generatePortalCredential()
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error generando contraseña")
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo generar la contraseña temporal")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error hasheando contraseña")
-	}
-
-	if _, err = createUserForPortal(c.UserContext(), h.service.repo, tenantID, parentEmail, string(hash), parentFirstName, parentLastName, "PARENT"); err != nil {
-		if isUniqueConflict(err) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"success": false, "message": "Ya existe un usuario con ese correo.", "data": fiber.Map{"email": parentEmail}})
+	if err := activateUserForPortal(ctx, tx, tenantID, parentID, hash); err != nil {
+		if errors.Is(err, errPortalAccountAlreadyActive) {
+			return portalAlreadyActiveResponse(c, "El padre/tutor ya tiene acceso al portal.", parentEmail)
 		}
-		return response.Error(c, fiber.StatusInternalServerError, fmt.Sprintf("Error creando usuario padre: %v", err))
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo activar el acceso del padre/tutor")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, "No se pudo confirmar el acceso del padre/tutor")
 	}
 
-	return response.Success(c, fiber.Map{"email": parentEmail, "password": password, "role": "PARENT"}, "Acceso portal padre creado")
+	markOneTimeCredentialResponse(c)
+	return response.Success(c, fiber.Map{
+		"email":                strings.ToLower(strings.TrimSpace(parentEmail)),
+		"password":             password,
+		"password_must_change": true,
+		"role":                 "PARENT",
+	}, "Acceso portal padre creado")
 }

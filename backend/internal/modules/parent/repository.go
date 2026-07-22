@@ -154,14 +154,17 @@ func (r *Repository) GetDocuments(ctx context.Context, tenantID, userID string) 
 		       COALESCE(d.description, ''),
 		       d.category,
 		       COALESCE(d.file_name, ''),
-		       COALESCE(d.file_url, ''),
+		       '' AS file_url,
 		       COALESCE(d.mime_type, ''),
 		       d.status,
 		       d.created_at
 		FROM school_documents d
 		INNER JOIN students s ON s.id = d.student_id AND s.tenant_id = $1
 		INNER JOIN parent_student ps ON ps.student_id = s.id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
-		WHERE d.tenant_id = $1 AND d.deleted_at IS NULL AND d.status <> 'deleted'
+		WHERE d.tenant_id = $1
+		  AND d.deleted_at IS NULL
+		  AND d.status <> 'deleted'
+		  AND d.audience IN ('parents', 'all')
 		ORDER BY d.created_at DESC
 	`, tenantID, userID)
 	if err != nil {
@@ -187,12 +190,14 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID, userID string) (
 		       p.concept,
 		       COALESCE(p.description, ''),
 		       p.amount::float8,
+		       COALESCE(p.paid_amount, 0)::float8,
+		       GREATEST(p.amount - COALESCE(p.paid_amount, 0), 0)::float8,
 		       p.currency,
 		       TO_CHAR(p.due_date, 'YYYY-MM-DD'),
 		       p.paid_at,
 		       COALESCE(p.payment_method, ''),
 		       COALESCE(p.receipt_number, ''),
-		       COALESCE(p.receipt_url, ''),
+		       '' AS receipt_url,
 		       p.status
 		FROM student_payments p
 		INNER JOIN students s ON s.id = p.student_id AND s.tenant_id = $1
@@ -208,7 +213,7 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID, userID string) (
 	for rows.Next() {
 		var item ParentPaymentResponse
 		var paidAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.Concept, &item.Description, &item.Amount, &item.Currency, &item.DueDate, &paidAt, &item.PaymentMethod, &item.ReceiptNumber, &item.ReceiptURL, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.Concept, &item.Description, &item.Amount, &item.PaidAmount, &item.RemainingAmount, &item.Currency, &item.DueDate, &paidAt, &item.PaymentMethod, &item.ReceiptNumber, &item.ReceiptURL, &item.Status); err != nil {
 			return nil, err
 		}
 		if paidAt.Valid {
@@ -217,10 +222,9 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID, userID string) (
 		if item.Currency != "" {
 			resp.Summary.Currency = item.Currency
 		}
-		if item.Status == "paid" {
-			resp.Summary.TotalPaid += item.Amount
-		} else if item.Status != "cancelled" {
-			resp.Summary.TotalDue += item.Amount
+		resp.Summary.TotalPaid += item.PaidAmount
+		if item.Status != "paid" && item.Status != "cancelled" {
+			resp.Summary.TotalDue += item.RemainingAmount
 			resp.Summary.PendingCount++
 			if item.Status == "overdue" {
 				resp.Summary.OverdueCount++
@@ -229,6 +233,47 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID, userID string) (
 		resp.Payments = append(resp.Payments, item)
 	}
 	return resp, rows.Err()
+}
+
+func (r *Repository) GetPaymentReceipt(ctx context.Context, tenantID, userID, paymentID string) (*ParentPaymentReceiptResponse, error) {
+	receipt := &ParentPaymentReceiptResponse{}
+	err := r.db.QueryRow(ctx, `
+		SELECT pt.id::text,
+		       p.id::text,
+		       pt.receipt_number,
+		       t.name,
+		       TRIM(CONCAT(s.first_name, ' ', s.paternal_last_name, ' ', s.maternal_last_name, ' ', s.last_name)),
+		       p.concept,
+		       p.amount::float8,
+		       pt.amount::float8,
+		       COALESCE(p.paid_amount, 0)::float8,
+		       GREATEST(p.amount - COALESCE(p.paid_amount, 0), 0)::float8,
+		       pt.currency,
+		       pt.method,
+		       COALESCE(pt.reference, ''),
+		       pt.created_at,
+		       p.status,
+		       COALESCE(pt.notes, '')
+		FROM payment_transactions pt
+		INNER JOIN student_payments p ON p.id = pt.charge_id AND p.tenant_id = pt.tenant_id
+		INNER JOIN students s ON s.id = p.student_id AND s.tenant_id = pt.tenant_id
+		INNER JOIN parent_student ps ON ps.student_id = s.id
+		    AND ps.parent_id = $2
+		    AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
+		INNER JOIN tenants t ON t.id = pt.tenant_id
+		WHERE pt.tenant_id = $1 AND pt.charge_id = $3
+		ORDER BY pt.created_at DESC, pt.id DESC
+		LIMIT 1
+	`, tenantID, userID, paymentID).Scan(
+		&receipt.TransactionID, &receipt.PaymentID, &receipt.Folio, &receipt.School,
+		&receipt.Student, &receipt.Concept, &receipt.ChargeAmount, &receipt.Amount,
+		&receipt.PaidAmount, &receipt.RemainingAmount, &receipt.Currency, &receipt.Method,
+		&receipt.Reference, &receipt.Date, &receipt.Status, &receipt.Notes,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("receipt not found: %w", err)
+	}
+	return receipt, nil
 }
 
 func (r *Repository) GetConsents(ctx context.Context, tenantID, userID string) ([]ParentConsentResponse, error) {
@@ -324,7 +369,7 @@ func (r *Repository) GetReportSummary(ctx context.Context, tenantID, userID stri
 		summary.AverageGrade = math.Round((summary.AverageGrade/float64(summary.ChildrenCount))*100) / 100
 	}
 	_ = r.db.QueryRow(ctx, `
-		SELECT COALESCE(SUM(CASE WHEN p.status <> 'paid' AND p.status <> 'cancelled' THEN p.amount ELSE 0 END), 0)::float8
+		SELECT COALESCE(SUM(CASE WHEN p.status <> 'paid' AND p.status <> 'cancelled' THEN GREATEST(p.amount - COALESCE(p.paid_amount, 0), 0) ELSE 0 END), 0)::float8
 		FROM student_payments p
 		INNER JOIN parent_student ps ON ps.student_id = p.student_id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
 		WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
@@ -337,11 +382,9 @@ func (r *Repository) GetReportSummary(ctx context.Context, tenantID, userID stri
 	_ = r.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM parent_messages WHERE tenant_id = $1 AND recipient_id = $2 AND read_at IS NULL
 	`, tenantID, userID).Scan(&summary.UnreadMessages)
-	_ = r.db.QueryRow(ctx, `
-		SELECT COUNT(*) FROM school_documents d
-		INNER JOIN parent_student ps ON ps.student_id = d.student_id AND ps.parent_id = $2 AND (ps.tenant_id = $1 OR ps.tenant_id IS NULL)
-		WHERE d.tenant_id = $1 AND d.deleted_at IS NULL
-	`, tenantID, userID).Scan(&summary.DocumentsAvailable)
+	// Binary document publication is intentionally disabled until private object
+	// storage and signed URLs are configured, so the portal advertises none.
+	summary.DocumentsAvailable = 0
 	return summary, nil
 }
 
@@ -738,7 +781,7 @@ func (r *Repository) UpdatePassword(ctx context.Context, tenantID, userID, newPa
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 	_, err = r.db.Exec(ctx, `
-		UPDATE users SET password_hash = $3, updated_at = NOW()
+		UPDATE users SET password_hash = $3, auth_version = auth_version + 1, updated_at = NOW()
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, userID, string(hash))
 	return err

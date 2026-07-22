@@ -25,6 +25,7 @@ import {
   Building2,
 } from "lucide-react";
 import { API_URL } from "@/lib/api";
+import { errorMessage } from "@/lib/api-response";
 
 interface School {
   id: string;
@@ -124,7 +125,7 @@ export default function LabPage() {
 
   useEffect(() => {
     setChecks(makeChecks(selectedSchool));
-  }, [selectedId]);
+  }, [selectedSchool]);
 
   const enterSupportMode = (path: string) => {
     if (!selectedSchool) return;
@@ -153,11 +154,11 @@ export default function LabPage() {
             : c
         )
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       setChecks((prev) =>
         prev.map((c) =>
           c.id === "backend-health"
-            ? { ...c, status: "fail", detail: err?.message || "Error de red" }
+            ? { ...c, status: "fail", detail: errorMessage(err, "Error de red") }
             : c
         )
       );
@@ -180,11 +181,11 @@ export default function LabPage() {
             : c
         )
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       setChecks((prev) =>
         prev.map((c) =>
           c.id === "school-info"
-            ? { ...c, status: "fail", detail: err?.message || "Error de red" }
+            ? { ...c, status: "fail", detail: errorMessage(err, "Error de red") }
             : c
         )
       );
@@ -219,7 +220,7 @@ export default function LabPage() {
             <p className="font-semibold text-amber-700 dark:text-amber-400">Selecciona una escuela para continuar</p>
             <p className="text-sm text-muted-foreground">
               Intentaste acceder a <code className="font-mono text-xs">{nextPath}</code> sin modo soporte activo.
-              Selecciona una escuela y haz clic en "Continuar".
+              Selecciona una escuela y haz clic en &quot;Continuar&quot;.
             </p>
           </div>
           {selectedSchool && (

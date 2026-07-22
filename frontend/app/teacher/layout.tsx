@@ -66,7 +66,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
             <h2 className="text-xl font-bold">Selecciona una escuela</h2>
             <p className="text-muted-foreground mt-2 text-sm">
               Para ver el portal de profesores en modo soporte, ve a
-              Super Admin → Escuelas → Detalles → Portales → "Ver como Profesor".
+              Super Admin → Escuelas → Detalles → Portales → &quot;Ver como Profesor&quot;.
             </p>
           </div>
           <Button onClick={() => router.push("/super-admin/schools")}>Ver escuelas</Button>

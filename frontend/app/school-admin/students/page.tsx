@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertCircle,
@@ -49,6 +49,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type StudentStatus = "active" | "inactive" | "graduated" | "withdrawn";
@@ -185,13 +186,6 @@ const emptyForm: StudentFormState = {
   parents: [{ ...emptyParent }],
 };
 
-const fallbackGroups: GroupOption[] = [
-  { id: "group-1a", name: "1A", grade_name: "Primero" },
-  { id: "group-2b", name: "2B", grade_name: "Segundo" },
-  { id: "group-3a", name: "3A", grade_name: "Tercero" },
-  { id: "group-4a", name: "4A", grade_name: "Cuarto" },
-];
-
 const importFields = [
   { key: "first_name", label: "Nombre(s)", required: true },
   { key: "paternal_last_name", label: "Apellido paterno", required: true },
@@ -255,19 +249,16 @@ function splitBirthDate(date?: string) {
   return { day: day || "", month: month || "", year: year || "" };
 }
 
-function normalizeStudents(response: any): Student[] {
-  const raw = response?.data?.students || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeStudents(response: unknown): Student[] {
+  return responseArray<Student>(response, "students");
 }
 
-function normalizeGroups(response: any): GroupOption[] {
-  const raw = response?.data?.groups || response?.data || [];
-  return Array.isArray(raw) && raw.length > 0 ? raw : fallbackGroups;
+function normalizeGroups(response: unknown): GroupOption[] {
+  return responseArray<GroupOption>(response, "groups");
 }
 
-function normalizeSchoolYears(response: any): SchoolYear[] {
-  const raw = response?.data?.school_years || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeSchoolYears(response: unknown): SchoolYear[] {
+  return responseArray<SchoolYear>(response, "school_years");
 }
 
 function getPrimaryParent(student: Student): ParentContact {
@@ -363,29 +354,10 @@ function documentStorageLabel(value?: string) {
   return labels[value || "digital_only"] || "Solo digital";
 }
 
-function buildAcademicHistory(student: Student, years: SchoolYear[]): AcademicHistoryItem[] {
-  if (student.academic_history?.length) return student.academic_history;
-  const current = years.find((year) => year.is_current) || years[0];
-  const previous = years.filter((year) => !year.is_current).slice(0, 2);
-  const seedYears = [current, ...previous].filter(Boolean) as SchoolYear[];
-  return seedYears.map((year, index) => ({
-    id: `${student.id}-${year.id}`,
-    school_year_id: year.id,
-    school_year: year.name,
-    grade_name: index === 0 ? student.grade_name || "Sin grado" : `Grado anterior ${index}`,
-    group_name: index === 0 ? student.group_name || "Sin grupo" : "Historico",
-    status: index === 0 ? statusLabel(student.status) : "Promovido",
-    average_grade: Math.max(70, Number(student.average_grade || 88) - index * 2),
-    attendance_rate: Math.max(80, Number(student.attendance_rate || 94) - index),
-    absences: Number(student.total_absences || 1) + index,
-    notes: index === 0 ? "Ciclo actual." : "Registro historico importado/demo.",
-  }));
-}
-
 function SchoolStudentsContent() {
   const { toast } = useToast();
   const [students, setStudents] = useState<Student[]>([]);
-  const [groups, setGroups] = useState<GroupOption[]>(fallbackGroups);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
   const [schoolYears, setSchoolYears] = useState<SchoolYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -407,25 +379,30 @@ function SchoolStudentsContent() {
   const [columnSearch, setColumnSearch] = useState("");
   const [mapping, setMapping] = useState<Record<string, string>>({});
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       const response = await authFetch("/api/v1/school-admin/academic/groups");
       setGroups(normalizeGroups(response));
-    } catch {
-      setGroups(fallbackGroups);
+    } catch (error) {
+      setGroups([]);
+      toast({
+        title: "No se pudieron cargar los grupos",
+        description: error instanceof Error ? error.message : "Intenta de nuevo.",
+        variant: "destructive",
+      });
     }
-  };
+  }, [toast]);
 
-  const loadSchoolYears = async () => {
+  const loadSchoolYears = useCallback(async () => {
     try {
       const response = await authFetch("/api/v1/school-admin/academic/school-years");
       setSchoolYears(normalizeSchoolYears(response));
     } catch {
       setSchoolYears([]);
     }
-  };
+  }, []);
 
-  const loadStudents = async () => {
+  const loadStudents = useCallback(async () => {
     try {
       setLoading(true);
       const response = await authFetch("/api/v1/school-admin/academic/students");
@@ -439,13 +416,13 @@ function SchoolStudentsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadGroups();
     loadSchoolYears();
     loadStudents();
-  }, []);
+  }, [loadGroups, loadSchoolYears, loadStudents]);
 
   const filteredStudents = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -469,7 +446,7 @@ function SchoolStudentsContent() {
     return { total: students.length, active, inactive, attention, parents };
   }, [students]);
 
-  const currentRows = sheets[activeSheet] || [];
+  const currentRows = useMemo(() => sheets[activeSheet] || [], [activeSheet, sheets]);
   const columns = useMemo(() => Object.keys(currentRows[0] || {}), [currentRows]);
   const visibleColumns = useMemo(() => {
     const term = columnSearch.trim().toLowerCase();
@@ -487,7 +464,9 @@ function SchoolStudentsContent() {
   }, [currentRows, mapping]);
 
   const importValidation = useMemo(() => {
-    const required = importFields.filter((field) => (field as any).required).map((field) => field.key);
+    const required = importFields
+      .filter((field) => "required" in field && field.required)
+      .map((field) => field.key);
     const missing = required.filter((field) => !mapping[field]);
     const validRows = mappedImportRows.filter((row) => required.every((field) => String(row[field] || "").trim())).length;
     return { missing, validRows, totalRows: currentRows.length };
@@ -510,7 +489,7 @@ function SchoolStudentsContent() {
   };
 
   const openDetail = async (student: Student) => {
-    const enriched = { ...student, academic_history: buildAcademicHistory(student, schoolYears) };
+    const enriched = { ...student, academic_history: student.academic_history || [] };
     setSelectedStudent(enriched);
     setHistoryYearFilter("all");
     setDetailOpen(true);
@@ -526,7 +505,7 @@ function SchoolStudentsContent() {
         ]);
         setSelectedStudent({
           ...response.data,
-          academic_history: historyResponse?.success ? historyResponse.data : buildAcademicHistory(response.data, schoolYears),
+          academic_history: historyResponse?.success && Array.isArray(historyResponse.data) ? historyResponse.data : [],
           schedule: scheduleResponse?.success ? scheduleResponse.data : [],
           recent_attendance: attendanceResponse?.success ? attendanceResponse.data?.records || [] : response.data.recent_attendance,
           documents: documentsResponse?.success ? documentsResponse.data : [],
@@ -754,7 +733,7 @@ function SchoolStudentsContent() {
     }
   };
 
-  const selectedHistory = selectedStudent ? buildAcademicHistory(selectedStudent, schoolYears) : [];
+  const selectedHistory = selectedStudent?.academic_history || [];
   const filteredHistory = selectedHistory.filter((item) => historyYearFilter === "all" || item.school_year_id === historyYearFilter);
 
   return (
@@ -851,8 +830,11 @@ function SchoolStudentsContent() {
                     <TableCell><div className="font-medium">{fullStudentName(student)}</div><div className="text-xs text-muted-foreground">{student.email || "Sin email de alumno"}</div></TableCell>
                     <TableCell>{student.enrollment_id}</TableCell>
                     <TableCell><div>{student.grade_name || "Sin grado"}</div><div className="text-xs text-muted-foreground">{student.group_name || "Sin grupo"}</div></TableCell>
-                    <TableCell><div>{student.parents?.length || 1} contacto(s)</div><div className="text-xs text-muted-foreground">{getPrimaryParent(student).email}</div></TableCell>
-                    <TableCell><div className="text-sm">{student.average_grade || 0} promedio</div><div className="text-xs text-muted-foreground">{student.attendance_rate || 0}% asistencia</div></TableCell>
+                    <TableCell><div>{student.parents?.length ?? 0} contacto(s)</div><div className="text-xs text-muted-foreground">{getPrimaryParent(student).email || "Sin contacto"}</div></TableCell>
+                    <TableCell>
+                      <div className="text-sm">{student.average_grade == null ? "Sin promedio" : `${student.average_grade} promedio`}</div>
+                      <div className="text-xs text-muted-foreground">{student.attendance_rate == null ? "Sin asistencia calculada" : `${student.attendance_rate}% asistencia`}</div>
+                    </TableCell>
                     <TableCell><Badge variant={student.status === "active" ? "default" : "outline"}>{statusLabel(student.status)}</Badge></TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
@@ -1090,6 +1072,9 @@ function SchoolStudentsContent() {
                           <TableCell>{item.status}</TableCell>
                         </TableRow>
                       ))}
+                      {filteredHistory.length === 0 && (
+                        <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Sin historial académico registrado.</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -1175,7 +1160,7 @@ function SchoolStudentsContent() {
                   <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
                     {importFields.map((field) => (
                       <div key={field.key} className="space-y-1">
-                        <Label>{field.label}{(field as any).required ? " *" : ""}</Label>
+                        <Label>{field.label}{"required" in field && field.required ? " *" : ""}</Label>
                         <Select value={mapping[field.key] || "none"} onValueChange={(value) => setMapping((current) => ({ ...current, [field.key]: value === "none" ? "" : value }))}>
                           <SelectTrigger><SelectValue placeholder="Seleccionar columna" /></SelectTrigger>
                           <SelectContent>

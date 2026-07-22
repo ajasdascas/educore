@@ -11,18 +11,42 @@ import { useToast } from "@/components/ui/use-toast";
 
 const today = new Date().toISOString().slice(0, 10);
 const statuses = [
-  { value: "present", label: "Presente" },
-  { value: "absent", label: "Ausente" },
-  { value: "late", label: "Retardo" },
-  { value: "excused", label: "Justificado" },
+  { value: "unrecorded", label: "Sin registrar", disabled: true },
+  { value: "present", label: "Presente", disabled: false },
+  { value: "absent", label: "Ausente", disabled: false },
+  { value: "late", label: "Retardo", disabled: false },
+  { value: "excused", label: "Justificado", disabled: false },
 ];
 
+interface TeacherClass {
+  id: string;
+  group_id: string;
+  group_name: string;
+  subject_name: string;
+}
+
+interface AttendanceStudent {
+  student_id: string;
+  student_name: string;
+  enrollment_id?: string;
+  status?: string;
+  notes?: string;
+}
+
+interface AttendanceSummary {
+  total?: number;
+  present?: number;
+  absent?: number;
+  late?: number;
+  excused?: number;
+}
+
 export default function TeacherAttendancePage() {
-  const [classes, setClasses] = useState<any[]>([]);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [groupId, setGroupId] = useState("");
   const [date, setDate] = useState(today);
-  const [students, setStudents] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({});
+  const [students, setStudents] = useState<AttendanceStudent[]>([]);
+  const [summary, setSummary] = useState<AttendanceSummary>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,11 +67,19 @@ export default function TeacherAttendancePage() {
     });
   }, [groupId, date]);
 
-  const update = (studentId: string, patch: any) => {
+  const update = (studentId: string, patch: Partial<Pick<AttendanceStudent, "status" | "notes">>) => {
     setStudents((items) => items.map((item) => item.student_id === studentId ? { ...item, ...patch } : item));
   };
 
   const save = async () => {
+    if (students.some((student) => !student.status || student.status === "unrecorded")) {
+      toast({
+        title: "Asistencia incompleta",
+        description: "Selecciona un estado real para cada alumno antes de guardar.",
+        variant: "destructive",
+      });
+      return;
+    }
     const res = await authFetch("/api/v1/teacher/attendance", {
       method: "POST",
       body: JSON.stringify({ group_id: groupId, date, records: students.map(({ student_id, status, notes }) => ({ student_id, status, notes })) }),
@@ -90,9 +122,9 @@ export default function TeacherAttendancePage() {
                     <td className="p-3 font-medium">{student.student_name}</td>
                     <td className="p-3">{student.enrollment_id || "N/D"}</td>
                     <td className="p-3">
-                      <Select value={student.status || "present"} onValueChange={(value) => update(student.student_id, { status: value })}>
+                      <Select value={student.status || "unrecorded"} onValueChange={(value) => update(student.student_id, { status: value })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{statuses.map((status) => <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>)}</SelectContent>
+                        <SelectContent>{statuses.map((status) => <SelectItem key={status.value} value={status.value} disabled={status.disabled}>{status.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </td>
                     <td className="p-3"><Input value={student.notes || ""} onChange={(e) => update(student.student_id, { notes: e.target.value })} placeholder="Notas" /></td>

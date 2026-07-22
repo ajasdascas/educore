@@ -66,19 +66,40 @@ type ParentDocumentResponse struct {
 }
 
 type ParentPaymentResponse struct {
-	ID            string     `json:"id"`
-	StudentID     string     `json:"student_id"`
-	StudentName   string     `json:"student_name"`
-	Concept       string     `json:"concept"`
-	Description   string     `json:"description"`
-	Amount        float64    `json:"amount"`
-	Currency      string     `json:"currency"`
-	DueDate       string     `json:"due_date"`
-	PaidAt        *time.Time `json:"paid_at,omitempty"`
-	PaymentMethod string     `json:"payment_method"`
-	ReceiptNumber string     `json:"receipt_number"`
-	ReceiptURL    string     `json:"receipt_url"`
-	Status        string     `json:"status"`
+	ID              string     `json:"id"`
+	StudentID       string     `json:"student_id"`
+	StudentName     string     `json:"student_name"`
+	Concept         string     `json:"concept"`
+	Description     string     `json:"description"`
+	Amount          float64    `json:"amount"`
+	PaidAmount      float64    `json:"paid_amount"`
+	RemainingAmount float64    `json:"remaining_amount"`
+	Currency        string     `json:"currency"`
+	DueDate         string     `json:"due_date"`
+	PaidAt          *time.Time `json:"paid_at,omitempty"`
+	PaymentMethod   string     `json:"payment_method"`
+	ReceiptNumber   string     `json:"receipt_number"`
+	ReceiptURL      string     `json:"receipt_url"`
+	Status          string     `json:"status"`
+}
+
+type ParentPaymentReceiptResponse struct {
+	TransactionID   string    `json:"transaction_id"`
+	PaymentID       string    `json:"payment_id"`
+	Folio           string    `json:"folio"`
+	School          string    `json:"school"`
+	Student         string    `json:"student"`
+	Concept         string    `json:"concept"`
+	ChargeAmount    float64   `json:"charge_amount"`
+	Amount          float64   `json:"amount"`
+	PaidAmount      float64   `json:"paid_amount"`
+	RemainingAmount float64   `json:"remaining_amount"`
+	Currency        string    `json:"currency"`
+	Method          string    `json:"method"`
+	Reference       string    `json:"reference"`
+	Date            time.Time `json:"date"`
+	Status          string    `json:"status"`
+	Notes           string    `json:"notes"`
 }
 
 type ParentPaymentSummary struct {

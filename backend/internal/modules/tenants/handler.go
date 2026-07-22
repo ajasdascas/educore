@@ -6,7 +6,6 @@ import (
 
 	"educore/internal/pkg/database"
 	"github.com/gofiber/fiber/v2"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Handler struct {
@@ -19,7 +18,10 @@ func NewHandler(db *database.DB) *Handler {
 
 func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/", h.List)
-	router.Post("/", h.Create)
+	// School provisioning has a single authoritative route:
+	// POST /api/v1/super-admin/schools. The legacy POST /tenants path skipped
+	// the production module gate, DNS provisioning and secure credentials, so it
+	// must not remain reachable as an alternate creation flow.
 	router.Get("/:id", h.GetByID)
 	router.Patch("/:id", h.Update)
 	router.Post("/:id/suspend", h.Suspend)
@@ -27,23 +29,6 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 }
 
 // --- DTOs ---
-
-type CreateTenantRequest struct {
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	LogoURL   string `json:"logo_url"`
-	Level     string `json:"level"`
-	Country   string `json:"country"`
-	State     string `json:"state"`
-	Phone     string `json:"phone"`
-	Plan      string `json:"plan"`
-	TrialDays int    `json:"trial_days"`
-	Director  struct {
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Email     string `json:"email"`
-	} `json:"director"`
-}
 
 type UpdateTenantRequest struct {
 	Name    *string `json:"name"`
@@ -118,87 +103,6 @@ func (h *Handler) List(c *fiber.Ctx) error {
 		"page":    page,
 		"limit":   limit,
 	}, "Tenants retrieved")
-}
-
-func (h *Handler) Create(c *fiber.Ctx) error {
-	var req CreateTenantRequest
-	if err := c.BodyParser(&req); err != nil {
-		return response.Error(c, fiber.StatusBadRequest, "Invalid request body")
-	}
-
-	if req.Name == "" || req.Slug == "" {
-		return response.Error(c, fiber.StatusBadRequest, "Name and slug are required")
-	}
-	if req.Plan == "" {
-		req.Plan = "starter"
-	}
-	if req.TrialDays == 0 {
-		req.TrialDays = 30
-	}
-
-	// Start transaction for provisioning
-	tx, err := h.db.Begin(c.Context())
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Transaction error")
-	}
-	defer tx.Rollback(c.Context())
-
-	// 1. Create tenant
-	var tenantID string
-	err = tx.QueryRow(c.Context(),
-		`INSERT INTO tenants (name, slug, logo_url, status, plan, settings)
-		 VALUES ($1, $2, $3, 'trial', $4, '{}')
-		 RETURNING id`,
-		req.Name, req.Slug, req.LogoURL, req.Plan).Scan(&tenantID)
-
-	if err != nil {
-		return response.Error(c, fiber.StatusConflict, "Slug already exists or insert error")
-	}
-
-	// 2. Insert core modules
-	coreModules := []string{"academic_core", "parent_portal", "teacher_portal", "communication", "payments_basic"}
-	for _, mod := range coreModules {
-		_, err = tx.Exec(c.Context(),
-			"INSERT INTO tenant_modules (tenant_id, module_key, is_active) VALUES ($1, $2, true)",
-			tenantID, mod)
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error creating modules")
-		}
-	}
-
-	// 3. Create school_settings
-	_, err = tx.Exec(c.Context(),
-		"INSERT INTO school_settings (tenant_id) VALUES ($1)", tenantID)
-	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error creating settings")
-	}
-
-	// 4. Create SCHOOL_ADMIN user (director) with invitation
-	if req.Director.Email != "" {
-		// Temporary password hash (will be replaced when invitation is accepted)
-		tempHash, _ := bcrypt.GenerateFromPassword([]byte("temp-will-be-replaced"), bcrypt.DefaultCost)
-
-		_, err = tx.Exec(c.Context(),
-			`INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active, invitation_token, invitation_expires_at)
-			 VALUES ($1, $2, $3, $4, $5, 'SCHOOL_ADMIN', true, gen_random_uuid()::text, NOW() + INTERVAL '7 days')`,
-			tenantID, req.Director.Email, string(tempHash), req.Director.FirstName, req.Director.LastName)
-
-		if err != nil {
-			return response.Error(c, fiber.StatusInternalServerError, "Error creating director: "+err.Error())
-		}
-
-		// TODO: Send invitation email via Resend
-	}
-
-	if err := tx.Commit(c.Context()); err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, "Error committing transaction")
-	}
-
-	return response.Success(c, fiber.Map{
-		"tenant_id": tenantID,
-		"slug":      req.Slug,
-		"url":       req.Slug + ".educore.app",
-	}, "School created successfully")
 }
 
 func (h *Handler) GetByID(c *fiber.Ctx) error {

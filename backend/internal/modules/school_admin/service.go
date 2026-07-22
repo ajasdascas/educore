@@ -2,14 +2,14 @@ package school_admin
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
-	"net/http"
-	"net/url"
-	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"educore/internal/events"
 )
@@ -18,6 +18,11 @@ type Service struct {
 	repo *Repository
 	bus  *events.EventBus
 }
+
+var (
+	ErrDocumentStorageUnavailable = errors.New("digital document storage is unavailable until an external object-storage provider is configured")
+	ErrCardPaymentsUnavailable    = errors.New("card payments are unavailable until a verified provider and webhook are configured")
+)
 
 func NewService(repo *Repository, bus *events.EventBus) *Service {
 	return &Service{
@@ -620,25 +625,39 @@ func (s *Service) GetGroupFinalGrades(ctx context.Context, tenantID, groupID str
 }
 
 func (s *Service) GenerateReportCard(ctx context.Context, tenantID, userID string, req GenerateReportCardRequest) (*ReportCardResponse, error) {
-	period := req.Period
-	if strings.TrimSpace(period) == "" {
+	studentID := strings.TrimSpace(req.StudentID)
+	if studentID == "" {
+		return nil, fmt.Errorf("student_id is required")
+	}
+	period := strings.TrimSpace(req.Period)
+	if period == "" {
 		period = "current"
 	}
-	reportCard, err := s.repo.GetStudentReportCard(ctx, tenantID, req.StudentID, period)
+	if !validReportPeriod(period) {
+		return nil, fmt.Errorf("period must contain only letters, numbers, spaces, hyphens or underscores and be at most 80 characters")
+	}
+	if req.PersistAsDocument {
+		return nil, ErrDocumentStorageUnavailable
+	}
+	reportCard, err := s.repo.GetStudentReportCard(ctx, tenantID, studentID, period)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate report card: %w", err)
 	}
-	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "report_card.generated", "students", req.StudentID, map[string]interface{}{"period": period, "persist_as_document": req.PersistAsDocument})
-	if req.PersistAsDocument {
-		_, _ = s.repo.CreateStudentDocument(ctx, tenantID, userID, CreateStudentDocumentRequest{
-			StudentID:   req.StudentID,
-			Title:       "Boleta " + period,
-			Description: "Boleta generada automaticamente desde calificaciones y asistencia.",
-			Category:    "report_card",
-			FileName:    "boleta-" + req.StudentID + "-" + period + ".pdf",
-			MimeType:    "application/pdf",
-		})
+	payload, err := json.Marshal(reportCard)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize report-card snapshot: %w", err)
 	}
+	checksum := fmt.Sprintf("%x", sha256.Sum256(payload))
+	snapshotID, err := s.repo.SaveReportCardSnapshot(ctx, tenantID, userID, studentID, period, payload, checksum)
+	if err != nil {
+		return nil, err
+	}
+	reportCard.SnapshotID = snapshotID
+	reportCard.SnapshotSHA256 = checksum
+	reportCard.SnapshotPayloadJSON = string(payload)
+	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "report_card.snapshot_created", "students", studentID, map[string]interface{}{
+		"period": period, "snapshot_id": snapshotID, "sha256": checksum,
+	})
 	return reportCard, nil
 }
 
@@ -647,51 +666,28 @@ func (s *Service) GetStudentDocuments(ctx context.Context, tenantID, studentID s
 	if err != nil {
 		return nil, fmt.Errorf("failed to get student documents: %w", err)
 	}
+	for i := range documents {
+		// No untrusted URL is exposed until the installation has a configured,
+		// allow-listed object-storage provider.
+		documents[i].FileURL = ""
+	}
 	return documents, nil
 }
 
 func (s *Service) CreateStudentDocument(ctx context.Context, tenantID, userID string, req CreateStudentDocumentRequest) (*StudentDocumentResponse, error) {
-	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.StudentID) == "" {
-		return nil, fmt.Errorf("student_id and title are required")
-	}
-	document, err := s.repo.CreateStudentDocument(ctx, tenantID, userID, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create student document: %w", err)
-	}
-	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.created", "school_documents", document.ID, map[string]interface{}{"after": document})
-	return document, nil
+	return nil, ErrDocumentStorageUnavailable
 }
 
 func (s *Service) UpdateStudentDocument(ctx context.Context, tenantID, userID, documentID string, req CreateStudentDocumentRequest) (*StudentDocumentResponse, error) {
-	if strings.TrimSpace(documentID) == "" || strings.TrimSpace(req.Title) == "" {
-		return nil, fmt.Errorf("document_id and title are required")
-	}
-	before, _ := s.repo.GetStudentDocument(ctx, tenantID, documentID)
-	document, err := s.repo.UpdateStudentDocument(ctx, tenantID, documentID, req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update student document: %w", err)
-	}
-	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.updated", "school_documents", documentID, map[string]interface{}{"before": before, "after": document})
-	return document, nil
+	return nil, ErrDocumentStorageUnavailable
 }
 
 func (s *Service) VerifyStudentDocument(ctx context.Context, tenantID, userID, documentID string) (*StudentDocumentResponse, error) {
-	before, _ := s.repo.GetStudentDocument(ctx, tenantID, documentID)
-	document, err := s.repo.VerifyStudentDocument(ctx, tenantID, userID, documentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify student document: %w", err)
-	}
-	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.verified", "school_documents", documentID, map[string]interface{}{"before": before, "after": document})
-	return document, nil
+	return nil, ErrDocumentStorageUnavailable
 }
 
 func (s *Service) DeleteStudentDocument(ctx context.Context, tenantID, userID, documentID string) error {
-	before, _ := s.repo.GetStudentDocument(ctx, tenantID, documentID)
-	if err := s.repo.DeleteStudentDocument(ctx, tenantID, documentID); err != nil {
-		return fmt.Errorf("failed to delete student document: %w", err)
-	}
-	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "document.deleted", "school_documents", documentID, map[string]interface{}{"before": before})
-	return nil
+	return ErrDocumentStorageUnavailable
 }
 
 func (s *Service) GetPayments(ctx context.Context, tenantID string, params GetPaymentsParams) (*StudentPaymentsResponse, error) {
@@ -702,11 +698,29 @@ func (s *Service) CreateStudentCharge(ctx context.Context, tenantID, userID stri
 	if strings.TrimSpace(req.StudentID) == "" || strings.TrimSpace(req.Concept) == "" || strings.TrimSpace(req.DueDate) == "" {
 		return nil, fmt.Errorf("student_id, concept and due_date are required")
 	}
-	if req.Amount <= 0 {
+	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 || req.Amount > 9999999999.99 {
 		return nil, fmt.Errorf("amount must be greater than zero")
 	}
+	if len(strings.TrimSpace(req.Concept)) > 255 || len(strings.TrimSpace(req.Description)) > 5000 || len(strings.TrimSpace(req.Notes)) > 2000 {
+		return nil, fmt.Errorf("concept, description or notes exceed the allowed length")
+	}
+	if _, err := time.Parse("2006-01-02", req.DueDate); err != nil {
+		return nil, fmt.Errorf("due_date must use YYYY-MM-DD")
+	}
+	amountCents := moneyToCents(req.Amount)
+	if amountCents <= 0 {
+		return nil, fmt.Errorf("amount must be at least 0.01")
+	}
+	req.Amount = centsToMoney(amountCents)
+	req.Concept = strings.TrimSpace(req.Concept)
+	req.Description = strings.TrimSpace(req.Description)
+	req.Notes = strings.TrimSpace(req.Notes)
+	req.Currency = strings.ToUpper(strings.TrimSpace(req.Currency))
 	if req.Currency == "" {
 		req.Currency = "MXN"
+	}
+	if req.Currency != "MXN" {
+		return nil, fmt.Errorf("only MXN charges are supported by this ledger")
 	}
 	payment, err := s.repo.CreateStudentCharge(ctx, tenantID, userID, req)
 	if err != nil {
@@ -717,13 +731,26 @@ func (s *Service) CreateStudentCharge(ctx context.Context, tenantID, userID stri
 }
 
 func (s *Service) RecordStudentPayment(ctx context.Context, tenantID, userID, paymentID string, req RecordStudentPaymentRequest) (*StudentPaymentResponse, error) {
-	method := strings.ToLower(strings.TrimSpace(req.Method))
-	if method != "cash" && method != "transfer" && method != "card" && method != "efectivo" && method != "transferencia" && method != "tarjeta" {
+	method, ok := normalizeManualPaymentMethod(req.Method)
+	if !ok {
 		return nil, fmt.Errorf("invalid payment method")
 	}
-	if req.Amount <= 0 {
+	if math.IsNaN(req.Amount) || math.IsInf(req.Amount, 0) || req.Amount <= 0 || req.Amount > 9999999999.99 {
 		return nil, fmt.Errorf("amount must be greater than zero")
 	}
+	if !validIdempotencyKey(req.IdempotencyKey) {
+		return nil, fmt.Errorf("idempotency_key must be 8-120 safe characters")
+	}
+	if len(strings.TrimSpace(req.Reference)) > 255 || len(strings.TrimSpace(req.Notes)) > 2000 {
+		return nil, fmt.Errorf("reference or notes exceed the allowed length")
+	}
+	amountCents := moneyToCents(req.Amount)
+	if amountCents <= 0 {
+		return nil, fmt.Errorf("amount must be at least 0.01")
+	}
+	req.Method = method
+	req.Amount = centsToMoney(amountCents)
+	req.IdempotencyKey = strings.TrimSpace(req.IdempotencyKey)
 	before, _ := s.repo.GetPayment(ctx, tenantID, paymentID)
 	payment, err := s.repo.RecordStudentPayment(ctx, tenantID, userID, paymentID, req)
 	if err != nil {
@@ -733,92 +760,42 @@ func (s *Service) RecordStudentPayment(ctx context.Context, tenantID, userID, pa
 	return payment, nil
 }
 
-func (s *Service) GetPaymentReceipt(ctx context.Context, tenantID, paymentID string) (map[string]interface{}, error) {
-	payment, err := s.repo.GetPayment(ctx, tenantID, paymentID)
+func (s *Service) GetPaymentReceipt(ctx context.Context, tenantID, paymentID string) (*PaymentReceiptResponse, error) {
+	receipt, err := s.repo.GetPaymentReceipt(ctx, tenantID, paymentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payment receipt: %w", err)
 	}
-	return map[string]interface{}{
-		"folio":        payment.ReceiptNumber,
-		"school":       "EduCore",
-		"student":      payment.StudentName,
-		"student_code": payment.StudentCode,
-		"concept":      payment.Concept,
-		"amount":       payment.Amount,
-		"currency":     payment.Currency,
-		"method":       payment.PaymentMethod,
-		"date":         payment.PaidAt,
-		"status":       payment.Status,
-		"notes":        payment.Notes,
-	}, nil
+	return receipt, nil
 }
 
 func (s *Service) CreateStripeCheckoutSession(ctx context.Context, tenantID, userID, paymentID string, req CreateCardCheckoutSessionRequest) (map[string]interface{}, error) {
-	if strings.ToLower(os.Getenv("EDUCORE_STRIPE_ENABLED")) != "true" {
-		return nil, fmt.Errorf("stripe payments are disabled for this tenant/environment")
-	}
-	secretKey := os.Getenv("STRIPE_SECRET_KEY")
-	if strings.TrimSpace(secretKey) == "" {
-		return nil, fmt.Errorf("stripe secret key is not configured")
-	}
-	payment, err := s.repo.GetPayment(ctx, tenantID, paymentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payment: %w", err)
-	}
-	if payment.Status == "paid" || payment.Status == "cancelled" {
-		return nil, fmt.Errorf("payment is not payable")
-	}
-	if payment.Amount <= 0 {
-		return nil, fmt.Errorf("payment amount must be greater than zero")
-	}
-	successURL := strings.TrimSpace(req.SuccessURL)
-	cancelURL := strings.TrimSpace(req.CancelURL)
-	if successURL == "" || cancelURL == "" {
-		return nil, fmt.Errorf("success_url and cancel_url are required")
-	}
+	return nil, ErrCardPaymentsUnavailable
+}
 
-	form := url.Values{}
-	form.Set("mode", "payment")
-	form.Set("success_url", successURL)
-	form.Set("cancel_url", cancelURL)
-	form.Set("client_reference_id", payment.ID)
-	form.Set("line_items[0][price_data][currency]", strings.ToLower(firstNonEmpty(payment.Currency, "MXN")))
-	form.Set("line_items[0][price_data][product_data][name]", fmt.Sprintf("%s - %s", payment.Concept, payment.StudentName))
-	form.Set("line_items[0][price_data][unit_amount]", fmt.Sprintf("%.0f", math.Round(payment.Amount*100)))
-	form.Set("line_items[0][quantity]", "1")
-	form.Set("metadata[tenant_id]", tenantID)
-	form.Set("metadata[payment_id]", payment.ID)
-	form.Set("metadata[student_id]", payment.StudentID)
+func moneyToCents(value float64) int64 { return int64(math.Round(value * 100)) }
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.stripe.com/v1/checkout/sessions", strings.NewReader(form.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	request.SetBasicAuth(secretKey, "")
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("Stripe-Version", "2026-02-25.clover")
+func centsToMoney(cents int64) float64 { return float64(cents) / 100 }
 
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("stripe checkout request failed")
+func nextManualPaymentState(chargeAmount, paidAmount, requestedAmount float64) (float64, string, error) {
+	chargeCents := moneyToCents(chargeAmount)
+	paidCents := moneyToCents(paidAmount)
+	requestedCents := moneyToCents(requestedAmount)
+	remainingCents := chargeCents - paidCents
+	if chargeCents <= 0 || requestedCents <= 0 {
+		return paidAmount, "", fmt.Errorf("payment amount must be greater than zero")
 	}
-	defer response.Body.Close()
-
-	var payload map[string]interface{}
-	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
-		return nil, fmt.Errorf("invalid stripe response")
+	if remainingCents <= 0 {
+		return paidAmount, "", fmt.Errorf("charge is already paid")
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("stripe checkout session could not be created")
+	if requestedCents > remainingCents {
+		return paidAmount, "", fmt.Errorf("payment amount exceeds remaining balance")
 	}
-
-	_ = s.repo.AuditSchoolAction(ctx, tenantID, userID, "payment.stripe_checkout_created", "student_payments", paymentID, map[string]interface{}{"provider": "stripe", "mode": "checkout"})
-	return map[string]interface{}{
-		"provider":   "stripe",
-		"mode":       "checkout",
-		"session_id": payload["id"],
-		"url":        payload["url"],
-	}, nil
+	newPaidCents := paidCents + requestedCents
+	status := "partial"
+	if newPaidCents == chargeCents {
+		status = "paid"
+	}
+	return centsToMoney(newPaidCents), status, nil
 }
 
 func firstNonEmpty(value, fallback string) string {
@@ -826,6 +803,45 @@ func firstNonEmpty(value, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func normalizeManualPaymentMethod(value string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "cash", "efectivo":
+		return "cash", true
+	case "transfer", "transferencia":
+		return "transfer", true
+	default:
+		return "", false
+	}
+}
+
+func validIdempotencyKey(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) < 8 || len(value) > 120 {
+		return false
+	}
+	for _, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '-' || char == '_' || char == ':' || char == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validReportPeriod(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 80 {
+		return false
+	}
+	for _, char := range value {
+		if unicode.IsLetter(char) || unicode.IsDigit(char) || char == '-' || char == '_' || char == ' ' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // Business rule validation methods
@@ -995,7 +1011,6 @@ func (s *Service) validateBulkGrades(ctx context.Context, tenantID string, req B
 
 	return nil
 }
-
 
 type AdminNotification struct {
 	ID        string `json:"id"`

@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"educore/internal/pkg/database"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Repository struct {
@@ -27,40 +25,6 @@ func NewRepository(db *database.DB) *Repository {
 
 func (r *Repository) DB() *database.DB { return r.db }
 
-func defaultStagingPortalPasswordHash() string {
-	if !strings.EqualFold(os.Getenv("APP_ENV"), "staging") && !strings.EqualFold(os.Getenv("EDUCORE_ENABLE_STAGING_PORTAL_PASSWORDS"), "true") {
-		return ""
-	}
-	password := cleanStagingSecret(os.Getenv("EDUCORE_DEFAULT_SCHOOL_ADMIN_PASSWORD"))
-	if len(password) < minimumStagingPortalPasswordLength() {
-		return ""
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return ""
-	}
-	return string(hash)
-}
-
-func cleanStagingSecret(value string) string {
-	cleaned := strings.TrimSpace(value)
-	if len(cleaned) >= 2 {
-		first := cleaned[0]
-		last := cleaned[len(cleaned)-1]
-		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
-			cleaned = strings.TrimSpace(cleaned[1 : len(cleaned)-1])
-		}
-	}
-	return cleaned
-}
-
-func minimumStagingPortalPasswordLength() int {
-	if strings.EqualFold(os.Getenv("APP_ENV"), "staging") {
-		return 10
-	}
-	return 12
-}
-
 func (r *Repository) IsModuleEnabled(ctx context.Context, tenantID, moduleKey string) bool {
 	var enabled bool
 	err := r.db.QueryRow(ctx, `
@@ -70,6 +34,7 @@ func (r *Repository) IsModuleEnabled(ctx context.Context, tenantID, moduleKey st
 		WHERE tm.tenant_id = $1
 		  AND tm.module_key = $2
 		  AND COALESCE(mc.global_enabled, true) = true
+		  AND mc.status = 'active'
 		LIMIT 1
 	`, tenantID, moduleKey).Scan(&enabled)
 	return err == nil && enabled
@@ -450,6 +415,12 @@ func (r *Repository) GetEnabledModules(ctx context.Context, tenantID string) ([]
 		INNER JOIN modules_catalog mc ON mc.key = tm.module_key
 		WHERE tm.tenant_id = $1
 		  AND COALESCE(tm.enabled, tm.is_active, false) = true
+		  AND mc.status = 'active'
+		  AND mc.global_enabled = true
+		  AND mc.key IN (
+		    'auth', 'users', 'academic_core', 'grading', 'students', 'groups',
+		    'grades', 'schedules', 'attendance'
+		  )
 		ORDER BY mc.is_core DESC, mc.name
 	`
 	rows, err := r.db.Query(ctx, query, tenantID)
@@ -543,7 +514,8 @@ func (r *Repository) GetStudentsPaginated(ctx context.Context, tenantID string, 
 		sortColumn = strings.ReplaceAll(sortColumn, " ASC", " DESC")
 	}
 	dataQuery := fmt.Sprintf(`
-		SELECT DISTINCT s.id, s.first_name, s.last_name, '' as email, '' as phone,
+		SELECT DISTINCT s.id, s.first_name, s.last_name,
+			   COALESCE(s.email, '') as email, COALESCE(s.phone, '') as phone,
 			   COALESCE(s.enrollment_number, '') as enrollment_id, s.status,
 			   COALESCE(g.name, '') as group_name,
 			   COALESCE(gl.name, '') as grade_name,
@@ -649,23 +621,27 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 	err = tx.QueryRow(ctx, `
 		INSERT INTO students (
 			tenant_id, enrollment_number, first_name, last_name, paternal_last_name,
-			maternal_last_name, birth_date, birth_day, birth_month, birth_year, status, notes
+			maternal_last_name, birth_date, birth_day, birth_month, birth_year,
+			status, notes, email, phone
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, '')::date, NULLIF($8, 0), NULLIF($9, 0), NULLIF($10, 0), $11, $12)
-		RETURNING id, first_name, COALESCE(paternal_last_name, ''), COALESCE(maternal_last_name, ''), last_name, COALESCE(enrollment_number, ''), status, created_at, updated_at
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, '')::date, NULLIF($8, 0), NULLIF($9, 0), NULLIF($10, 0), $11, $12, $13, $14)
+		RETURNING id, first_name, COALESCE(paternal_last_name, ''),
+			COALESCE(maternal_last_name, ''), last_name,
+			COALESCE(email, ''), COALESCE(phone, ''),
+			COALESCE(enrollment_number, ''), status, created_at, updated_at
 	`,
 		tenantID, req.EnrollmentID, req.FirstName, lastName, req.PaternalLastName,
-		req.MaternalLastName, req.BirthDate, birthDay, birthMonth, birthYear, status, req.Address,
+		req.MaternalLastName, req.BirthDate, birthDay, birthMonth, birthYear,
+		status, req.Address, strings.ToLower(strings.TrimSpace(req.Email)), strings.TrimSpace(req.Phone),
 	).Scan(
-		&student.ID, &student.FirstName, &student.PaternalLastName, &student.MaternalLastName, &student.LastName, &student.EnrollmentID,
+		&student.ID, &student.FirstName, &student.PaternalLastName, &student.MaternalLastName,
+		&student.LastName, &student.Email, &student.Phone, &student.EnrollmentID,
 		&student.Status, &student.CreatedAt, &student.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create student: %w", err)
 	}
 
-	student.Email = req.Email
-	student.Phone = req.Phone
 	if len(parents) > 0 {
 		student.ParentName = strings.TrimSpace(parents[0].FirstName + " " + parents[0].PaternalLastName + " " + parents[0].MaternalLastName)
 		student.ParentEmail = parents[0].Email
@@ -693,25 +669,26 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 			relationship = "guardian"
 		}
 		var parentID string
-		parentPasswordHash := defaultStagingPortalPasswordHash()
 		err = tx.QueryRow(ctx, `
 			INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
 			VALUES ($1, $2, $3, $4, $5, 'PARENT', true)
 			ON CONFLICT (tenant_id, email)
-			DO UPDATE SET password_hash = CASE WHEN EXCLUDED.password_hash <> '' THEN EXCLUDED.password_hash ELSE users.password_hash END,
+			DO UPDATE SET password_hash = COALESCE(NULLIF(users.password_hash, ''), EXCLUDED.password_hash),
 			              first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
 			RETURNING id
-		`, tenantID, parent.Email, parentPasswordHash, parent.FirstName, parentLastName).Scan(&parentID)
+		`, tenantID, strings.ToLower(strings.TrimSpace(parent.Email)), nil, parent.FirstName, parentLastName).Scan(&parentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create parent user: %w", err)
 		}
 
 		_, err = tx.Exec(ctx, `
-			INSERT INTO parent_student (parent_id, student_id, relationship, is_primary, phone, notes)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO parent_student (tenant_id, parent_id, student_id, relationship, is_primary, phone, notes)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (parent_id, student_id)
-			DO UPDATE SET relationship = EXCLUDED.relationship, is_primary = EXCLUDED.is_primary, phone = EXCLUDED.phone, notes = EXCLUDED.notes, updated_at = NOW()
-		`, parentID, student.ID, relationship, parent.IsPrimary || index == 0, parent.Phone, parent.Notes)
+			DO UPDATE SET tenant_id = EXCLUDED.tenant_id, relationship = EXCLUDED.relationship,
+			              is_primary = EXCLUDED.is_primary, phone = EXCLUDED.phone,
+			              notes = EXCLUDED.notes, updated_at = NOW()
+		`, tenantID, parentID, student.ID, relationship, parent.IsPrimary || index == 0, parent.Phone, parent.Notes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to link parent to student: %w", err)
 		}
@@ -726,7 +703,8 @@ func (r *Repository) CreateStudent(ctx context.Context, tenantID string, req Cre
 
 func (r *Repository) GetStudentByID(ctx context.Context, tenantID, studentID string) (*StudentDetailResponse, error) {
 	query := `
-		SELECT s.id, s.first_name, s.last_name, '' as email, '' as phone,
+		SELECT s.id, s.first_name, s.last_name,
+			   COALESCE(s.email, '') as email, COALESCE(s.phone, '') as phone,
 			   COALESCE(to_char(s.birth_date, 'YYYY-MM-DD'), '') as birth_date,
 			   COALESCE(s.notes, '') as address,
 			   COALESCE(s.enrollment_number, '') as enrollment_id,
@@ -820,6 +798,46 @@ func (r *Repository) UpdateStudent(ctx context.Context, tenantID, studentID stri
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("last_name = $%d", argCount))
 		args = append(args, req.LastName)
+	}
+	if req.PaternalLastName != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("paternal_last_name = $%d", argCount))
+		args = append(args, req.PaternalLastName)
+	}
+	if req.MaternalLastName != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("maternal_last_name = $%d", argCount))
+		args = append(args, req.MaternalLastName)
+	}
+	if req.Email != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("email = $%d", argCount))
+		args = append(args, strings.ToLower(strings.TrimSpace(req.Email)))
+	}
+	if req.Phone != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("phone = $%d", argCount))
+		args = append(args, strings.TrimSpace(req.Phone))
+	}
+	if req.BirthDate != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("birth_date = NULLIF($%d, '')::date", argCount))
+		args = append(args, req.BirthDate)
+	}
+	if req.BirthDay != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("birth_day = NULLIF($%d, 0)", argCount))
+		args = append(args, parseIntOrZero(req.BirthDay))
+	}
+	if req.BirthMonth != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("birth_month = NULLIF($%d, 0)", argCount))
+		args = append(args, parseIntOrZero(req.BirthMonth))
+	}
+	if req.BirthYear != "" {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("birth_year = NULLIF($%d, 0)", argCount))
+		args = append(args, parseIntOrZero(req.BirthYear))
 	}
 	if req.Address != "" {
 		argCount++
@@ -1029,18 +1047,20 @@ func (r *Repository) CommitStudentImport(ctx context.Context, tenantID, userID s
 			var parentID string
 			err = tx.QueryRow(ctx, `
 				INSERT INTO users (tenant_id, email, password_hash, first_name, last_name, role, is_active)
-				VALUES ($1, $2, '', $3, $4, 'PARENT', true)
+				VALUES ($1, $2, $3, $4, $5, 'PARENT', true)
 				ON CONFLICT (tenant_id, email)
-				DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
+				DO UPDATE SET password_hash = NULLIF(users.password_hash, ''),
+				              first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
 				RETURNING id
-			`, tenantID, parent.Email, parent.FirstName, parentLastName).Scan(&parentID)
+			`, tenantID, strings.ToLower(strings.TrimSpace(parent.Email)), nil, parent.FirstName, parentLastName).Scan(&parentID)
 			if err == nil {
 				_, _ = tx.Exec(ctx, `
-					INSERT INTO parent_student (parent_id, student_id, relationship, is_primary, phone)
-					VALUES ($1, $2, $3, $4, $5)
+					INSERT INTO parent_student (tenant_id, parent_id, student_id, relationship, is_primary, phone)
+					VALUES ($1, $2, $3, $4, $5, $6)
 					ON CONFLICT (parent_id, student_id)
-					DO UPDATE SET relationship = EXCLUDED.relationship, is_primary = EXCLUDED.is_primary, phone = EXCLUDED.phone, updated_at = NOW()
-				`, parentID, studentID, parent.Relationship, parent.IsPrimary, parent.Phone)
+					DO UPDATE SET tenant_id = EXCLUDED.tenant_id, relationship = EXCLUDED.relationship,
+					              is_primary = EXCLUDED.is_primary, phone = EXCLUDED.phone, updated_at = NOW()
+				`, tenantID, parentID, studentID, parent.Relationship, parent.IsPrimary, parent.Phone)
 			}
 		}
 
@@ -1147,13 +1167,12 @@ func (r *Repository) CreateTeacher(ctx context.Context, tenantID string, req Cre
 	// Create user
 	var userID string
 	isActive := req.Status != "inactive"
-	teacherPasswordHash := defaultStagingPortalPasswordHash()
 	err = tx.QueryRow(ctx, `
 		INSERT INTO users (tenant_id, first_name, last_name, email,
 						  password_hash, role, is_active)
 		VALUES ($1, $2, $3, $4, $5, 'TEACHER', $6)
 		RETURNING id
-	`, tenantID, req.FirstName, req.LastName, req.Email, teacherPasswordHash, isActive).Scan(&userID)
+	`, tenantID, req.FirstName, req.LastName, strings.ToLower(strings.TrimSpace(req.Email)), nil, isActive).Scan(&userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -1192,11 +1211,34 @@ func (r *Repository) CreateTeacher(ctx context.Context, tenantID string, req Cre
 
 // Validation helper functions
 func (r *Repository) StudentEmailExists(ctx context.Context, tenantID, email string) (bool, error) {
-	return false, nil
+	if strings.TrimSpace(email) == "" {
+		return false, nil
+	}
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM students
+			WHERE tenant_id = $1
+			  AND LOWER(TRIM(email)) = LOWER(TRIM($2))
+		)
+	`, tenantID, email).Scan(&exists)
+	return exists, err
 }
 
 func (r *Repository) StudentEmailExistsExcluding(ctx context.Context, tenantID, email, studentID string) (bool, error) {
-	return false, nil
+	if strings.TrimSpace(email) == "" {
+		return false, nil
+	}
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM students
+			WHERE tenant_id = $1
+			  AND LOWER(TRIM(email)) = LOWER(TRIM($2))
+			  AND id <> $3
+		)
+	`, tenantID, email, studentID).Scan(&exists)
+	return exists, err
 }
 
 func (r *Repository) GroupExists(ctx context.Context, tenantID, groupID string) (bool, error) {
@@ -2622,14 +2664,16 @@ func (r *Repository) GetStudentReportCard(ctx context.Context, tenantID, student
 	}
 	card := &ReportCardResponse{StudentID: studentID, Period: period, SubjectGrades: []SubjectGrade{}, Comments: []TeacherComment{}, GeneratedAt: time.Now()}
 	if err := r.db.QueryRow(ctx, `
-		SELECT TRIM(CONCAT(s.first_name, ' ', s.paternal_last_name, ' ', s.maternal_last_name, ' ', s.last_name)),
+		SELECT t.name,
+		       TRIM(CONCAT(s.first_name, ' ', s.paternal_last_name, ' ', s.maternal_last_name, ' ', s.last_name)),
 		       COALESCE(g.name, 'Sin grupo')
 		FROM students s
+		INNER JOIN tenants t ON t.id = s.tenant_id
 		LEFT JOIN group_students gs ON gs.student_id = s.id
-		LEFT JOIN groups g ON g.id = gs.group_id
+		LEFT JOIN groups g ON g.id = gs.group_id AND g.tenant_id = s.tenant_id
 		WHERE s.tenant_id = $1 AND s.id = $2
 		LIMIT 1
-	`, tenantID, studentID).Scan(&card.StudentName, &card.GroupName); err != nil {
+	`, tenantID, studentID).Scan(&card.SchoolName, &card.StudentName, &card.GroupName); err != nil {
 		return nil, fmt.Errorf("failed to get report card student: %w", err)
 	}
 
@@ -2637,7 +2681,8 @@ func (r *Repository) GetStudentReportCard(ctx context.Context, tenantID, student
 		SELECT COALESCE(sub.name, 'Materia'), COALESCE(sub.credits, 0),
 		       COALESCE(TRIM(CONCAT(u.first_name, ' ', u.last_name)), 'Profesor'),
 		       COALESCE(AVG(gr.score), 0),
-		       COALESCE(MAX(gr.notes), '')
+		       COALESCE(MAX(gr.notes), ''),
+		       MAX(gr.updated_at)
 		FROM grade_records gr
 		LEFT JOIN subjects sub ON sub.id = gr.subject_id AND sub.tenant_id = gr.tenant_id
 		LEFT JOIN class_schedule_blocks cs ON cs.subject_id = gr.subject_id AND cs.group_id = gr.group_id AND cs.tenant_id = gr.tenant_id AND cs.status = 'active'
@@ -2655,7 +2700,8 @@ func (r *Repository) GetStudentReportCard(ctx context.Context, tenantID, student
 	for rows.Next() {
 		subject := SubjectGrade{}
 		comment := ""
-		if err := rows.Scan(&subject.SubjectName, &subject.Credits, &subject.TeacherName, &subject.Average, &comment); err != nil {
+		var commentDate time.Time
+		if err := rows.Scan(&subject.SubjectName, &subject.Credits, &subject.TeacherName, &subject.Average, &comment, &commentDate); err != nil {
 			return nil, err
 		}
 		subject.Average = roundFloat(subject.Average, 1)
@@ -2664,19 +2710,56 @@ func (r *Repository) GetStudentReportCard(ctx context.Context, tenantID, student
 		subject.Behavior = behaviorLabel(subject.Average)
 		card.SubjectGrades = append(card.SubjectGrades, subject)
 		if strings.TrimSpace(comment) != "" {
-			card.Comments = append(card.Comments, TeacherComment{TeacherName: subject.TeacherName, Subject: subject.SubjectName, Comment: comment, Date: time.Now().Format("2006-01-02")})
+			card.Comments = append(card.Comments, TeacherComment{TeacherName: subject.TeacherName, Subject: subject.SubjectName, Comment: comment, Date: commentDate.Format("2006-01-02")})
 		}
 		total += subject.Average
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	if len(card.SubjectGrades) > 0 {
 		card.OverallGPA = roundFloat(total/float64(len(card.SubjectGrades)), 1)
 	}
 	card.OverallGrade = letterGrade(card.OverallGPA)
-	history, _ := r.GetStudentAttendanceHistory(ctx, tenantID, studentID, "", "")
-	if history != nil {
-		card.AttendanceRate = history.Summary.Rate
+	history, err := r.GetStudentAttendanceHistory(ctx, tenantID, studentID, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get report card attendance: %w", err)
 	}
+	card.AttendanceRate = history.Summary.Rate
 	return card, nil
+}
+
+func (r *Repository) SaveReportCardSnapshot(ctx context.Context, tenantID, userID, studentID, period string, payload []byte, checksum string) (string, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var lockedStudentID string
+	if err := tx.QueryRow(ctx, `
+		SELECT id::text
+		FROM students
+		WHERE tenant_id = $1 AND id = $2
+		FOR UPDATE
+	`, tenantID, studentID).Scan(&lockedStudentID); err != nil {
+		return "", fmt.Errorf("student not found in tenant: %w", err)
+	}
+
+	snapshotID := database.NewID()
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO report_card_snapshots (
+			id, tenant_id, student_id, period, payload_json, payload_sha256, generated_by
+		)
+		VALUES ($1, $2, $3, $4, $5::jsonb, $6, NULLIF($7, '')::uuid)
+	`, snapshotID, tenantID, studentID, period, string(payload), checksum, userID); err != nil {
+		return "", fmt.Errorf("failed to persist report-card snapshot: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return snapshotID, nil
 }
 
 func (r *Repository) GetGroupFinalGrades(ctx context.Context, tenantID, groupID string) (*GroupFinalGradesResponse, error) {
@@ -2923,12 +3006,14 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID string, params Ge
 		       p.concept,
 		       COALESCE(p.description, ''),
 		       p.amount::float8,
+		       COALESCE(p.paid_amount, 0)::float8,
+		       GREATEST(p.amount - COALESCE(p.paid_amount, 0), 0)::float8,
 		       p.currency,
 		       TO_CHAR(p.due_date, 'YYYY-MM-DD'),
 		       p.paid_at,
 		       COALESCE(p.payment_method, ''),
 		       COALESCE(p.receipt_number, ''),
-		       COALESCE(p.receipt_url, ''),
+		       '' AS receipt_url,
 		       p.status,
 		       COALESCE(p.metadata->>'notes', ''),
 		       p.created_at
@@ -2951,7 +3036,7 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID string, params Ge
 	for rows.Next() {
 		var item StudentPaymentResponse
 		var paidAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.StudentCode, &item.GroupID, &item.GroupName, &item.Concept, &item.Description, &item.Amount, &item.Currency, &item.DueDate, &paidAt, &item.PaymentMethod, &item.ReceiptNumber, &item.ReceiptURL, &item.Status, &item.Notes, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.StudentID, &item.StudentName, &item.StudentCode, &item.GroupID, &item.GroupName, &item.Concept, &item.Description, &item.Amount, &item.PaidAmount, &item.RemainingAmount, &item.Currency, &item.DueDate, &paidAt, &item.PaymentMethod, &item.ReceiptNumber, &item.ReceiptURL, &item.Status, &item.Notes, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		if paidAt.Valid {
@@ -2960,21 +3045,21 @@ func (r *Repository) GetPayments(ctx context.Context, tenantID string, params Ge
 		if item.Currency != "" {
 			resp.Summary.Currency = item.Currency
 		}
+		resp.Summary.TotalPaid += item.PaidAmount
 		switch item.Status {
 		case "paid":
-			resp.Summary.TotalPaid += item.Amount
 			resp.Summary.PaidCount++
 		case "overdue":
-			resp.Summary.TotalDue += item.Amount
-			resp.Summary.TotalOverdue += item.Amount
+			resp.Summary.TotalDue += item.RemainingAmount
+			resp.Summary.TotalOverdue += item.RemainingAmount
 			resp.Summary.OverdueCount++
 		case "partial":
-			resp.Summary.TotalDue += item.Amount
+			resp.Summary.TotalDue += item.RemainingAmount
 			resp.Summary.PartialCount++
 		case "cancelled":
 			resp.Summary.CancelledCount++
 		default:
-			resp.Summary.TotalDue += item.Amount
+			resp.Summary.TotalDue += item.RemainingAmount
 			resp.Summary.PendingCount++
 		}
 		resp.Payments = append(resp.Payments, item)
@@ -3011,49 +3096,125 @@ func (r *Repository) CreateStudentCharge(ctx context.Context, tenantID, userID s
 }
 
 func (r *Repository) RecordStudentPayment(ctx context.Context, tenantID, userID, paymentID string, req RecordStudentPaymentRequest) (*StudentPaymentResponse, error) {
-	before, err := r.GetPayment(ctx, tenantID, paymentID)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if req.Amount > before.Amount {
-		return nil, fmt.Errorf("payment amount exceeds charge amount")
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var chargeAmount, paidAmount float64
+	var currency, currentStatus string
+	if err := tx.QueryRow(ctx, `
+		SELECT amount::float8, COALESCE(paid_amount, 0)::float8, currency, status
+		FROM student_payments
+		WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL
+		FOR UPDATE
+	`, tenantID, paymentID).Scan(&chargeAmount, &paidAmount, &currency, &currentStatus); err != nil {
+		return nil, fmt.Errorf("payment not found: %w", err)
 	}
-	status := "paid"
-	if req.Amount < before.Amount {
-		status = "partial"
-	}
-	receiptNumber := before.ReceiptNumber
-	if receiptNumber == "" {
-		suffix := paymentID
-		if len(suffix) > 8 {
-			suffix = suffix[len(suffix)-8:]
+	var existingChargeID, existingMethod, existingReference, existingNotes string
+	var existingAmount float64
+	existingErr := tx.QueryRow(ctx, `
+		SELECT charge_id::text, amount::float8, method, COALESCE(reference, ''), COALESCE(notes, '')
+		FROM payment_transactions
+		WHERE tenant_id = $1 AND idempotency_key = $2
+	`, tenantID, req.IdempotencyKey).Scan(&existingChargeID, &existingAmount, &existingMethod, &existingReference, &existingNotes)
+	if existingErr == nil {
+		if existingChargeID != paymentID || moneyToCents(existingAmount) != moneyToCents(req.Amount) || existingMethod != req.Method || existingReference != strings.TrimSpace(req.Reference) || existingNotes != strings.TrimSpace(req.Notes) {
+			return nil, fmt.Errorf("idempotency key was already used for a different payment")
 		}
-		receiptNumber = "REC-" + time.Now().Format("20060102") + "-" + strings.ToUpper(suffix)
+		if err := tx.Commit(ctx); err != nil {
+			return nil, err
+		}
+		return r.GetPayment(ctx, tenantID, paymentID)
 	}
-	metadata, _ := json.Marshal(map[string]interface{}{
-		"notes":            strings.TrimSpace(req.Notes),
-		"reference":        strings.TrimSpace(req.Reference),
-		"registered_by":    userID,
-		"amount_collected": req.Amount,
-	})
-	tag, err := r.db.Exec(ctx, `
+	if existingErr != sql.ErrNoRows {
+		return nil, existingErr
+	}
+	if currentStatus == "cancelled" {
+		return nil, fmt.Errorf("cancelled charges cannot receive payments")
+	}
+
+	newPaidAmount, status, err := nextManualPaymentState(chargeAmount, paidAmount, req.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	transactionID := database.NewID()
+	receiptSuffix := strings.ToUpper(strings.ReplaceAll(transactionID, "-", ""))
+	if len(receiptSuffix) > 12 {
+		receiptSuffix = receiptSuffix[len(receiptSuffix)-12:]
+	}
+	receiptNumber := "REC-" + time.Now().UTC().Format("20060102") + "-" + receiptSuffix
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO payment_transactions (
+			id, tenant_id, charge_id, amount, currency, method, reference, notes,
+			idempotency_key, receipt_number, recorded_by
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), NULLIF($8, ''), $9, $10, NULLIF($11, '')::uuid)
+	`, transactionID, tenantID, paymentID, req.Amount, currency, req.Method, strings.TrimSpace(req.Reference), strings.TrimSpace(req.Notes), req.IdempotencyKey, receiptNumber, userID); err != nil {
+		return nil, err
+	}
+	tag, err := tx.Exec(ctx, `
 		UPDATE student_payments
 		SET status = $1,
-		    paid_at = NOW(),
-		    payment_method = $2,
-		    receipt_number = $3,
-		    receipt_url = COALESCE(NULLIF(receipt_url, ''), '#'),
-		    metadata = $4::jsonb,
-		    updated_at = NOW()
+		    paid_amount = $2,
+		    paid_at = CASE WHEN $1 = 'paid' THEN CURRENT_TIMESTAMP ELSE paid_at END,
+		    payment_method = $3,
+		    receipt_number = $4,
+		    receipt_url = NULL,
+		    updated_at = CURRENT_TIMESTAMP
 		WHERE tenant_id = $5 AND id = $6 AND deleted_at IS NULL
-	`, status, req.Method, receiptNumber, string(metadata), tenantID, paymentID)
+	`, status, newPaidAmount, req.Method, receiptNumber, tenantID, paymentID)
 	if err != nil {
 		return nil, err
 	}
 	if tag.RowsAffected() == 0 {
 		return nil, fmt.Errorf("payment not found")
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return r.GetPayment(ctx, tenantID, paymentID)
+}
+
+func (r *Repository) GetPaymentReceipt(ctx context.Context, tenantID, paymentID string) (*PaymentReceiptResponse, error) {
+	receipt := &PaymentReceiptResponse{}
+	err := r.db.QueryRow(ctx, `
+		SELECT pt.id::text,
+		       p.id::text,
+		       pt.receipt_number,
+		       t.name,
+		       TRIM(CONCAT(s.first_name, ' ', s.paternal_last_name, ' ', s.maternal_last_name, ' ', s.last_name)),
+		       COALESCE(s.enrollment_number, ''),
+		       p.concept,
+		       p.amount::float8,
+		       pt.amount::float8,
+		       COALESCE(p.paid_amount, 0)::float8,
+		       GREATEST(p.amount - COALESCE(p.paid_amount, 0), 0)::float8,
+		       pt.currency,
+		       pt.method,
+		       COALESCE(pt.reference, ''),
+		       pt.created_at,
+		       p.status,
+		       COALESCE(pt.notes, '')
+		FROM payment_transactions pt
+		INNER JOIN student_payments p ON p.id = pt.charge_id AND p.tenant_id = pt.tenant_id
+		INNER JOIN students s ON s.id = p.student_id AND s.tenant_id = pt.tenant_id
+		INNER JOIN tenants t ON t.id = pt.tenant_id
+		WHERE pt.tenant_id = $1 AND pt.charge_id = $2
+		ORDER BY pt.created_at DESC, pt.id DESC
+		LIMIT 1
+	`, tenantID, paymentID).Scan(
+		&receipt.TransactionID, &receipt.PaymentID, &receipt.Folio, &receipt.School,
+		&receipt.Student, &receipt.StudentCode, &receipt.Concept, &receipt.ChargeAmount,
+		&receipt.Amount, &receipt.PaidAmount, &receipt.RemainingAmount, &receipt.Currency,
+		&receipt.Method, &receipt.Reference, &receipt.Date, &receipt.Status, &receipt.Notes,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("receipt not found: %w", err)
+	}
+	return receipt, nil
 }
 
 // --- Quota helpers ---

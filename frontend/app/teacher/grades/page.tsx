@@ -9,13 +9,37 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 
+interface TeacherClass {
+  id: string;
+  group_id: string;
+  group_name: string;
+  subject_id: string;
+  subject_name: string;
+}
+
+interface GradeStudent {
+  student_id: string;
+  student_name: string;
+  enrollment_id?: string;
+  score?: number | string;
+  notes?: string;
+}
+
+interface GradeSummary {
+  total?: number;
+  average?: number;
+  passing?: number;
+  at_risk?: number;
+  passing_threshold?: number | null;
+}
+
 export default function TeacherGradesPage() {
-  const [classes, setClasses] = useState<any[]>([]);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [groupId, setGroupId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [period, setPeriod] = useState("current");
-  const [students, setStudents] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({});
+  const [students, setStudents] = useState<GradeStudent[]>([]);
+  const [summary, setSummary] = useState<GradeSummary>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,14 +65,19 @@ export default function TeacherGradesPage() {
 
   const selectedClass = useMemo(() => classes.find((item) => item.group_id === groupId && item.subject_id === subjectId) || classes.find((item) => item.group_id === groupId), [classes, groupId, subjectId]);
 
-  const update = (studentId: string, patch: any) => {
+  const update = (studentId: string, patch: Partial<Pick<GradeStudent, "score" | "notes">>) => {
     setStudents((items) => items.map((item) => item.student_id === studentId ? { ...item, ...patch } : item));
   };
 
   const save = async () => {
+    const captured = students.filter((student) => student.score !== null && student.score !== undefined && student.score !== "");
+    if (captured.length === 0) {
+      toast({ title: "Sin calificaciones", description: "Captura al menos una calificacion antes de guardar.", variant: "destructive" });
+      return;
+    }
     const res = await authFetch("/api/v1/teacher/grades", {
       method: "POST",
-      body: JSON.stringify({ group_id: groupId, period, grades: students.map(({ student_id, score, notes }) => ({ student_id, subject_id: subjectId, score: Number(score || 0), type: "exam", notes })) }),
+      body: JSON.stringify({ group_id: groupId, period, grades: captured.map(({ student_id, score, notes }) => ({ student_id, subject_id: subjectId, score: Number(score), notes })) }),
     });
     toast({ title: res.success ? "Calificaciones guardadas" : "No se pudo guardar", description: res.message || "Registro actualizado." });
   };
@@ -64,9 +93,9 @@ export default function TeacherGradesPage() {
       </div>
       <div className="grid gap-4 sm:grid-cols-4">
         <Metric title="Alumnos" value={summary.total || students.length} />
-        <Metric title="Promedio" value={summary.average || 0} />
-        <Metric title="Aprobando" value={summary.passing || 0} />
-        <Metric title="Riesgo" value={summary.at_risk || 0} />
+        <Metric title="Promedio" value={summary.average ?? "Sin datos"} />
+        <Metric title="Aprobando" value={summary.passing_threshold == null ? "Sin escala" : summary.passing ?? 0} />
+        <Metric title="Riesgo" value={summary.passing_threshold == null ? "Sin escala" : summary.at_risk ?? 0} />
       </div>
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> {selectedClass?.subject_name || "Materia"}</CardTitle></CardHeader>
@@ -102,7 +131,7 @@ export default function TeacherGradesPage() {
                   <tr key={student.student_id} className="border-t">
                     <td className="p-3 font-medium">{student.student_name}</td>
                     <td className="p-3">{student.enrollment_id || "N/D"}</td>
-                    <td className="p-3"><Input type="number" min={0} max={100} value={student.score || 0} onChange={(e) => update(student.student_id, { score: e.target.value })} /></td>
+                    <td className="p-3"><Input type="number" min={0} max={100} value={student.score ?? ""} onChange={(e) => update(student.student_id, { score: e.target.value })} placeholder="Sin capturar" /></td>
                     <td className="p-3"><Input value={student.notes || ""} onChange={(e) => update(student.student_id, { notes: e.target.value })} placeholder="Retroalimentacion" /></td>
                   </tr>
                 ))}
@@ -116,6 +145,6 @@ export default function TeacherGradesPage() {
   );
 }
 
-function Metric({ title, value }: { title: string; value: number }) {
+function Metric({ title, value }: { title: string; value: number | string }) {
   return <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">{title}</p><p className="text-2xl font-bold">{value}</p></CardContent></Card>;
 }

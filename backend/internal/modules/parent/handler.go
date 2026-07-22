@@ -43,6 +43,7 @@ func (h *Handler) RegisterRoutes(app fiber.Router) {
 	// Documents, payments, consents and reports
 	api.Get("/documents", h.GetDocuments)
 	api.Get("/payments", h.GetPayments)
+	api.Get("/payments/:id/receipt", h.GetPaymentReceipt)
 	api.Get("/consents", h.GetConsents)
 	api.Patch("/consents/:id", h.UpdateConsent)
 	api.Get("/reports/summary", h.GetReportSummary)
@@ -315,6 +316,14 @@ func (h *Handler) GetPayments(c *fiber.Ctx) error {
 		return response.ErrorFromErr(c, fiber.StatusInternalServerError, err)
 	}
 	return response.Success(c, payments, "Success")
+}
+
+func (h *Handler) GetPaymentReceipt(c *fiber.Ctx) error {
+	receipt, err := h.service.GetPaymentReceipt(c.Context(), c.Locals("tenant_id").(string), c.Locals("user_id").(string), c.Params("id"))
+	if err != nil {
+		return response.ErrorFromErr(c, fiber.StatusNotFound, err)
+	}
+	return response.Success(c, receipt, "Success")
 }
 
 func (h *Handler) GetConsents(c *fiber.Ctx) error {

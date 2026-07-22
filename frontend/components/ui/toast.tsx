@@ -276,31 +276,6 @@ type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
 
 type ToastActionElement = React.ReactElement<typeof ToastAction>
 
-// Funciones de utilidad para diferentes tipos de toast
-const showSuccess = (title: string, description?: string) => {
-  return useToast().toast({
-    title,
-    description,
-    variant: "success",
-  })
-}
-
-const showError = (title: string, description?: string) => {
-  return useToast().toast({
-    title,
-    description,
-    variant: "destructive",
-  })
-}
-
-const showWarning = (title: string, description?: string) => {
-  return useToast().toast({
-    title,
-    description,
-    variant: "warning",
-  })
-}
-
 export {
   type ToastProps,
   type ToastActionElement,
@@ -311,7 +286,4 @@ export {
   ToastTitle,
   ToastDescription,
   useToast,
-  showSuccess,
-  showError,
-  showWarning,
 }

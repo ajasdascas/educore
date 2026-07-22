@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Edit, Trash2, Check, X, Star } from "lucide-react";
@@ -31,7 +31,7 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const { toast } = useToast();
 
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/api/v1/super-admin/plans");
@@ -44,11 +44,11 @@ export default function PlansPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchPlans();
-  }, []);
+  }, [fetchPlans]);
 
   const handleTogglePlan = async (id: string, currentStatus: boolean) => {
     try {
@@ -57,7 +57,7 @@ export default function PlansPage() {
         setPlans(plans.map(p => p.id === id ? { ...p, is_active: !currentStatus } : p));
         toast({ title: "Éxito", description: `Plan ${!currentStatus ? 'activado' : 'desactivado'}` });
       }
-    } catch (err) {
+    } catch {
       toast({ title: "Error", description: "No se pudo cambiar el estado", variant: "destructive" });
     }
   };
@@ -72,7 +72,7 @@ export default function PlansPage() {
       } else {
         toast({ title: "Aviso", description: res.message || "No se pudo eliminar el plan (puede estar en uso)", variant: "destructive" });
       }
-    } catch (err) {
+    } catch {
       toast({ title: "Error", description: "Error al eliminar el plan", variant: "destructive" });
     }
   };
@@ -123,8 +123,8 @@ export default function PlansPage() {
           {plans.map((plan) => {
             let parsedModules = [];
             let parsedFeatures = [];
-            try { parsedModules = Array.isArray(plan.modules) ? plan.modules : JSON.parse(plan.modules || "[]"); } catch(e){}
-            try { parsedFeatures = Array.isArray(plan.features) ? plan.features : JSON.parse(plan.features || "[]"); } catch(e){}
+            try { parsedModules = Array.isArray(plan.modules) ? plan.modules : JSON.parse(plan.modules || "[]"); } catch {}
+            try { parsedFeatures = Array.isArray(plan.features) ? plan.features : JSON.parse(plan.features || "[]"); } catch {}
 
             return (
               <Card key={plan.id} className={`flex flex-col relative overflow-hidden transition-all ${plan.is_featured ? 'border-primary shadow-md' : ''} ${!plan.is_active ? 'opacity-70' : ''}`}>

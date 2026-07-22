@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Columns3,
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { authFetch } from "@/lib/auth";
 import { useToast } from "@/components/ui/use-toast";
+import { errorMessage } from "@/lib/api-response";
 
 type TenantTable = {
   name: string;
@@ -123,26 +124,26 @@ export default function TenantDatabasePage() {
     : columns.slice(0, 8).map((column) => column.name);
   const editableColumns = columns.filter((column) => !protectedEditKeys.has(column.name) && !column.is_protected && !column.is_virtual);
 
-  const loadTables = async () => {
+  const loadTables = useCallback(async () => {
     setLoading(true);
     try {
       const res = await authFetch("/api/v1/school-admin/database/tables");
       if (!res.success) throw new Error(res.message || res.error || "No se pudieron cargar tablas");
       const nextTables = res.data?.tables || [];
       setTables(nextTables);
-      if (!selectedTable && nextTables.length > 0) setSelectedTable(nextTables[0].name);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudieron cargar tablas", variant: "destructive" });
+      setSelectedTable((current) => current || nextTables[0]?.name || "");
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudieron cargar tablas"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const loadTable = async (tableName: string) => {
+  const loadTable = useCallback(async (tableName: string, searchTerm = "") => {
     if (!tableName) return;
     setTableLoading(true);
     try {
-      const search = rowQuery.trim() ? `&search=${encodeURIComponent(rowQuery.trim())}` : "";
+      const search = searchTerm.trim() ? `&search=${encodeURIComponent(searchTerm.trim())}` : "";
       const [schemaRes, rowsRes] = await Promise.all([
         authFetch(`/api/v1/school-admin/database/tables/${tableName}/schema`),
         authFetch(`/api/v1/school-admin/database/tables/${tableName}/rows?per_page=50${search}`),
@@ -152,20 +153,20 @@ export default function TenantDatabasePage() {
       setColumns([...(schemaRes.data?.columns || []), ...(schemaRes.data?.custom_fields || [])]);
       setRelationships(schemaRes.data?.relationships || []);
       setRows(rowsRes.data?.rows || []);
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "No se pudo cargar tabla", variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: errorMessage(error, "No se pudo cargar tabla"), variant: "destructive" });
     } finally {
       setTableLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadTables();
-  }, []);
+  }, [loadTables]);
 
   useEffect(() => {
     if (selectedTable) loadTable(selectedTable);
-  }, [selectedTable]);
+  }, [loadTable, selectedTable]);
 
   const openCreate = () => {
     const initial: Record<string, string> = {};
@@ -476,7 +477,7 @@ export default function TenantDatabasePage() {
                 </div>
                 <div className="flex min-w-0 gap-2">
                   <Input value={rowQuery} onChange={(event) => setRowQuery(event.target.value)} placeholder="Buscar filas" className="min-w-0 lg:w-72" />
-                  <Button variant="outline" onClick={() => loadTable(selectedTable)}>
+                  <Button variant="outline" onClick={() => loadTable(selectedTable, rowQuery)}>
                     <Search className="h-4 w-4" />
                   </Button>
                 </div>

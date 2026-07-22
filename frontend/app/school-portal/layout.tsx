@@ -3,21 +3,18 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   BookOpen, Users, GraduationCap, UserCheck, LayoutDashboard,
   LogOut, Menu, X, ChevronRight, Building2,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { authFetch } from "@/lib/auth";
-import { API_URL } from "@/lib/api";
+import { authFetch, getDashboardPath } from "@/lib/auth";
 
 interface SchoolInfo {
-  id: string;
   name: string;
   slug: string;
   logo_url?: string;
-  status: string;
-  plan: string;
 }
 
 const NAV_MODULES = [
@@ -33,22 +30,21 @@ const NAV_MODULES = [
     label: "Profesores",
     icon: GraduationCap,
     href: "/school-portal/teachers",
-    roles: ["SUPER_ADMIN", "SCHOOL_ADMIN", "TEACHER"],
+    roles: ["SUPER_ADMIN", "TEACHER"],
   },
   {
     key: "parents",
     label: "Padres",
     icon: Users,
     href: "/school-portal/parents",
-    roles: ["SUPER_ADMIN", "SCHOOL_ADMIN", "PARENT"],
+    roles: ["SUPER_ADMIN", "PARENT"],
   },
   {
     key: "students",
     label: "Alumnos",
     icon: UserCheck,
     href: "/school-portal/students",
-    roles: ["SUPER_ADMIN", "SCHOOL_ADMIN"],
-    badge: "Próximamente",
+    roles: ["SUPER_ADMIN", "STUDENT"],
   },
 ];
 
@@ -64,19 +60,19 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!slug) return;
-    authFetch(`${API_URL}/api/v1/super-admin/schools?search=${slug}&per_page=1`)
+    authFetch(`/api/v1/public/school-info?slug=${encodeURIComponent(slug)}`)
       .then((d) => {
-        const list = d?.data?.schools || [];
-        const found = list.find((s: SchoolInfo) => s.slug === slug);
-        if (found) setSchool(found);
+        if (d?.success && d?.data?.name) setSchool(d.data as SchoolInfo);
       })
       .catch(() => {});
   }, [slug]);
 
   // Redirect unauthenticated
   useEffect(() => {
-    if (user === null) router.replace("/login");
-  }, [user, router]);
+    if (user === null) {
+      router.replace(slug ? `/login?slug=${encodeURIComponent(slug)}` : "/login");
+    }
+  }, [slug, user, router]);
 
   const activeKey = pathname.split("/")[2] ?? "";
   const visibleNav = NAV_MODULES.filter(
@@ -97,9 +93,12 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
         <div className="p-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
             {school?.logo_url ? (
-              <img
+              <Image
                 src={school.logo_url}
                 alt="Logo"
+                width={40}
+                height={40}
+                unoptimized
                 className="w-10 h-10 rounded-xl object-contain bg-white border border-slate-700 p-0.5"
               />
             ) : (
@@ -138,11 +137,6 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
               >
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="truncate flex-1">{item.label}</span>
-                {item.badge && (
-                  <span className="text-[9px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full font-semibold">
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -151,11 +145,11 @@ function PortalLayoutInner({ children }: { children: React.ReactNode }) {
         {/* Footer */}
         <div className="p-3 border-t border-slate-800 space-y-1">
           <Link
-            href="/super-admin/schools"
+            href={user?.role === "SUPER_ADMIN" ? "/super-admin/schools" : getDashboardPath(user?.role || "")}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <ChevronRight className="w-4 h-4 rotate-180" />
-            Volver a Escuelas
+            {user?.role === "SUPER_ADMIN" ? "Volver a Escuelas" : "Ir a mi panel"}
           </Link>
           <button
             onClick={logout}

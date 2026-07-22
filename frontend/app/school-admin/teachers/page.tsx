@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   BookOpen,
@@ -46,6 +46,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { authFetch } from "@/lib/auth";
+import { responseArray } from "@/lib/api-response";
 import { ModuleGuard } from "@/components/providers/ModuleGuard";
 
 type Teacher = {
@@ -100,9 +101,8 @@ function getTeacherName(teacher: Teacher) {
   return `${teacher.first_name} ${teacher.last_name}`.trim();
 }
 
-function normalizeTeachers(response: any): Teacher[] {
-  const raw = response?.data?.teachers || response?.data || [];
-  return Array.isArray(raw) ? raw : [];
+function normalizeTeachers(response: unknown): Teacher[] {
+  return responseArray<Teacher>(response, "teachers");
 }
 
 function toForm(teacher: Teacher): TeacherFormState {
@@ -153,7 +153,7 @@ function SchoolTeachersContent() {
   const [portalAccessLoading, setPortalAccessLoading] = useState(false);
   const [portalAccessResult, setPortalAccessResult] = useState<{ email: string; password?: string } | null>(null);
 
-  const loadTeachers = async () => {
+  const loadTeachers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await authFetch("/api/v1/school-admin/academic/teachers");
@@ -167,11 +167,11 @@ function SchoolTeachersContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadTeachers();
-  }, []);
+  }, [loadTeachers]);
 
   const createTeacherPortalAccess = async (teacher: Teacher) => {
     setPortalAccessLoading(true);

@@ -1,6 +1,9 @@
 package student
 
 import (
+	"database/sql"
+	"errors"
+
 	"educore/internal/pkg/response"
 	"github.com/gofiber/fiber/v2"
 )
@@ -24,49 +27,56 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	router.Get("/notifications", h.GetNotifications)
 }
 
-func (h *Handler) GetDashboard(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
+func studentRequestContext(c *fiber.Ctx) (userID, tenantID string, ok bool) {
+	userID, userOK := c.Locals("user_id").(string)
+	tenantID, tenantOK := c.Locals("tenant_id").(string)
+	return userID, tenantID, userOK && tenantOK && userID != "" && tenantID != ""
+}
 
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+func studentLookupError(c *fiber.Ctx, err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+	}
+	return response.Error(c, fiber.StatusInternalServerError, "Student portal data unavailable")
+}
+
+func (h *Handler) GetDashboard(c *fiber.Ctx) error {
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 
 	data, err := h.svc.GetDashboard(c.UserContext(), userID, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+		return studentLookupError(c, err)
 	}
 
 	return response.Success(c, data, "ok")
 }
 
 func (h *Handler) GetProfile(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 
 	profile, err := h.svc.repo.GetProfileByUserID(c.UserContext(), userID, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+		return studentLookupError(c, err)
 	}
 
 	return response.Success(c, profile, "ok")
 }
 
 func (h *Handler) GetGrades(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 
 	profile, err := h.svc.repo.GetProfileByUserID(c.UserContext(), userID, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+		return studentLookupError(c, err)
 	}
 
 	grades, err := h.svc.repo.GetRecentGrades(c.UserContext(), profile.ID, tenantID, 50)
@@ -78,16 +88,14 @@ func (h *Handler) GetGrades(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetAttendance(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 
 	profile, err := h.svc.repo.GetProfileByUserID(c.UserContext(), userID, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+		return studentLookupError(c, err)
 	}
 
 	summary, err := h.svc.repo.GetAttendanceSummary(c.UserContext(), profile.ID, tenantID)
@@ -99,10 +107,9 @@ func (h *Handler) GetAttendance(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetMessages(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 	messages, err := h.svc.repo.GetMessages(c.UserContext(), userID, tenantID)
 	if err != nil {
@@ -112,14 +119,13 @@ func (h *Handler) GetMessages(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetAssignments(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 	profile, err := h.svc.repo.GetProfileByUserID(c.UserContext(), userID, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+		return studentLookupError(c, err)
 	}
 	assignments, err := h.svc.repo.GetAssignments(c.UserContext(), profile.ID, tenantID)
 	if err != nil {
@@ -129,14 +135,13 @@ func (h *Handler) GetAssignments(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetSchedule(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 	profile, err := h.svc.repo.GetProfileByUserID(c.UserContext(), userID, tenantID)
 	if err != nil {
-		return response.Error(c, fiber.StatusNotFound, "Student profile not found")
+		return studentLookupError(c, err)
 	}
 	schedule, err := h.svc.repo.GetSchedule(c.UserContext(), profile.ID, tenantID)
 	if err != nil {
@@ -146,10 +151,9 @@ func (h *Handler) GetSchedule(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetNotifications(c *fiber.Ctx) error {
-	userID, _ := c.Locals("user_id").(string)
-	tenantID, _ := c.Locals("tenant_id").(string)
-	if tenantID == "" {
-		return response.Error(c, fiber.StatusForbidden, "Student must belong to a school")
+	userID, tenantID, ok := studentRequestContext(c)
+	if !ok {
+		return response.Error(c, fiber.StatusForbidden, "Student identity context is required")
 	}
 	notifications, err := h.svc.repo.GetNotifications(c.UserContext(), userID, tenantID)
 	if err != nil {

@@ -8,11 +8,42 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+interface ChildOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+interface GradeAssignment {
+  id: string;
+  title: string;
+  date: string;
+  comments?: string;
+  score: number;
+  max_score: number;
+}
+
+interface SubjectGrades {
+  subject_id: string;
+  subject_name: string;
+  current_grade: string | number;
+  letter_grade: string;
+  teacher_name?: string;
+  assignments?: GradeAssignment[];
+}
+
+interface GradesData {
+  overall_gpa?: number;
+  overall_grade?: string;
+  summary?: { total_assignments?: number };
+  subjects?: SubjectGrades[];
+}
+
 export default function ParentGradesPage() {
-  const [children, setChildren] = useState<any[]>([]);
+  const [children, setChildren] = useState<ChildOption[]>([]);
   const [childId, setChildId] = useState("");
   const [period, setPeriod] = useState("current");
-  const [grades, setGrades] = useState<any>(null);
+  const [grades, setGrades] = useState<GradesData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,7 +106,7 @@ export default function ParentGradesPage() {
         <div className="animate-pulse text-muted-foreground">Cargando calificaciones...</div>
       ) : (
         <div className="grid gap-4">
-          {subjects.map((subject: any) => (
+          {subjects.map((subject) => (
             <Card key={subject.subject_id}>
               <CardHeader>
                 <CardTitle className="flex flex-wrap items-center justify-between gap-3">
@@ -88,7 +119,7 @@ export default function ParentGradesPage() {
                 <p className="text-sm text-muted-foreground">{subject.teacher_name || "Docente no asignado"}</p>
               </CardHeader>
               <CardContent className="space-y-3">
-                {(subject.assignments || []).map((grade: any) => (
+                {(subject.assignments || []).map((grade) => (
                   <div key={grade.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
                     <div>
                       <p className="text-sm font-medium">{grade.title}</p>

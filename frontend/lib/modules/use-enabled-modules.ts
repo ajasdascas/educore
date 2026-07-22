@@ -10,7 +10,8 @@ import {
 } from "@/lib/modules/registry";
 
 export function useEnabledModules() {
-  const [modules, setModules] = useState<EnabledModule[]>(DEFAULT_ENABLED_MODULES);
+  const demoModules = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODULES === "true";
+  const [modules, setModules] = useState<EnabledModule[]>(demoModules ? DEFAULT_ENABLED_MODULES : []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -20,12 +21,12 @@ export function useEnabledModules() {
       setError("");
       setModules(await fetchEnabledModules());
     } catch (err) {
-      setModules(DEFAULT_ENABLED_MODULES);
+      setModules(demoModules ? DEFAULT_ENABLED_MODULES : []);
       setError(err instanceof Error ? err.message : "No se pudo cargar la configuracion modular.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [demoModules]);
 
   useEffect(() => {
     refresh();

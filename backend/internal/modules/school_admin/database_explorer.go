@@ -73,7 +73,10 @@ type tenantCustomTableRequest struct {
 }
 
 func (h *Handler) registerDatabaseExplorerRoutes(api fiber.Router) {
-	db := api.Group("/database")
+	// Database Admin is intentionally not a production-ready school module.
+	// Keep every direct URL fail-closed even if a stale tenant_modules row or a
+	// handcrafted request tries to bypass the hidden navigation entry.
+	db := api.Group("/database", h.RequireModule("database_admin"))
 	db.Get("/tables", h.ListTenantDatabaseTables)
 	db.Get("/tables/:table/schema", h.GetTenantDatabaseTableSchema)
 	db.Get("/tables/:table/rows", h.ListTenantDatabaseTableRows)

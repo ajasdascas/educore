@@ -9,7 +9,9 @@
  */
 
 // Alineado con backend/internal/pkg/slug (Reserved) y htaccess-subdomain-root.
-const EXCLUDED_SUBDOMAINS = new Set([
+export const TENANT_ROOT_DOMAIN = "onlineu.mx";
+
+export const EXCLUDED_SUBDOMAINS = new Set([
   "www",
   "mail",
   "ftp",
@@ -34,9 +36,48 @@ const EXCLUDED_SUBDOMAINS = new Set([
   "login",
   "auth",
   "public",
+  "ns1",
+  "ns2",
+  "mx",
 ]);
 
-const ROOT_DOMAINS = ["onlineu.mx", "localhost"];
+const ROOT_DOMAINS = [TENANT_ROOT_DOMAIN, "localhost"];
+const VALID_TENANT_SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
+/**
+ * Converts a school name or user-entered value into the same DNS-safe slug
+ * format enforced by the backend.
+ */
+export function normalizeTenantSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/g, "");
+}
+
+export function getTenantSlugError(value: string): string | null {
+  if (value.length < 2) return "El subdominio debe tener al menos 2 caracteres.";
+  if (value.length > 63) return "El subdominio no puede exceder 63 caracteres.";
+  if (value.includes("--")) return "El subdominio no puede tener guiones dobles.";
+  if (!VALID_TENANT_SLUG.test(value)) {
+    return "Usa solo minúsculas, números y guiones, sin guion inicial o final.";
+  }
+  if (EXCLUDED_SUBDOMAINS.has(value)) return "Ese subdominio está reservado.";
+  return null;
+}
+
+export function parseTenantSlug(value?: string | null): string | null {
+  if (!value) return null;
+  const candidate = value.trim().toLowerCase();
+  return getTenantSlugError(candidate) ? null : candidate;
+}
 
 /**
  * Extract the school slug from a given hostname.
@@ -53,7 +94,7 @@ export function getTenantFromHost(hostname: string): string | null {
   if (!hostname) return null;
 
   // Strip port if present (e.g. localhost:3000)
-  const host = hostname.split(":")[0].toLowerCase();
+  const host = hostname.split(":")[0].toLowerCase().replace(/\.$/, "");
 
   // Explicit root domains — no tenant
   if (ROOT_DOMAINS.includes(host)) return null;
@@ -67,15 +108,12 @@ export function getTenantFromHost(hostname: string): string | null {
   const domain = parts.slice(1).join(".");
 
   // Only process known root domain
-  if (domain !== "onlineu.mx") return null;
+  if (domain !== TENANT_ROOT_DOMAIN) return null;
 
   // Exclude system subdomains
   if (EXCLUDED_SUBDOMAINS.has(sub)) return null;
 
-  // Must match school slug pattern: a-z, 0-9, hyphens, no leading/trailing hyphen
-  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(sub) && !/^[a-z0-9]$/.test(sub)) return null;
-
-  return sub;
+  return parseTenantSlug(sub);
 }
 
 /**
@@ -90,5 +128,5 @@ export function getActiveTenantSlug(searchParams?: URLSearchParams | null): stri
   const fromHost = getTenantFromHost(window.location.hostname);
   if (fromHost) return fromHost;
 
-  return searchParams?.get("slug") || null;
+  return parseTenantSlug(searchParams?.get("slug"));
 }

@@ -15,11 +15,33 @@ const statusLabels: Record<string, string> = {
   excused: "Justificado",
 };
 
+interface ChildOption {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+interface AttendanceRecord {
+  date: string;
+  status: string;
+  notes?: string;
+}
+
+interface AttendanceData {
+  summary?: {
+    rate?: number;
+    present_days?: number;
+    late_days?: number;
+    absent_days?: number;
+  };
+  records?: AttendanceRecord[];
+}
+
 export default function ParentAttendancePage() {
-  const [children, setChildren] = useState<any[]>([]);
+  const [children, setChildren] = useState<ChildOption[]>([]);
   const [childId, setChildId] = useState("");
   const [range, setRange] = useState("30");
-  const [attendance, setAttendance] = useState<any>(null);
+  const [attendance, setAttendance] = useState<AttendanceData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -89,7 +111,7 @@ export default function ParentAttendancePage() {
         <CardContent className="space-y-3">
           {loading && <p className="animate-pulse text-sm text-muted-foreground">Cargando asistencia...</p>}
           {!loading && records.length === 0 && <p className="text-sm text-muted-foreground">Sin registros para el rango seleccionado.</p>}
-          {records.map((record: any) => (
+          {records.map((record) => (
             <div key={`${record.date}-${record.status}`} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
               <div>
                 <p className="text-sm font-medium">{record.date}</p>
