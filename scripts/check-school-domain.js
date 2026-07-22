@@ -1,196 +1,156 @@
 #!/usr/bin/env node
 /**
- * check-school-domain.js
- *
- * Verifies that a school subdomain is correctly set up:
- *   1. DNS resolves (wildcard catch-all)
- *   2. HTTP redirect reaches the EduCore school portal
- *   3. Backend /public/school-info returns valid data for the slug
+ * Read-only production health check for one EduCore school domain.
+ * Verifies DNS, same-host HTTPS routing, static application delivery and the
+ * backend tenant resolver. It never creates or deletes Hostinger resources.
  *
  * Usage:
- *   node scripts/check-school-domain.js kinder1
- *   node scripts/check-school-domain.js colegio-la-paz --verbose
- *
- * Options:
- *   --verbose   Print full HTTP responses
+ *   NEXT_PUBLIC_API_URL=https://api.example node scripts/check-school-domain.js kinder1 --verbose
  */
 
 "use strict";
 
-const https = require("https");
-const http = require("http");
-const dns = require("dns");
+const dns = require("node:dns");
+const http = require("node:http");
+const https = require("node:https");
+const { validateSlug } = require("./provision-school-domain");
 
-const slug = process.argv[2];
+const rawSlug = process.argv[2];
 const verbose = process.argv.includes("--verbose");
+const domain = String(process.env.HOSTINGER_WEBSITE_DOMAIN || process.env.DOMAIN || "onlineu.mx")
+  .trim()
+  .toLowerCase();
+const apiURL = String(process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
 
-const DOMAIN = process.env.DOMAIN || "onlineu.mx";
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://educore-production-beef.up.railway.app";
+const pass = (message) => console.log(`  PASS ${message}`);
+const fail = (message) => console.log(`  FAIL ${message}`);
+const info = (message) => verbose && console.log(`       ${message}`);
 
-if (!slug) {
-  console.error("Usage: node scripts/check-school-domain.js <slug>");
-  console.error("Example: node scripts/check-school-domain.js kinder1");
-  process.exit(1);
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const pass = (msg) => console.log(`  ✅ ${msg}`);
-const fail = (msg) => console.log(`  ❌ ${msg}`);
-const warn = (msg) => console.log(`  ⚠️  ${msg}`);
-const info = (msg) => verbose && console.log(`     ${msg}`);
-
-function resolveDNS(hostname) {
+function request(target, timeout = 12000) {
   return new Promise((resolve) => {
-    dns.resolve4(hostname, (err, addrs) => {
-      if (err) resolve({ ok: false, error: err.message });
-      else resolve({ ok: true, addresses: addrs });
-    });
-  });
-}
-
-function httpGet(url, options = {}) {
-  return new Promise((resolve) => {
-    const lib = url.startsWith("https") ? https : http;
-    const timeout = options.timeout || 8000;
-
-    const req = lib.get(
-      url,
-      { headers: { "User-Agent": "EduCore-DomainChecker/1.0" }, timeout },
-      (res) => {
+    const parsed = new URL(target);
+    const client = parsed.protocol === "https:" ? https : http;
+    const req = client.get(
+      parsed,
+      { timeout, headers: { "User-Agent": "EduCore-DomainChecker/2.0", Accept: "text/html,application/json" } },
+      (response) => {
         let body = "";
-        res.on("data", (c) => (body += c));
-        res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body }));
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          if (body.length < 1024 * 1024) body += chunk;
+        });
+        response.on("end", () => resolve({
+          status: response.statusCode || 0,
+          headers: response.headers,
+          body,
+        }));
       }
     );
-    req.on("error", (e) => resolve({ status: 0, error: e.message }));
-    req.on("timeout", () => {
-      req.destroy();
-      resolve({ status: 0, error: "timeout" });
-    });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("error", (error) => resolve({ status: 0, error: error.message, headers: {}, body: "" }));
   });
 }
 
-// ─── Checks ──────────────────────────────────────────────────────────────────
-
 async function checkDNS(hostname) {
-  process.stdout.write(`  Resolving ${hostname}... `);
-  const res = await resolveDNS(hostname);
-  if (res.ok) {
-    console.log(`→ ${res.addresses.join(", ")}`);
-    pass(`DNS resolves (wildcard catch-all is active)`);
-    info(`IPs: ${res.addresses.join(", ")}`);
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    if (!addresses.length) throw new Error("sin direcciones");
+    pass(`DNS resuelve ${hostname}`);
+    info(addresses.map(({ address, family }) => `${address} (IPv${family})`).join(", "));
     return true;
-  } else {
-    console.log("failed");
-    fail(`DNS does not resolve: ${res.error}`);
-    warn("Run: node scripts/provision-wildcard-domain.js");
+  } catch (error) {
+    fail(`DNS no resuelve ${hostname}: ${error.code || error.message}`);
     return false;
   }
 }
 
-async function checkRedirect(hostname) {
-  const url = `http://${hostname}/`;
-  process.stdout.write(`  HTTP redirect from ${url}... `);
-  const res = await httpGet(url);
+async function checkPortal(hostname) {
+  let current = new URL(`https://${hostname}/`);
+  let sawExpectedRoute = false;
 
-  if (res.error) {
-    console.log("failed");
-    fail(`HTTP error: ${res.error}`);
-    return false;
-  }
-
-  console.log(`→ ${res.status}`);
-  info(`Location: ${res.headers?.location || "(none)"}`);
-
-  if (res.status >= 301 && res.status <= 308) {
-    const location = res.headers?.location || "";
-    if (location.includes("/educore/escuela/") || location.includes(`slug=${slug}`)) {
-      pass(`Redirect → EduCore school portal (${location})`);
-      return true;
-    } else {
-      warn(`Redirect exists but points elsewhere: ${location}`);
-      return true; // partial pass
+  for (let hop = 0; hop < 5; hop += 1) {
+    const response = await request(current.href);
+    if (response.error) {
+      fail(`HTTPS no responde en ${current.href}: ${response.error}`);
+      return false;
     }
-  } else if (res.status === 200) {
-    warn(`Got 200 directly — .htaccess subdomain redirect may not be active`);
-    return false;
-  } else {
-    fail(`Unexpected status: ${res.status}`);
-    return false;
+    info(`${response.status} ${current.href}`);
+
+    if (response.status >= 300 && response.status <= 399 && response.headers.location) {
+      const next = new URL(response.headers.location, current);
+      if (next.hostname.toLowerCase() !== hostname.toLowerCase()) {
+        fail(`El portal cambia a un host distinto: ${next.hostname}`);
+        return false;
+      }
+      if (next.pathname.startsWith("/educore/escuela/")) sawExpectedRoute = true;
+      current = next;
+      continue;
+    }
+
+    if (response.status !== 200) {
+      fail(`El portal terminó con HTTP ${response.status}`);
+      return false;
+    }
+    if (!sawExpectedRoute && !current.pathname.startsWith("/educore/escuela/")) {
+      fail(`La ruta final no es el portal escolar: ${current.pathname}`);
+      return false;
+    }
+    if (!response.body.includes("/_next/") && !response.body.includes("/educore/_next/")) {
+      fail("La respuesta no parece ser el export estático de EduCore.");
+      return false;
+    }
+    pass(`HTTPS sirve el portal en ${current.href}`);
+    return true;
   }
+
+  fail("El portal excedió el máximo de redirecciones.");
+  return false;
 }
 
 async function checkAPI(slug) {
-  const url = `${API_URL}/api/v1/public/school-info?slug=${encodeURIComponent(slug)}`;
-  process.stdout.write(`  Checking backend API for slug "${slug}"... `);
-  const res = await httpGet(url);
-
-  if (res.error) {
-    console.log("failed");
-    fail(`API error: ${res.error}`);
+  const target = `${apiURL}/api/v1/public/schools/resolve?slug=${encodeURIComponent(slug)}`;
+  const response = await request(target);
+  if (response.error) {
+    fail(`La API no responde: ${response.error}`);
     return false;
   }
-
-  console.log(`→ ${res.status}`);
-  info(`Response: ${res.body.substring(0, 200)}`);
-
-  if (res.status === 200) {
-    try {
-      const data = JSON.parse(res.body);
-      if (data?.data?.name) {
-        pass(`School found in DB: "${data.data.name}"`);
-        return true;
-      }
-    } catch { /* fall through */ }
-    warn("Backend returned 200 but no school name in response");
+  if (response.status !== 200) {
+    fail(`La API respondió HTTP ${response.status} para el slug.`);
     return false;
-  } else if (res.status === 404) {
-    fail(`Slug "${slug}" not found in EduCore database`);
-    warn("Make sure the school was created in the Super Admin panel with this exact slug");
-    return false;
-  } else {
-    fail(`Backend returned ${res.status}`);
+  }
+  try {
+    const payload = JSON.parse(response.body);
+    if (payload?.data?.slug !== slug || !payload?.data?.name) throw new Error("respuesta incompleta");
+    pass(`La API confirmó la escuela: ${payload.data.name}`);
+    info(`hosting_status=${payload.data.hosting_status || "unknown"}`);
+    return true;
+  } catch (error) {
+    fail(`La respuesta de la API no confirma la escuela: ${error.message}`);
     return false;
   }
 }
-
-// ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const hostname = `${slug}.${DOMAIN}`;
-  console.log(`\n🔍 EduCore — Domain Check: ${hostname}`);
-  console.log("─".repeat(50));
+  if (!rawSlug) throw new Error("Uso: node scripts/check-school-domain.js <slug> [--verbose]");
+  if (!apiURL) throw new Error("Define NEXT_PUBLIC_API_URL con la URL pública del backend.");
+  const slug = validateSlug(rawSlug);
+  const hostname = `${slug}.${domain}`;
 
-  const checks = [
-    { name: "DNS Resolution", fn: () => checkDNS(hostname) },
-    { name: "HTTP Redirect", fn: () => checkRedirect(hostname) },
-    { name: "Backend API",   fn: () => checkAPI(slug) },
-  ];
+  console.log(`EduCore — auditoría de ${hostname}`);
+  const results = await Promise.all([
+    checkDNS(hostname),
+    checkPortal(hostname),
+    checkAPI(slug),
+  ]);
 
-  let passed = 0;
-
-  for (const check of checks) {
-    console.log(`\n[${check.name}]`);
-    const ok = await check.fn();
-    if (ok) passed++;
+  if (results.every(Boolean)) {
+    console.log("Resultado: dominio escolar operativo.");
+    return;
   }
-
-  console.log("\n" + "─".repeat(50));
-  console.log(`Result: ${passed}/${checks.length} checks passed\n`);
-
-  if (passed === checks.length) {
-    console.log(`🎉 ${hostname} is fully operational!`);
-    console.log(`   School portal: https://${DOMAIN}/educore/escuela/?slug=${slug}`);
-  } else {
-    console.log("⚠️  Some checks failed. Review the issues above.");
-    process.exit(1);
-  }
+  throw new Error("Una o más comprobaciones fallaron.");
 }
 
-main().catch((err) => {
-  console.error("❌  Unexpected error:", err.message);
+main().catch((error) => {
+  console.error(`ERROR: ${error.message}`);
   process.exit(1);
 });

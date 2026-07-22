@@ -60,6 +60,17 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Validate production contracts
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_DEMO_MODE: "false"
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: |
+          npm run typecheck
+          npm run test:global-users
+          npm run check:production-readiness
+          npm run lint -- --max-warnings=0
+
       - name: Build static frontend
         working-directory: frontend
         env:
@@ -76,6 +87,8 @@ jobs:
             test -f "frontend/out/$f"
           done
           test -d frontend/out/_next
+          test -f frontend/out/.htaccess
+          cmp -s frontend/htaccess-subdomain-app-root frontend/out/.htaccess
           echo "✓ Artefactos críticos presentes en frontend/out/"
           # NO debe quedar la URL muerta de Railway horneada.
           if grep -rq "educore-production-beef" frontend/out/; then
@@ -98,9 +111,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      # Despliegue estático resiliente (FTPS explícito → FTP plano → FTPS implícito → SFTP).
+      # Despliegue estático cifrado. No existe fallback a FTP plano: si Hostinger
+      # no presenta un certificado válido, la publicación debe fallar.
       # SIN --delete: no borra archivos remotos en este flujo (rollback más seguro).
-      - name: Deploy to Hostinger (FTP/FTPS/SFTP)
+      - name: Deploy to Hostinger (verified FTPS)
         env:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
@@ -133,7 +147,7 @@ jobs:
           set cmd:fail-exit yes
           set ftp:passive-mode yes
           set ftp:prefer-epsv false
-          set ssl:verify-certificate no
+          set ssl:verify-certificate yes
           set dns:order inet
           set net:timeout 30
           set net:max-retries 2
@@ -157,20 +171,10 @@ jobs:
                 ssl_force=true
                 ssl_protect=true
                 ;;
-              plain_ftp)
-                url="ftp://${ftp_endpoint}:21"
-                ssl_force=false
-                ssl_protect=false
-                ;;
               implicit_ftps)
                 url="ftps://${ftp_endpoint}:990"
                 ssl_force=true
                 ssl_protect=true
-                ;;
-              sftp)
-                url="sftp://${ftp_endpoint}:22"
-                ssl_force=false
-                ssl_protect=false
                 ;;
             esac
 
@@ -187,11 +191,12 @@ jobs:
               mkdir -f ${target_leaf};
               cd ${target_leaf};
               mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .;
+              put -O . frontend/out/.htaccess;
               bye
             "
           }
 
-          for mode in explicit_ftps plain_ftp implicit_ftps sftp; do
+          for mode in explicit_ftps implicit_ftps; do
             for attempt in 1 2; do
               echo "Deploy mode=${mode} attempt=${attempt}/2"
               if run_deploy "${mode}"; then

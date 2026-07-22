@@ -21,7 +21,6 @@ on:
         options:
           - provision        # provision-school-domain.js (after DB creation)
           - check            # check-school-domain.js     (verify DNS + API)
-          - provision-wildcard # One-time wildcard setup
         default: provision
 
   # Scheduled: daily health check of all school subdomains (optional)
@@ -37,6 +36,12 @@ jobs:
       DOMAIN: onlineu.mx
       # URL del backend desde secret (la de Railway anterior ya no existe).
       NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+      HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+      HOSTINGER_HOSTING_USERNAME: ${{ secrets.HOSTINGER_HOSTING_USERNAME }}
+      HOSTINGER_WEBSITE_DOMAIN: onlineu.mx
+      HOSTINGER_SUBDOMAIN_DIRECTORY: educore
+      SCHOOL_SLUG_INPUT: ${{ github.event.inputs.slug }}
+      SCHOOL_NAME_INPUT: ${{ github.event.inputs.name }}
 
     steps:
       - name: Checkout code
@@ -51,32 +56,10 @@ jobs:
         if: ${{ github.event.inputs.action == 'provision' }}
         run: |
           node scripts/provision-school-domain.js \
-            --slug="${{ github.event.inputs.slug }}" \
-            --name="${{ github.event.inputs.name }}"
+            --slug="${SCHOOL_SLUG_INPUT}" \
+            --name="${SCHOOL_NAME_INPUT}"
 
       - name: Check school domain
         if: ${{ github.event.inputs.action == 'check' }}
         run: |
-          node scripts/check-school-domain.js "${{ github.event.inputs.slug }}" --verbose
-
-  provision-wildcard:
-    if: ${{ github.event.inputs.action == 'provision-wildcard' }}
-    runs-on: ubuntu-latest
-    env:
-      DOMAIN: onlineu.mx
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4.3.0
-        with:
-          node-version: "20"
-
-      - name: Provision wildcard DNS record
-        env:
-          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-        run: |
-          node scripts/provision-wildcard-domain.js
+          node scripts/check-school-domain.js "${SCHOOL_SLUG_INPUT}" --verbose

@@ -1,0 +1,69 @@
+name: Migrate EduCore production database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type APPLY to run pending production migrations"
+        required: true
+        type: string
+      start_at:
+        description: "First migration for an already-baselined DB (default 020)"
+        required: true
+        default: "020"
+        type: string
+
+concurrency:
+  group: educore-production-database-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: ${{ inputs.confirm == 'APPLY' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MIGRATION_START_AT: ${{ inputs.start_at }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate inputs and secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${DATABASE_URL}" || { echo "::error::Missing production DATABASE_URL secret"; exit 1; }
+          case "${MIGRATION_START_AT}" in
+            0[0-9][0-9]) ;;
+            *) echo "::error::start_at must be a three-digit migration prefix"; exit 1 ;;
+          esac
+
+      - name: Show pending migration names
+        shell: bash
+        run: bash scripts/migrate.sh status
+
+      - name: Apply pending migrations transactionally
+        shell: bash
+        run: bash scripts/migrate.sh up
+
+      - name: Verify release migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for version in \
+            020_production_module_readiness_gate.sql \
+            021_global_user_management_rbac.sql \
+            022_student_portal_identity.sql \
+            023_manual_payments_and_report_card_snapshots.sql \
+            024_password_recovery_hardening.sql; do
+            applied=$(psql "${DATABASE_URL}" -X -v ON_ERROR_STOP=1 -tA \
+              -v migration_version="${version}" \
+              -c "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = :'migration_version');")
+            test "${applied}" = "t" || { echo "::error::Migration not recorded: ${version}"; exit 1; }
+          done
+          echo "Production release migrations are recorded."

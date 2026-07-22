@@ -154,10 +154,10 @@ if (!roleGuard) {
 }
 
 // ─── 6. .htaccess ────────────────────────────────────────────────────────────
-console.log("\n[.htaccess Router — frontend/htaccess-subdomain-root]");
-const htaccess = readFile("frontend/htaccess-subdomain-root");
+console.log("\n[.htaccess Router — frontend/htaccess-subdomain-app-root]");
+const htaccess = readFile("frontend/htaccess-subdomain-app-root");
 if (!htaccess) {
-  fail("File not found: frontend/htaccess-subdomain-root");
+  fail("File not found: frontend/htaccess-subdomain-app-root");
   allPassed = false;
 } else {
   check(
@@ -201,20 +201,21 @@ if (studentInMain) {
 }
 
 // ─── 8. GitHub Actions workflow ──────────────────────────────────────────────
-console.log("\n[GitHub Actions — .github/workflows/deploy.yml]");
-const workflow = readFile(".github/workflows/deploy.yml");
+console.log("\n[GitHub Actions — deploy-frontend-hostinger.yml]");
+const workflow = readFile(".github/workflows/deploy-frontend-hostinger.yml");
 if (!workflow) {
-  warn("No deploy.yml found — deploy may be manual");
+  warn("No deploy-frontend-hostinger.yml found — deploy may be manual");
 } else {
+  const packageJSON = readFile("frontend/package.json") || "";
   check(
-    workflow.includes("htaccess"),
-    "Workflow deploys .htaccess to server root",
-    "Workflow does not deploy .htaccess — wildcard routing may not work"
+    workflow.includes("npm run build") && packageJSON.includes("prepare-static-hosting.cjs"),
+    "Workflow build includes out/.htaccess preparation",
+    "Workflow build does not prepare out/.htaccess"
   );
   check(
-    workflow.includes("FTP_PASSWORD"),
-    "Workflow uses FTP_PASSWORD secret",
-    "Workflow missing FTP_PASSWORD — check secrets configuration"
+    workflow.includes("HOSTINGER_FTP_PASSWORD"),
+    "Workflow uses HOSTINGER_FTP_PASSWORD secret",
+    "Workflow missing HOSTINGER_FTP_PASSWORD — check secrets configuration"
   );
 }
 

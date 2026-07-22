@@ -224,7 +224,7 @@ END $$;
 
 -- ================= 002_add_modules_settings.sql =================
 -- EduCore MVP — Schema Update for educore_dev
--- Run this AFTER the initial 001_up.sql migration
+-- Source section follows the canonical 001_initial.sql migration.
 
 -- Add missing tables and columns
 

@@ -1,142 +1,122 @@
 #!/usr/bin/env node
+
 /**
- * check-school-provisioning.js
- * QA: Verifica que el provisioning de escuela esté correctamente implementado.
- * Valida código fuente del backend y del frontend.
+ * Static release contract for creating a school.
  *
- * Uso:
- *   node scripts/check-school-provisioning.js
+ * This intentionally verifies fail-closed provisioning. A new tenant must not
+ * receive unfinished level modules merely because they still exist in an old
+ * catalog or migration.
  */
 
 const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-
 let passed = 0;
 let failed = 0;
 
-function ok(msg)      { console.log(`  ✅ ${msg}`); passed++; }
-function fail(msg)    { console.error(`  ❌ ${msg}`); failed++; }
-function info(msg)    { console.log(`  ℹ️  ${msg}`); }
-function section(msg) { console.log(`\n── ${msg} ──`); }
-
-function read(rel) {
-  const full = path.join(ROOT, rel);
-  if (!fs.existsSync(full)) return null;
-  return fs.readFileSync(full, "utf8");
+function read(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
-// ─── Backend: CreateSchool handler ──────────────────────────────────────────
-section("Backend: CreateSchool provisioning completo");
-{
-  const src = read("backend/internal/modules/super_admin/handler.go");
-  if (!src) { fail("super_admin/handler.go no encontrado"); }
-  else {
-    const checks = [
-      ["Crea tenant",                 /INSERT INTO tenants/],
-      ["Crea admin user SCHOOL_ADMIN",/SCHOOL_ADMIN/],
-      ["Siembra tenant_roles",        /tenant_roles/],
-      ["Activa core modules",         /modules_catalog/],
-      ["Activa módulos por nivel",    /modulesByEducationLevel/],
-      ["Siembra ciclo escolar",       /school_years/],
-      ["Siembra school_settings",     /school_settings/],
-      ["Siembra grade_levels",        /grade_levels/],
-      ["Siembra subjects default",    /subjects/],
-      ["Siembra grupo default",       /INSERT.*groups/],
-      ["Activa portal modules",       /portal_school_admin/],
-    ];
-    for (const [label, re] of checks) {
-      re.test(src) ? ok(label) : fail(`FALTA: ${label}`);
-    }
-
-    // Niveles soportados
-    const levels = ["babies", "preescolar", "kinder", "primaria"];
-    for (const l of levels) {
-      src.includes(`"${l}"`) ? ok(`Nivel "${l}" soportado`) : fail(`Nivel "${l}" NO soportado`);
-    }
-
-    // Módulos bebés
-    const babyModules = ["daily_logs", "meals", "naps", "diapers", "health_checks", "incidents", "pickup_authorizations", "milestones", "photos_evidence"];
-    for (const m of babyModules) {
-      src.includes(`"${m}"`) ? ok(`Módulo bebés: ${m}`) : fail(`Módulo bebés FALTA: ${m}`);
-    }
-
-    // Módulos preescolar/kinder
-    const preschoolModules = ["qualitative_assessments", "development_areas", "observations", "activities", "behavior_notes", "preschool_report_cards"];
-    for (const m of preschoolModules) {
-      src.includes(`"${m}"`) ? ok(`Módulo preescolar: ${m}`) : fail(`Módulo preescolar FALTA: ${m}`);
-    }
-
-    // Módulos primaria
-    const primaryModules = ["grades", "grading", "report_cards", "subjects", "assignments", "exams"];
-    for (const m of primaryModules) {
-      src.includes(`"${m}"`) ? ok(`Módulo primaria: ${m}`) : fail(`Módulo primaria FALTA: ${m}`);
-    }
-
-    // Dual MySQL/Postgres
-    src.includes("IsMySQL") ? ok("Soporta MySQL (Hostinger) y PostgreSQL") : fail("NO soporta dual MySQL/PostgreSQL");
+function check(condition, message) {
+  if (condition) {
+    passed += 1;
+    console.log(`PASS ${message}`);
+  } else {
+    failed += 1;
+    console.error(`FAIL ${message}`);
   }
 }
 
-// ─── Frontend: formulario crear escuela ─────────────────────────────────────
-section("Frontend: formulario crear escuela");
-{
-  const src = read("frontend/app/super-admin/schools/page.tsx");
-  if (!src) { fail("super-admin/schools/page.tsx no encontrado"); }
-  else {
-    ["babies", "preescolar", "kinder", "primaria"].forEach((l) => {
-      src.includes(l) ? ok(`Opción "${l}" en formulario`) : fail(`Opción "${l}" FALTA en formulario`);
-    });
-    src.includes("educationLevelOptions") ? ok("educationLevelOptions definido") : fail("educationLevelOptions no encontrado");
-  }
+const handler = read("backend/internal/modules/super_admin/handler.go");
+for (const marker of [
+  "INSERT INTO tenants",
+  "tenant_roles",
+  "school_years",
+  "school_settings",
+  "grade_levels",
+  "subjects",
+  "INSERT INTO groups",
+]) {
+  check(handler.includes(marker), `school transaction includes ${marker}`);
 }
 
-// ─── Backend: portal_access.go ───────────────────────────────────────────────
-section("Backend: portal_access.go — crear usuarios por portal");
-{
-  const src = read("backend/internal/modules/school_admin/portal_access.go");
-  if (!src) { fail("school_admin/portal_access.go no encontrado"); }
-  else {
-    ok("portal_access.go existe");
-    src.includes("CreateTeacherPortalAccess") ? ok("CreateTeacherPortalAccess handler") : fail("FALTA CreateTeacherPortalAccess");
-    src.includes("CreateStudentPortalAccess") ? ok("CreateStudentPortalAccess handler") : fail("FALTA CreateStudentPortalAccess");
-    src.includes("CreateParentPortalAccess")  ? ok("CreateParentPortalAccess handler")  : fail("FALTA CreateParentPortalAccess");
-    src.includes("TEACHER") ? ok("Crea usuario role=TEACHER") : fail("No crea TEACHER");
-    src.includes("STUDENT") ? ok("Crea usuario role=STUDENT") : fail("No crea STUDENT");
-    src.includes("PARENT")  ? ok("Crea usuario role=PARENT")  : fail("No crea PARENT");
-    src.includes("generatePortalPassword") ? ok("Genera contraseña aleatoria") : fail("No genera contraseña");
-    src.includes("UPDATE students SET user_id") ? ok("Vincula user_id en students al crear STUDENT") : fail("No vincula user_id en students");
-  }
+check(
+  handler.includes("productionReadyTenantModules") &&
+    handler.includes("classifyRequestedAddons") &&
+    handler.includes("invalidRequestedAddons"),
+  "new schools reject add-ons outside the production allowlist"
+);
+check(
+  handler.includes("schooldomain.NewFromEnv") &&
+    handler.includes("recordDomainProvisioningStatus") &&
+    handler.includes("domain_provisioning_status"),
+  "school creation provisions Hostinger and persists a retryable status"
+);
+check(
+  handler.includes("generateSchoolAdminPassword") &&
+    handler.includes('"password_must_change"') &&
+    handler.includes("HeaderCacheControl"),
+  "initial administrator receives a non-cacheable one-time credential"
+);
+
+const unfinishedModules = [
+  "daily_logs", "meals", "naps", "diapers", "mood", "health_checks",
+  "incidents", "pickup_authorizations", "milestones", "photos_evidence",
+  "qualitative_assessments", "development_areas", "observations", "activities",
+  "behavior_notes", "preschool_report_cards", "report_cards", "assignments", "exams",
+];
+const levelMap = handler.slice(
+  handler.indexOf("var modulesByEducationLevel"),
+  handler.indexOf("var productionReadyTenantModules")
+);
+for (const moduleKey of unfinishedModules) {
+  check(!levelMap.includes(`"${moduleKey}"`), `new schools do not auto-enable unfinished ${moduleKey}`);
 }
 
-// ─── Migración 006: students.user_id ─────────────────────────────────────────
-section("Migración 006: students.user_id (pendiente en Hostinger)");
-{
-  const src = read("backend/migrations_mysql/006_student_portal_user_id.sql");
-  if (!src) { fail("006_student_portal_user_id.sql no encontrado"); }
-  else {
-    ok("006_student_portal_user_id.sql existe");
-    src.includes("user_id") ? ok("Agrega columna user_id a students") : fail("No agrega user_id a students");
-    info("⚠️  Aplicar manualmente en Hostinger si aún no se hizo.");
-  }
+for (const level of ["babies", "preescolar", "kinder", "primaria"]) {
+  check(levelMap.includes(`"${level}"`), `education level ${level} has a safe provisioning contract`);
 }
 
-// ─── Registry frontend ────────────────────────────────────────────────────────
-section("Frontend: registry.ts — niveles y módulos actualizados");
-{
-  const src = read("frontend/lib/modules/registry.ts");
-  if (!src) { fail("lib/modules/registry.ts no encontrado"); }
-  else {
-    ["babies", "preescolar", "kinder", "primaria"].forEach((l) => {
-      src.includes(`"${l}"`) ? ok(`Nivel ${l} en EducationLevel`) : fail(`Nivel ${l} FALTA en EducationLevel`);
-    });
-    ["daily_logs", "qualitative_assessments", "preschool_report_cards", "grading"].forEach((m) => {
-      src.includes(m) ? ok(`Módulo ${m} en MODULES_BY_LEVEL`) : fail(`Módulo ${m} FALTA en MODULES_BY_LEVEL`);
-    });
-  }
+const portalAccess = read("backend/internal/modules/school_admin/portal_access.go");
+for (const marker of [
+  "CreateTeacherPortalAccess",
+  "CreateStudentPortalAccess",
+  "CreateParentPortalAccess",
+  "generatePortalPassword",
+  "password_must_change",
+]) {
+  check(portalAccess.includes(marker), `portal access enforces ${marker}`);
+}
+check(
+  portalAccess.includes("user_id") && portalAccess.includes("STUDENT"),
+  "student portal identity is linked to the student record"
+);
+
+const schoolsPage = read("frontend/app/super-admin/schools/page.tsx");
+for (const level of ["babies", "preescolar", "kinder", "primaria"]) {
+  check(schoolsPage.includes(level), `school form supports ${level}`);
+}
+check(
+  schoolsPage.includes("domain_ready") && schoolsPage.includes("createdCredential"),
+  "school form exposes domain state and the one-time credential result"
+);
+
+const registry = read("frontend/lib/modules/registry.ts");
+check(
+  registry.includes('NEXT_PUBLIC_ENABLE_DEMO_MODULES === "true"'),
+  "unfinished demo modules require an explicit non-production build flag"
+);
+
+for (const migration of [
+  "backend/migrations/020_production_module_readiness_gate.sql",
+  "backend/migrations/021_global_user_management_rbac.sql",
+  "backend/migrations/022_student_portal_identity.sql",
+  "backend/migrations/024_password_recovery_hardening.sql",
+]) {
+  check(fs.existsSync(path.join(ROOT, migration)), `${migration} exists`);
 }
 
-// ─── Resumen ──────────────────────────────────────────────────────────────────
-console.log(`\n── Resultado: ${passed} passed / ${failed} failed ──\n`);
-if (failed > 0) process.exit(1);
+console.log(`\nSchool provisioning readiness: ${passed} passed, ${failed} failed`);
+process.exit(failed === 0 ? 0 : 1);
