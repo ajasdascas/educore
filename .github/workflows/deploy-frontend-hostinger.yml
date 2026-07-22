@@ -155,8 +155,8 @@ jobs:
               source ftp-deploy.lftp;
               set ftp:ssl-force ${ssl_force};
               set ftp:ssl-protect-data ${ssl_protect};
-              open --user \"${FTP_USER}\" --env-password \"${url}\";
-              cd \"${FTP_TARGET_DIR}\";
+              open --user ${FTP_USER} --env-password ${url};
+              cd ${FTP_TARGET_DIR};
               mirror --reverse --verbose --parallel=2 --exclude-glob .git* --exclude-glob node_modules/** frontend/out/ .;
               bye
             "
