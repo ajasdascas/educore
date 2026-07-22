@@ -40,20 +40,20 @@ EDUCORE_DEPLOY_WEBHOOK_SECRET
 
 Destino en Hostinger:
 
-/public_html/educore/
+/educore/
 
-El contenido de frontend/out/ se sube directamente a public_html/educore/.
+El contenido de frontend/out/ se sube directamente a `/educore/`; la raíz FTP ya corresponde a `public_html/`.
 
 Correcto:
 
-/public_html/educore/index.html
-/public_html/educore/_next/
-/public_html/educore/school-admin/
-/public_html/educore/super-admin/
+/educore/index.html
+/educore/_next/
+/educore/school-admin/
+/educore/super-admin/
 
 Incorrecto:
 
-/public_html/educore/out/index.html
+/educore/out/index.html
 
 Primer deploy:
 

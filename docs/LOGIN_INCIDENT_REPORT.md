@@ -100,7 +100,7 @@ backend Go/Fiber vuelva a estar corriendo en una URL pública alcanzable.
 | Mecanismo | Dispara | Ruta remota | Notas de riesgo |
 |---|---|---|---|
 | `.github/workflows/deploy.yml` | push a `master` (todo) + manual | `/domains/onlineu.mx/public_html/educore/` | FTP **plano**; **no** pasa `NEXT_PUBLIC_API_URL`; sube `.htaccess` a la raíz del dominio |
-| `.github/workflows/deploy-frontend-hostinger.yml` | push a `master` (si cambia `frontend/**`) + manual | `/public_html/educore/` | FTPS/SFTP; usa `mirror --delete`; **sí** pasa `NEXT_PUBLIC_API_URL` |
+| `.github/workflows/deploy-frontend-hostinger.yml` | push a `master` (si cambia `frontend/**`) + manual | `/educore/` (raíz FTP = `public_html/`) | FTPS/SFTP; `mirror` **sin `--delete`**; **sí** pasa `NEXT_PUBLIC_API_URL` |
 | `sync.js` (manual, `node sync.js`) | manual | `/domains/onlineu.mx/public_html/educore` | Hace `git commit` + `git push` → **puede disparar ambos workflows** (efecto cascada) |
 
 Problemas:
@@ -175,7 +175,7 @@ Problemas:
 
 - El frontend actual ya sirve; **no se toca producción** hasta tener backend vivo + build probado.
 - Cualquier cambio se hace primero local, se verifica, y se despliega por FTP a
-  `/public_html/educore/` (ruta visible por la cuenta FTP) **sin `--delete`**.
+  `/educore/` (la raíz de la cuenta FTP ya es `public_html/`) **sin `--delete`**.
 - Se conserva inventario del directorio remoto antes de subir.
 
 ---
@@ -256,7 +256,7 @@ out/  → 6.2 MB, con index.html, login/, escuela/, super-admin/dashboard/
 2. Guardar esa URL como **GitHub Secret `NEXT_PUBLIC_API_URL`** (p. ej. la URL nueva de Railway
    o, a futuro, `https://api.onlineu.mx`).
 3. Rehornear el frontend con esa variable y desplegar por **un solo** flujo a
-   `/public_html/educore/` por FTP.
+   `/educore/` por FTP.
 4. Pruebas de aceptación (health, preflight CORS, login válido, 401 JSON, dashboard, refresh, logout).
 
 > Nota cross-site: el `refresh_token` usa cookie `SameSite=Lax`. Si el backend queda en otro
@@ -284,7 +284,7 @@ también offline. En vez de pagar Railway, se **migró el backend a hosting grat
   warmup del backend al abrir el login (mitiga el cold start del plan Free de Render).
 
 **Pendiente:** merge del PR `recovery/production-login` → master, que dispara el deploy
-automático del frontend a `/public_html/educore/` vía GitHub Actions (equivalente a
+automático del frontend a `/educore/` vía GitHub Actions (la raíz FTP ya es `public_html/`; equivale a
 `/domains/onlineu.mx/public_html/educore/` en File Manager).
 
 > La cookie `refresh_token` es cross-site (frontend `onlineu.mx` ↔ backend `onrender.com`)

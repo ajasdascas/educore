@@ -95,7 +95,7 @@ Opcion manual controlada:
 
 1. Localmente correr build: `cd frontend && npm run build`.
 2. Conectar FTP a Hostinger.
-3. Subir contenido de `frontend/out/` directamente a `/public_html/educore/` por FTP (equivale a `/domains/onlineu.mx/public_html/educore/` en File Manager).
+3. Subir contenido de `frontend/out/` directamente a `/educore/` por FTP (la raíz FTP ya es `public_html/`; equivale a `/domains/onlineu.mx/public_html/educore/` en File Manager).
 4. Confirmar que no queda `/educore/out/index.html`; debe ser `/educore/index.html`.
 5. Confirmar `_next/static` completo.
 

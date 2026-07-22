@@ -105,10 +105,10 @@ jobs:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          # La cuenta FTP de onlineu.mx está aislada en la raíz del hosting y
-          # expone public_html/. En File Manager la misma carpeta se muestra
-          # como /domains/onlineu.mx/public_html/educore/.
-          FTP_TARGET_DIR: ${{ secrets.HOSTINGER_FTP_TARGET_DIR || '/public_html/educore/' }}
+          # La cuenta FTP de onlineu.mx ya tiene public_html/ como raíz.
+          # /educore/ equivale en File Manager a
+          # /domains/onlineu.mx/public_html/educore/.
+          FTP_TARGET_DIR: ${{ secrets.HOSTINGER_FTP_TARGET_DIR || '/educore/' }}
         run: |
           if [ -z "${FTP_HOST}" ] || [ -z "${FTP_USER}" ] || [ -z "${FTP_PASS}" ]; then
             echo "::error::Faltan secrets FTP de Hostinger (HOSTINGER_FTP_SERVER/USERNAME/PASSWORD)."
@@ -131,10 +131,11 @@ jobs:
             target_dir="${FTP_TARGET_DIR%/}"
             target_parent="${target_dir%/*}"
             target_leaf="${target_dir##*/}"
-            if [ -z "${target_parent}" ] || [ -z "${target_leaf}" ]; then
+            if [ -z "${target_leaf}" ]; then
               echo "::error::HOSTINGER_FTP_TARGET_DIR no es una ruta válida."
               return 1
             fi
+            [ -n "${target_parent}" ] || target_parent="/"
 
             case "${mode}" in
               explicit_ftps)
