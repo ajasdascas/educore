@@ -205,11 +205,78 @@ jobs:
           exit 1
 
       - name: Smoke test público
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
         run: |
+          set -euo pipefail
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "${tmp_dir}"' EXIT
+
           echo "Probando https://onlineu.mx/educore/ ..."
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 25 https://onlineu.mx/educore/login/ || echo "000")
-          echo "login/ -> HTTP ${code}"
-          [ "${code}" = "200" ] || echo "::warning::login/ no devolvió 200 (revisar propagación/ruta)."
+          cache_key="${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}"
+          html_matches=false
+          for attempt in 1 2 3 4 5 6; do
+            if ! code=$(curl -sS -L --compressed --retry 2 --retry-all-errors \
+              -H 'Cache-Control: no-cache' \
+              -o "${tmp_dir}/login.html" -w "%{http_code}" --max-time 25 \
+              "https://onlineu.mx/educore/login/?deploy=${cache_key}-${attempt}"); then
+              code="000"
+            fi
+            echo "login/ intento ${attempt}/6 -> HTTP ${code}"
+            if [ "${code}" = "200" ] && cmp -s frontend/out/login/index.html "${tmp_dir}/login.html"; then
+              html_matches=true
+              break
+            fi
+            [ "${attempt}" = "6" ] || sleep 5
+          done
+          if [ "${html_matches}" != "true" ]; then
+            echo "::error::Producción no sirve el login.html recién compilado después de 6 intentos."
+            exit 1
+          fi
+
+          remote_chunk=$(grep -oE 'src="[^"]*/login/page-[^"]+\.js"' "${tmp_dir}/login.html" \
+            | head -n 1 | sed -E 's/^src="//; s/"$//' || true)
+          local_chunk=$(grep -oE 'src="[^"]*/login/page-[^"]+\.js"' frontend/out/login/index.html \
+            | head -n 1 | sed -E 's/^src="//; s/"$//' || true)
+
+          if [ -z "${remote_chunk}" ] || [ -z "${local_chunk}" ]; then
+            echo "::error::No se pudo identificar el chunk de login local o público."
+            exit 1
+          fi
+          if [ "${remote_chunk}" != "${local_chunk}" ]; then
+            echo "::error::Producción todavía sirve un artefacto de login distinto al recién compilado."
+            exit 1
+          fi
+          case "${remote_chunk}" in
+            /educore/_next/*) : ;;
+            *) echo "::error::El chunk público no respeta el basePath /educore."; exit 1 ;;
+          esac
+
+          local_chunk_file="frontend/out/${local_chunk#/educore/}"
+          test -f "${local_chunk_file}" || {
+            echo "::error::El chunk de login no existe en frontend/out/."
+            exit 1
+          }
+          curl -sS -L --compressed --fail --retry 2 --retry-all-errors --max-time 25 \
+            -H 'Cache-Control: no-cache' \
+            "https://onlineu.mx${remote_chunk}?deploy=${cache_key}" \
+            -o "${tmp_dir}/login.js"
+          if ! cmp -s "${local_chunk_file}" "${tmp_dir}/login.js"; then
+            echo "::error::El chunk público no coincide con el artefacto recién compilado."
+            exit 1
+          fi
+
+          backend_url=$(printf '%s' "${NEXT_PUBLIC_API_URL}" | sed -E \
+            's/^[[:space:]]+//; s/[[:space:]]+$//; s#/*$##')
+          if [ -z "${backend_url}" ] || ! grep -Fq "${backend_url}" "${tmp_dir}/login.js"; then
+            echo "::error::El chunk público no contiene el backend configurado."
+            exit 1
+          fi
+          if grep -Eq 'educore-production-beef|localhost:8082' "${tmp_dir}/login.js"; then
+            echo "::error::El chunk público contiene un backend obsoleto o local."
+            exit 1
+          fi
+          echo "✓ Producción sirve exactamente el artefacto recién compilado y el backend correcto"
 
       # Registro de historial (best-effort; no falla el deploy si no está configurado).
       - name: Record deployment in EduCore
