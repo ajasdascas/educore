@@ -11,16 +11,16 @@
 Navegador ─── https://onlineu.mx/educore/ ──▶ Hostinger (archivos estáticos)
                                                    │  (solo sirve HTML/CSS/JS)
                                                    ▼
-                        fetch NEXT_PUBLIC_API_URL ──▶ Backend Go/Fiber (Railway u otro)
+                        fetch NEXT_PUBLIC_API_URL ──▶ Backend Go/Fiber (Render)
                                                         │
                                                         ▼
-                                                   MySQL/MariaDB de Hostinger
+                                                   PostgreSQL (Neon)
 ```
 
 - **Frontend**: Next.js 14, export estático (`output: "export"`), `basePath:"/educore"`,
   `trailingSlash:true`. Hostinger **solo sirve archivos** — sin Node, sin `npm start`.
 - **Backend**: servicio Go/Fiber **separado** (no vive dentro del hosting estático).
-- **DB**: solo el backend accede; el navegador nunca toca MySQL.
+- **DB**: solo el backend accede; el navegador nunca toca PostgreSQL.
 
 ---
 
@@ -51,6 +51,10 @@ Correcto: `/educore/index.html`. Incorrecto: `/educore/out/index.html`.
 > hPanel muestra la ruta absoluta bajo `domains/`, pero la cuenta FTP de
 > `onlineu.mx` está aislada con `public_html/` como su propia raíz.
 
+El build también crea `out/.htaccess`. Ese archivo es parte obligatoria del
+deploy: permite que cada subdominio escolar apuntado al directorio `educore`
+sirva correctamente las URLs generadas con `basePath=/educore`.
+
 ---
 
 ## Secrets de GitHub que debes configurar
@@ -66,8 +70,8 @@ Correcto: `/educore/index.html`. Incorrecto: `/educore/out/index.html`.
 | `HOSTINGER_FTP_TARGET_DIR` | ruta remota si difiere del default | Opcional |
 | `EDUCORE_DEPLOY_WEBHOOK_URL` | historial de deploys (opcional) | No |
 | `EDUCORE_DEPLOY_WEBHOOK_SECRET` | secreto del webhook | No |
-| `HOSTINGER_API_TOKEN` | provisión wildcard DNS (FASE subdominios) | Solo para wildcard |
-| `SERVER_IP` | IP del hosting para el wildcard A record | Solo para wildcard |
+| `HOSTINGER_API_TOKEN` | reintento manual de un subdominio escolar | Para workflow de dominios |
+| `HOSTINGER_HOSTING_USERNAME` | usuario del sitio/cuenta de hosting, no el usuario FTP | Para workflow de dominios |
 
 ---
 
@@ -86,17 +90,34 @@ Correcto: `/educore/index.html`. Incorrecto: `/educore/out/index.html`.
 
 ### Variables del backend en Render (solo nombres; valores como secrets del servicio)
 `APP_ENV=production`, `DB_DRIVER=postgres`, `DATABASE_URL` (Neon, `?sslmode=require`),
-`JWT_SECRET`, `EDUCORE_AUTO_SEED_OWNERS=true`, `EDUCORE_OWNER_ADMIN_EMAILS`,
-`EDUCORE_OWNER_ADMIN_PASSWORD` (≥12 en producción), `ALLOW_DEMO_LOGIN=false`.
+`JWT_SECRET`, `EDUCORE_AUTO_SEED_OWNERS=false`, `ALLOW_DEMO_LOGIN=false`.
+`EDUCORE_OWNER_ADMIN_EMAILS` y `EDUCORE_OWNER_ADMIN_PASSWORD` se usan solo en
+el bootstrap create-once descrito abajo; no deben permanecer activos.
+Para crear subdominios al registrar escuelas: `HOSTINGER_API_TOKEN`,
+`HOSTINGER_HOSTING_USERNAME`, `HOSTINGER_WEBSITE_DOMAIN=onlineu.mx` y
+`HOSTINGER_SUBDOMAIN_DIRECTORY=educore`.
 **No** definir `PORT` (lo maneja Render). `REDIS_URL` opcional.
 
 > La conexión Neon usa el rol `neondb_owner`, que **bypassa RLS** (las tablas tienen RLS
 > ENABLE sin FORCE) — por eso el backend lee/escribe sin bloqueo.
-> CORS permite `https://onlineu.mx` (origin sin ruta — nunca `https://onlineu.mx/educore`).
+> CORS permite los orígenes exactos de plataforma y un único slug escolar
+> válido bajo `https://{slug}.onlineu.mx` (el origin nunca incluye `/educore`).
+
+### Subdominios escolares
+
+Hostinger no admite wildcard de subdominios en hPanel. El backend usa la API
+oficial para crear un subdominio individual por escuela, de forma idempotente,
+y lo apunta al directorio compartido `educore`. No se debe configurar un
+subdominio manual con otro document root. Ver
+[`AUTOMATIC_SCHOOL_SUBDOMAINS.md`](./AUTOMATIC_SCHOOL_SUBDOMAINS.md).
 
 ### Bootstrap de una base Postgres nueva
 1. Aplicar `scripts/schema_postgres_consolidated.sql` una vez (Neon SQL Editor).
-2. `EDUCORE_AUTO_SEED_OWNERS=true` + `EDUCORE_OWNER_ADMIN_*` → el admin se crea al arrancar.
+2. Definir temporalmente `EDUCORE_AUTO_SEED_OWNERS=true` y
+   `EDUCORE_OWNER_ADMIN_*`; arrancar una vez y verificar la creación.
+3. Volver inmediatamente `EDUCORE_AUTO_SEED_OWNERS=false`, retirar
+   `EDUCORE_OWNER_ADMIN_PASSWORD` del servicio y reiniciar. El bootstrap nunca
+   cambia ni reactiva una cuenta que ya existe.
 
 > ⛔ **NO usar Railway ni MySQL de Hostinger como producción.** El servicio de Railway
 > quedó fuera (trial expirado) y las migraciones `migrations_mysql/` son un puente histórico

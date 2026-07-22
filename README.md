@@ -53,11 +53,13 @@ cd frontend && npm ci && npm run build
 - `docs/PRODUCTION_RUNBOOK.md` — reactivar/detener/monitorear
 - `docs/ROLLBACK.md` — procedimientos de rollback
 - `docs/HOSTINGER_REMOTE_INVENTORY.md` — ruta remota confirmada
-- `docs/SCHOOL_PORTALS_AND_DNS.md` — portales por escuela y subdominios wildcard
+- `docs/SCHOOL_PORTALS_AND_DNS.md` — portales por escuela, DNS y acceso por rol
+- `docs/AUTOMATIC_SCHOOL_SUBDOMAINS.md` — provisión automática con la API de Hostinger
 
 ## Subdominios por escuela
 
-Cada escuela puede tener `https://slug.onlineu.mx` que **redirige** (htaccess wildcard) a
-`https://onlineu.mx/educore/escuela/?slug=slug` — sin duplicar la app. Requiere DNS wildcard
-`*.onlineu.mx` (paso manual autorizado). El slug se valida/normaliza al crear la escuela
-(`backend/internal/pkg/slug`).
+Cada escuela obtiene `https://slug.onlineu.mx`. Después de confirmar la escuela en la
+base de datos, el backend crea de forma idempotente un subdominio individual mediante
+la API oficial de Hostinger y lo apunta al export compartido `educore`. El build incluye
+el router `.htaccess` requerido por `basePath=/educore`. El slug se valida y normaliza
+con las mismas reglas en backend y frontend.

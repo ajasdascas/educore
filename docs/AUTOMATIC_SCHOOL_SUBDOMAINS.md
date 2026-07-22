@@ -1,229 +1,115 @@
-# Automatic School Subdomains — EduCore
-## Estado verificado: 2026-05-05
+# Subdominios automáticos de escuelas en Hostinger
 
----
+**Actualizado:** 21-07-2026
 
-## Resumen ejecutivo
+EduCore crea un subdominio individual por escuela. No depende de un wildcard de
+hosting: Hostinger indica que hPanel no admite subdominios wildcard, aunque la
+zona DNS sí permita registros `*`.
 
-| Componente | Estado | Qué falta |
-|-----------|--------|-----------|
-| Backend API (school-info) | ✅ Funciona | — |
-| Frontend portal `/escuela/` | ✅ Funciona | — |
-| Login con hostname-detection | ✅ Funciona | — |
-| .htaccess routing (código) | ✅ Listo + deploy automático | — |
-| Rol STUDENT backend | ✅ Implementado | — |
-| Portal de estudiante frontend | ✅ Implementado | — |
-| DNS wildcard `*.onlineu.mx` | ⚠️ Requiere configuración | `HOSTINGER_API_TOKEN` o `CLOUDFLARE_API_TOKEN` |
-| cPanel wildcard subdomain | ⚠️ Un paso manual o API | `CPANEL_HOST/USER/TOKEN` |
+Fuentes oficiales:
 
----
+- [Crear y eliminar subdominios en Hostinger](https://support.hostinger.com/en/articles/1583405-how-to-create-and-delete-subdomains-in-hostinger)
+- [Hostinger API](https://developers.hostinger.com/)
+- [Especificación OpenAPI de Hostinger](https://github.com/hostinger/api/blob/main/openapi.json)
 
-## Cómo funciona el sistema
+## Flujo de producción
 
-```
-Usuario visita: kinder1.onlineu.mx
-      ↓
-[DNS Wildcard]  *.onlineu.mx  →  mismo IP que onlineu.mx
-      ↓
-[Apache .htaccess]  public_html/.htaccess
-   RewriteRule según path:
-   /                → https://onlineu.mx/educore/escuela/?slug=kinder1
-   /login?role=X    → https://onlineu.mx/educore/login?slug=kinder1&role=X
-   /otra-ruta       → https://onlineu.mx/educore/otra-ruta
-      ↓
-[Next.js App]  lee ?slug= o detecta hostname
-   Portal selector / Login page / Dashboard
-      ↓
-[Backend JWT]  tenant_id en el token garantiza aislamiento de datos
-```
+Al crear una escuela con slug `kinder-prueba`:
 
----
+1. El backend valida el slug y confirma la escuela, su administrador, roles y módulos en la base de datos.
+2. Después del `COMMIT`, llama a la API oficial de Hostinger.
+3. Consulta los subdominios existentes con:
+   `GET /api/hosting/v1/accounts/{username}/websites/onlineu.mx/subdomains`.
+4. Si falta, crea `kinder-prueba` con:
 
-## Setup único (hacer UNA vez, aplica a TODAS las escuelas futuras)
-
-### Paso 1 — DNS Wildcard (automatizable con script)
-
-El script detecta automáticamente qué proveedor usar según las variables de entorno:
-
-```bash
-# Opción A — Cloudflare (recomendado, más fiable)
-CLOUDFLARE_API_TOKEN=xxx CLOUDFLARE_ZONE_ID=yyy \
-node scripts/provision-wildcard-domain.js
-
-# Opción B — Hostinger DNS API
-HOSTINGER_API_TOKEN=xxx \
-node scripts/provision-wildcard-domain.js
-
-# Opción C — Solo cPanel (sin token DNS)
-CPANEL_HOST=server.hostinger.com CPANEL_USER=u550473909 CPANEL_TOKEN=xxx \
-node scripts/provision-wildcard-domain.js
-
-# Opción D — Dry run para ver el plan sin cambios
-DRY_RUN=true CLOUDFLARE_API_TOKEN=xxx CLOUDFLARE_ZONE_ID=yyy \
-node scripts/provision-wildcard-domain.js
-```
-
-O hacerlo manualmente en el panel DNS:
-
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A    | *    | [IP del servidor] | 3600 |
-
-**¿Cómo obtengo la IP?** → hPanel → Hosting → Administrar → IP Address del servidor
-
-### Paso 2 — cPanel Wildcard Subdomain (automatizable o manual)
-
-**Intento automático con CPANEL_TOKEN:**
-```bash
-CPANEL_HOST=server.hostinger.com CPANEL_USER=u550473909 CPANEL_TOKEN=xxx \
-node scripts/provision-wildcard-domain.js
-```
-
-**Si el API falla (limitación de plan Hostinger shared):**
-1. hPanel → Hosting → Administrar → cPanel
-2. Domains → Subdomains
-3. Crear:
-   - Subdomain: `*`
-   - Domain: `onlineu.mx`
-   - Document Root: `public_html/`
-4. Guardar
-
-> ⚠️ **Hostinger shared hosting** puede no permitir wildcards vía cPanel API.
-> Si el script reporta error de permisos, el único paso manual es el de cPanel.
-> **Se hace UNA sola vez y aplica a todas las escuelas futuras.**
-
-### Paso 3 — .htaccess (automático via GitHub Actions)
-
-El archivo `frontend/htaccess-subdomain-root` se despliega automáticamente como
-`public_html/.htaccess` en cada push a `master`. No necesitas hacer nada.
-
----
-
-## Paths manejados por el .htaccess
-
-| URL del subdominio | Redirige a |
-|-------------------|-----------|
-| `kinder1.onlineu.mx` | `onlineu.mx/educore/escuela/?slug=kinder1` |
-| `kinder1.onlineu.mx/login?role=school_admin` | `onlineu.mx/educore/login?slug=kinder1&role=school_admin` |
-| `kinder1.onlineu.mx/login?role=teacher` | `onlineu.mx/educore/login?slug=kinder1&role=teacher` |
-| `kinder1.onlineu.mx/login?role=parent` | `onlineu.mx/educore/login?slug=kinder1&role=parent` |
-| `kinder1.onlineu.mx/login?role=student` | `onlineu.mx/educore/login?slug=kinder1&role=student` |
-| `kinder1.onlineu.mx/school-admin/dashboard` | `onlineu.mx/educore/school-admin/dashboard` |
-| `kinder1.onlineu.mx/cualquier-otra-ruta` | `onlineu.mx/educore/cualquier-otra-ruta` |
-
----
-
-## Por cada nueva escuela (cero configuración adicional)
-
-Cuando creas una nueva escuela en el Super Admin con slug `nueva-escuela`:
-
-1. ✅ El wildcard DNS ya funciona — `nueva-escuela.onlineu.mx` resuelve automáticamente
-2. ✅ El .htaccess ya redirige — sin cambios
-3. ✅ El backend ya tiene el tenant — slug registrado en DB
-4. Verificar (opcional):
-   ```bash
-   node scripts/check-school-domain.js nueva-escuela
+   ```json
+   {
+     "subdomain": "kinder-prueba",
+     "directory": "educore",
+     "is_using_public_directory": false
+   }
    ```
 
-**No necesitas crear DNS manual por cada escuela. Nunca.**
+5. Si ya existe y apunta a `.../public_html/educore`, lo conserva. Si apunta a
+   otro directorio, falla de forma segura y no modifica ni borra ese recurso.
+6. Persiste en `tenants.settings`:
+   `domain_provisioning_status` (`created`, `existing`, `pending` o
+   `not_configured`) y `domain_ready`.
 
----
+Un error externo no revierte la escuela ya confirmada en la base de datos. El
+Super Admin muestra el estado y permite reintentar desde Detalles.
 
-## Roles de login disponibles
+## Variables requeridas en el backend de Render
 
-| Rol URL (`?role=`) | Rol backend | Dashboard |
-|-------------------|-------------|-----------|
-| `school_admin` | `SCHOOL_ADMIN` | `/school-admin/dashboard` |
-| `teacher` | `TEACHER` | `/teacher/dashboard` |
-| `parent` | `PARENT` | `/parent/dashboard` |
-| `student` | `STUDENT` | `/student/dashboard` |
-| (ninguno) | `SUPER_ADMIN` | `/super-admin/dashboard` |
+Configurar como secretos del servicio, nunca como `NEXT_PUBLIC_*`:
 
-### Estado del rol STUDENT:
-- ✅ Backend: módulo `student` con endpoints `/api/v1/student/dashboard|profile|grades|attendance`
-- ✅ Frontend: layout, dashboard, grades, attendance, schedule, notifications, settings
-- ✅ RoleGuard: `allowedRoles={["STUDENT"]}`
-- ✅ getDashboardPath: devuelve `/student/dashboard`
-- ✅ Login: redirige a `/student/dashboard` post-login
-- ✅ Portal escuela: tarjeta de Estudiante en selector
-- ✅ .htaccess: reenvía `?role=student` correctamente
-
-**Para crear un alumno con acceso al portal:**
-El alumno necesita un registro en `users` con `role = 'STUDENT'` y un registro
-correspondiente en `students` con `user_id` apuntando a ese usuario.
-Esto se hace desde School Admin → Estudiantes (asignar credenciales de acceso).
-
----
-
-## Scripts de mantenimiento
-
-| Script | Uso | Ejemplo |
-|--------|-----|---------|
-| `provision-wildcard-domain.js` | Setup inicial DNS + cPanel | `CLOUDFLARE_API_TOKEN=xxx CLOUDFLARE_ZONE_ID=yyy node ...` |
-| `provision-school-domain.js` | Verificar que escuela existe en DB + DNS | `node ... --slug=kinder1` |
-| `check-school-domain.js` | Health check completo (DNS + HTTP + API) | `node ... kinder1 --verbose` |
-| `check-auth-routing.js` | Verificar login routing para todos los roles | `node ...` |
-| `check-school-routing.js` | Verificar routing completo de subdominios | `node ... --live --slug=kinder1` |
-
----
-
-## Secrets requeridos
-
-| Secret | Dónde configurar | Para qué |
-|--------|-----------------|---------|
-| `CLOUDFLARE_API_TOKEN` | GitHub Secrets + local `.env` | DNS wildcard via Cloudflare (recomendado) |
-| `CLOUDFLARE_ZONE_ID` | GitHub Secrets + local `.env` | ID de zona Cloudflare para onlineu.mx |
-| `HOSTINGER_API_TOKEN` | GitHub Secrets + local `.env` | DNS wildcard via Hostinger API |
-| `CPANEL_HOST` | Local `.env` | Hostname del servidor cPanel |
-| `CPANEL_USER` | Local `.env` | Usuario cPanel |
-| `CPANEL_TOKEN` | Local `.env` | API token cPanel |
-| `SERVER_IP` | Local `.env` | IP del servidor (auto-detectada si no se pone) |
-| `FTP_PASSWORD` | GitHub Secrets (ya existe) | Deploy FTP a Hostinger |
-
----
-
-## Detección de slug en la app
-
-El archivo `frontend/lib/tenant.ts` centraliza la lógica:
-
-```typescript
-import { getTenantFromHost, getActiveTenantSlug } from "@/lib/tenant";
-
-// Desde hostname:
-getTenantFromHost("kinder1.onlineu.mx")  // → "kinder1"
-getTenantFromHost("onlineu.mx")          // → null  (plataforma principal)
-getTenantFromHost("www.onlineu.mx")      // → null  (excluido)
-
-// Desde URL actual (hostname + ?slug= fallback):
-const slug = getActiveTenantSlug(searchParams);
+```dotenv
+HOSTINGER_API_TOKEN=...
+HOSTINGER_HOSTING_USERNAME=...
+HOSTINGER_WEBSITE_DOMAIN=onlineu.mx
+HOSTINGER_SUBDOMAIN_DIRECTORY=educore
 ```
 
-La página de login usa esta prioridad:
-1. `?slug=` en la URL (viene del redirect del .htaccess)
-2. `window.location.hostname` via `getTenantFromHost()` (si app sirve directo en subdomain)
-3. `null` → login de plataforma principal
+`HOSTINGER_HOSTING_USERNAME` es el usuario de la cuenta/sitio de hosting que
+acepta el endpoint de Hostinger. No debe deducirse a partir de un usuario FTP.
+Primero debe confirmarse con la cuenta de hPanel o con una consulta autenticada
+a la API. No se documentan valores secretos reales en el repositorio.
 
----
+Para el workflow manual `.github/workflows/provision-domains.yml`, crear además
+los secrets de GitHub `HOSTINGER_API_TOKEN`, `HOSTINGER_HOSTING_USERNAME` y
+`NEXT_PUBLIC_API_URL`.
 
-## Aislamiento multi-tenant (seguridad)
+## Enrutamiento del export estático
 
-- El JWT contiene `tenant_id` fijo al momento del login
-- El backend usa `tenant_id` del JWT para TODAS las queries
-- RLS en PostgreSQL como segunda capa de seguridad
-- Si un usuario de `kinder1` accede a `kinder2.onlineu.mx`, puede ver el portal de `kinder2`,
-  pero cuando hace login con sus credenciales, el backend retorna datos de `kinder1` (su tenant real)
-- El backend rechaza el `X-Tenant-ID` header por seguridad — solo confía en JWT
+Next.js se exporta con `basePath=/educore`. El build ejecuta
+`frontend/scripts/prepare-static-hosting.cjs`, que copia
+`frontend/htaccess-subdomain-app-root` como `frontend/out/.htaccess`.
 
----
+Cada subdominio apunta al directorio compartido:
 
-## Troubleshooting
+```text
+/home/{hosting_username}/domains/onlineu.mx/public_html/educore
+```
 
-| Síntoma | Causa | Solución |
-|---------|-------|---------|
-| `kinder1.onlineu.mx` no resuelve | DNS wildcard no configurado | Correr `provision-wildcard-domain.js` o paso manual |
-| Resuelve pero da 404 | cPanel wildcard subdomain no creado | Paso 2 del setup (manual en hPanel) |
-| Resuelve pero no redirige al portal | .htaccess no subido | Verificar deploy.yml o subir manualmente vía FTP |
-| Portal muestra "Tu Institución" | Slug no existe en BD | Crear escuela en Super Admin con ese slug |
-| Login va al Manager Maestro | Usuario sin `?slug` en URL | Verificar que .htaccess inyecta `?slug=` |
-| STUDENT recibe 403 | Usuario no tiene `role='STUDENT'` en BD | Asignar rol desde School Admin |
-| STUDENT no ve datos | Falta registro en tabla `students` | Crear perfil en School Admin → Estudiantes |
+El router mantiene el hostname escolar y resuelve internamente el prefijo del
+`basePath`:
+
+```text
+https://kinder-prueba.onlineu.mx/
+  -> https://kinder-prueba.onlineu.mx/educore/escuela/
+
+https://kinder-prueba.onlineu.mx/educore/login/?role=teacher
+  -> archivo /public_html/educore/login/index.html
+```
+
+El frontend obtiene el tenant del hostname. `?slug=` se conserva únicamente
+como respaldo para rutas internas de `onlineu.mx/educore`.
+
+## Reintento y verificación
+
+Desde la interfaz: Super Admin -> Escuelas -> Detalles -> Portales ->
+**Reintentar configuración**.
+
+Desde GitHub Actions: ejecutar `EduCore — School Domain Provisioner` con la
+acción `provision`.
+
+Desde una terminal autorizada:
+
+```bash
+node scripts/provision-school-domain.js --slug=kinder-prueba
+node scripts/check-school-domain.js kinder-prueba --verbose
+```
+
+El primer comando modifica Hostinger; el segundo es solo lectura. Una respuesta
+exitosa de creación confirma que Hostinger aceptó la configuración, no que DNS
+y SSL ya propagaron. El verificador en vivo confirma DNS, HTTPS, el export
+estático y la escuela en la API.
+
+## Seguridad y recuperación
+
+- El token Hostinger solo existe en el backend/secret store y viaja como Bearer hacia la API oficial.
+- Nunca se imprime, persiste en la base de datos ni incluye en el frontend.
+- Solo se aceptan slugs DNS válidos y no reservados.
+- CORS acepta orígenes exactos conocidos y un único label escolar válido bajo `onlineu.mx`.
+- La automatización no elimina subdominios ni sobrescribe un document root distinto.
+- Para detener nuevas provisiones, retirar las variables Hostinger del backend. Eliminar un subdominio existente es una acción destructiva manual fuera de este flujo.

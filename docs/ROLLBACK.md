@@ -64,10 +64,15 @@ los archivos sin borrar nada extra.
 
 ## 5. Rollback de subdominios / DNS
 
-- El wildcard `*.onlineu.mx` es un cambio de DNS. Para revertir: eliminar el registro
-  A wildcard en el panel DNS de Hostinger. **No** afecta a `onlineu.mx` ni a `/educore/`.
-- El `.htaccess` router va en la raíz de `public_html`. Respaldar el `.htaccess` existente
-  antes de reemplazarlo; para revertir, restaurar el respaldo.
+- Para detener nuevas provisiones, retirar `HOSTINGER_API_TOKEN` y
+  `HOSTINGER_HOSTING_USERNAME` del backend. Las escuelas seguirán disponibles por sus
+  rutas internas y los subdominios existentes no se eliminan.
+- Cada subdominio es un recurso individual de Hostinger. Eliminarlo es destructivo y
+  debe hacerse manualmente después de confirmar el slug y el document root; la
+  automatización no borra ni reemplaza recursos existentes.
+- El router se despliega como `/educore/.htaccess`. Para revertir solo el router,
+  restaurar el build anterior completo de `/educore/`; no sobrescribir el `.htaccess`
+  de la raíz de `public_html`.
 
 ---
 
