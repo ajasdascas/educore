@@ -1,4 +1,4 @@
-name: Deploy Frontend to Hostinger
+name: Deploy EduCore Frontend to Hostinger
 
 # ─────────────────────────────────────────────────────────────
 # ÚNICO flujo automático del frontend estático de EduCore.
@@ -68,20 +68,29 @@ jobs:
         run: npm run build
 
       - name: Verify output artifacts
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
         run: |
           set -e
-          test -f frontend/out/index.html
-          test -f frontend/out/login/index.html
-          test -f frontend/out/escuela/index.html
-          test -f frontend/out/super-admin/dashboard/index.html
+          for f in index.html login/index.html escuela/index.html super-admin/dashboard/index.html; do
+            test -f "frontend/out/$f"
+          done
           test -d frontend/out/_next
           echo "✓ Artefactos críticos presentes en frontend/out/"
-          # Asegura que NO quede la URL muerta de Railway horneada.
-          if grep -rq "educore-production-beef.up.railway.app" frontend/out/; then
-            echo "::error::El build contiene la URL muerta de Railway. Revisa NEXT_PUBLIC_API_URL."
-            exit 1
+          # NO debe quedar la URL muerta de Railway horneada.
+          if grep -rq "educore-production-beef" frontend/out/; then
+            echo "::error::El build contiene la URL muerta de Railway. Revisa NEXT_PUBLIC_API_URL."; exit 1
           fi
-          echo "✓ Sin URL de Railway obsoleta en el build"
+          # NO debe quedar el fallback de desarrollo (localhost) horneado.
+          if grep -rq "localhost:8082" frontend/out/_next/; then
+            echo "::error::El build contiene localhost:8082 (fallback de dev)."; exit 1
+          fi
+          # DEBE contener el host del backend configurado.
+          host="$(printf '%s' "$NEXT_PUBLIC_API_URL" | sed -E 's#^https?://##; s#/.*$##')"
+          if [ -n "$host" ] && ! grep -rq "$host" frontend/out/_next/; then
+            echo "::error::El build no contiene NEXT_PUBLIC_API_URL ($host)."; exit 1
+          fi
+          echo "✓ Build apunta al backend correcto; sin Railway ni localhost"
           du -sh frontend/out/
 
       - name: Install deployment tools

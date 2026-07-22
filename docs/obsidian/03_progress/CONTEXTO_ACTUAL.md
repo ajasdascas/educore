@@ -1,12 +1,15 @@
 # Contexto Actual — EduCore SaaS
 **Fecha:** 21-07-2026 (actualizado)
 
-## 🔴 Recuperación de producción en curso (21-07-2026)
+## 🟢 Recuperación de producción (21-07-2026)
 - **Dominio canónico definitivo:** `https://onlineu.mx/educore/` (NO migrar a `educore.onlineu.mx`).
-- **Login caído** → causa raíz: backend Railway ausente (404). Frontend en Hostinger vivo.
-- Trabajo en rama `recovery/production-login` (basada en `origin/master`). Fixes de frontend,
-  Railway/Dockerfile, workflows y validación de slug ya commiteados **en local, sin desplegar**.
-- **Bloqueante:** reactivar el backend en una URL viva y configurar `NEXT_PUBLIC_API_URL`.
+- **Arquitectura de producción actual:**
+  - Frontend: estático en Hostinger `/domains/onlineu.mx/public_html/educore/` (deploy vía GitHub Actions).
+  - Backend: **Render** `https://educore-api-1va5.onrender.com` (Docker, Free).
+  - DB: **PostgreSQL en Neon** (us-east-2, Free). Railway (trial expirado) y MySQL Hostinger: NO activos.
+- **Login: restaurado a nivel backend** (health 200, CORS ok, 401 controlado, admin sembrado).
+- Rama `recovery/production-login` (sobre `origin/master`) con todos los fixes; PR pendiente de merge.
+- **Siguiente:** merge del PR → deploy automático del frontend a Hostinger.
 - Ver `docs/LOGIN_INCIDENT_REPORT.md`, `docs/HOSTINGER_DEPLOYMENT.md`, `docs/PRODUCTION_RUNBOOK.md`.
 
 ---

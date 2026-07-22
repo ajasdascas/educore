@@ -67,27 +67,37 @@ Correcto: `public_html/educore/index.html`. Incorrecto: `public_html/educore/out
 
 ---
 
-## Backend — configuración (Railway con Dockerfile)
+## Backend — PRODUCCIÓN ACTUAL: Render + Neon (Postgres)
 
-Config única: [`railway.toml`](../railway.toml) (se eliminó `railway.json`, que apuntaba
-a un Dockerfile con Go 1.21 incompatible con `go.mod` Go 1.26 → build fallaba).
+**Backend en vivo:** `https://educore-api-1va5.onrender.com` (Render, Docker, plan Free).
+**Base de datos:** PostgreSQL en **Neon** (us-east-2, plan Free, durable).
 
-| Parámetro | Valor |
+| Parámetro (Render) | Valor |
 |---|---|
-| Builder | DOCKERFILE (raíz `Dockerfile`, Go 1.26, contexto = repo) |
-| Start | binario `./server` (CMD del Dockerfile) |
-| Puerto | **`PORT` que provee Railway** (no fijo) |
-| Health check | `GET /api/v1/health` |
-| Restart policy | ON_FAILURE, máx. 10 reintentos (evita loop infinito) |
+| Runtime | Docker (Dockerfile **raíz** `./Dockerfile`, Go 1.26) |
+| Branch desplegada | `master` (auto-deploy al hacer merge del PR) |
+| Puerto | **`PORT` que provee Render** (no fijo) |
+| Health Check Path | `/api/v1/health` → 200 JSON |
+| Instancia | Free (⚠️ duerme tras ~15 min → primer request ~50s; mitigado con warmup en el login) |
 
-### Variables del backend (solo nombres; valores como secrets del servicio)
-`APP_ENV`, `PORT`, `DB_DRIVER`, `DATABASE_URL` **o** `MYSQL_DSN`,
-`EDUCORE_ALLOW_MYSQL_RUNTIME`, `JWT_SECRET`, `REDIS_URL` (opcional),
-`ALLOW_DEMO_LOGIN`, `EDUCORE_OWNER_ADMIN_EMAILS`, `EDUCORE_OWNER_ADMIN_PASSWORD`.
+### Variables del backend en Render (solo nombres; valores como secrets del servicio)
+`APP_ENV=production`, `DB_DRIVER=postgres`, `DATABASE_URL` (Neon, `?sslmode=require`),
+`JWT_SECRET`, `EDUCORE_AUTO_SEED_OWNERS=true`, `EDUCORE_OWNER_ADMIN_EMAILS`,
+`EDUCORE_OWNER_ADMIN_PASSWORD` (≥12 en producción), `ALLOW_DEMO_LOGIN=false`.
+**No** definir `PORT` (lo maneja Render). `REDIS_URL` opcional.
 
-> Si la DB es MySQL de Hostinger: `DB_DRIVER=mysql`, `EDUCORE_ALLOW_MYSQL_RUNTIME=true`
-> (solo tras validar el esquema), DSN con `parseTime=true&charset=utf8mb4`, y pool limitado.
-> CORS ya permite `https://onlineu.mx` (origin sin ruta — nunca `https://onlineu.mx/educore`).
+> La conexión Neon usa el rol `neondb_owner`, que **bypassa RLS** (las tablas tienen RLS
+> ENABLE sin FORCE) — por eso el backend lee/escribe sin bloqueo.
+> CORS permite `https://onlineu.mx` (origin sin ruta — nunca `https://onlineu.mx/educore`).
+
+### Bootstrap de una base Postgres nueva
+1. Aplicar `scripts/schema_postgres_consolidated.sql` una vez (Neon SQL Editor).
+2. `EDUCORE_AUTO_SEED_OWNERS=true` + `EDUCORE_OWNER_ADMIN_*` → el admin se crea al arrancar.
+
+> ⛔ **NO usar Railway ni MySQL de Hostinger como producción.** El servicio de Railway
+> quedó fuera (trial expirado) y las migraciones `migrations_mysql/` son un puente histórico
+> **no activo**. No definir `DB_DRIVER=mysql`, `MYSQL_DSN` ni `EDUCORE_ALLOW_MYSQL_RUNTIME`.
+> `railway.toml` / Dockerfiles se conservan solo como alternativa histórica.
 
 ---
 

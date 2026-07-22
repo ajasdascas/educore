@@ -2,7 +2,7 @@
 
 **Fecha:** 21-07-2026 (America/Mexico_City)
 **Autor:** Auditoría asistida por IA (Claude Code) + Giovanni
-**Estado:** Causa raíz confirmada · fix de frontend aplicado en local (rama `recovery/production-login`) · pendiente reactivar backend (acción del dueño)
+**Estado:** ✅ **Backend restaurado** en Render + Neon (Postgres). Login funcional a nivel API. Pendiente: desplegar el frontend corregido a Hostinger (merge del PR).
 **Severidad:** 🔴 Crítica (login 100% caído en producción)
 **Dominio afectado:** https://onlineu.mx/educore/
 
@@ -264,4 +264,29 @@ out/  → 6.2 MB, con index.html, login/, escuela/, super-admin/dashboard/
 > `SameSite=None; Secure` (y probarlo) o mover el refresh a `Authorization: Bearer`.
 > El login por sí solo funciona sin la cookie (el access_token viene en el JSON). Se aborda
 > después de restaurar disponibilidad.
+
+---
+
+## 14. Resolución (21-07-2026)
+
+El servicio de Railway estaba **apagado por trial expirado** (no eliminado), con su Postgres
+también offline. En vez de pagar Railway, se **migró el backend a hosting gratuito**:
+
+- **Backend → Render** (Docker, Dockerfile raíz Go 1.26, plan Free):
+  `https://educore-api-1va5.onrender.com`. Health `200` JSON, `db_driver=postgres`, `env=production`.
+- **DB → Neon** (PostgreSQL, us-east-2, Free, durable). Esquema aplicado una vez con
+  `scripts/schema_postgres_consolidated.sql` (generado desde `backend/migrations/*.sql`).
+- **Owner admin** sembrado al arrancar vía `EDUCORE_AUTO_SEED_OWNERS=true` +
+  `EDUCORE_OWNER_ADMIN_EMAILS/PASSWORD` (≥12). La contraseña expuesta en captura quedó rotada.
+- Verificado por curl: health 200, preflight CORS con `access-control-allow-origin: https://onlineu.mx`,
+  y `POST /auth/login` con password incorrecta → `401 {"error":"Invalid credentials","success":false}`.
+- Frontend: `NEXT_PUBLIC_API_URL=https://educore-api-1va5.onrender.com` (GitHub Secret) +
+  warmup del backend al abrir el login (mitiga el cold start del plan Free de Render).
+
+**Pendiente:** merge del PR `recovery/production-login` → master, que dispara el deploy
+automático del frontend a `/domains/onlineu.mx/public_html/educore/` vía GitHub Actions.
+
+> La cookie `refresh_token` es cross-site (frontend `onlineu.mx` ↔ backend `onrender.com`)
+> con `SameSite=Lax` → no viaja. El login funciona (access_token en el body); el refresh
+> por cookie queda como mejora posterior (pasar a `SameSite=None; Secure` o Bearer).
 

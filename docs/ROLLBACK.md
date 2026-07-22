@@ -43,10 +43,13 @@ los archivos sin borrar nada extra.
 
 ---
 
-## 3. Rollback del backend (Railway)
+## 3. Rollback del backend (Render)
 
-- Railway conserva deployments anteriores: **Deployments → seleccionar uno anterior → Redeploy/Rollback**.
-- Si un cambio de variables rompe el arranque (log.Fatal), revertir la variable y redeployar.
+- Render conserva deploys anteriores: servicio `educore-api` → **"Deploys"** →
+  en un deploy previo exitoso → **"Rollback to this deploy"**.
+- Si un cambio de variables rompe el arranque (log.Fatal por seed/DB), revertir la
+  variable en **Environment** y Render redeploya solo.
+- La base (Neon) es independiente del backend: revertir el backend NO borra datos.
 - El health check `/api/v1/health` debe volver a 200 JSON tras el rollback.
 
 ---

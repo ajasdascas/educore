@@ -1,6 +1,21 @@
 # Cambios Recientes — EduCore
 **Sesión:** 28-04-2026
 
+## [21-07-2026 · tarde] — 🟢 Backend restaurado en Render + Neon
+
+- Railway estaba **apagado por trial expirado** (no borrado). Se migró el backend a gratis:
+  - **Render** (Docker, Dockerfile raíz Go 1.26): `https://educore-api-1va5.onrender.com`. Health 200.
+  - **Neon** PostgreSQL (us-east-2, Free). Esquema aplicado con `scripts/schema_postgres_consolidated.sql`.
+  - Owner admin sembrado con `EDUCORE_AUTO_SEED_OWNERS=true` (contraseña ≥12, rotada).
+- Frontend: `NEXT_PUBLIC_API_URL` como GitHub Secret + **warmup** del backend al abrir el login
+  (mitiga cold start del plan Free). `railway.json` eliminado; `railway.toml`/Dockerfiles = históricos.
+- Workflow único `deploy-frontend-hostinger.yml` (renombrado "Deploy EduCore Frontend to Hostinger")
+  con verificación de que el build apunta a Render y no a Railway/localhost. Ruta FTP confirmada:
+  `/domains/onlineu.mx/public_html/educore/`.
+- **Pendiente:** merge del PR → deploy automático del frontend. Desconectar auto-deploy de
+  `educore.onlineu.mx`. MySQL Hostinger descartado como producción.
+
+
 ## [21-07-2026] — 🔧 Recuperación de producción (rama `recovery/production-login`)
 
 **Incidente:** login caído en `https://onlineu.mx/educore/`. Causa raíz: el backend de

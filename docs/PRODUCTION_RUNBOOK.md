@@ -8,12 +8,19 @@ para revertir ver [ROLLBACK.md](ROLLBACK.md).
 
 ---
 
+## Arquitectura de producción (actual)
+
+- **Frontend**: estático en Hostinger → `https://onlineu.mx/educore/` (deploy vía GitHub Actions).
+- **Backend**: Go/Fiber en **Render** → `https://educore-api-1va5.onrender.com` (Docker, Free).
+- **DB**: PostgreSQL en **Neon** (us-east-2, Free).
+
 ## Reactivar EduCore (checklist)
 
-1. **Backend vivo**: desplegar el backend (Railway u otro). Verificar:
+1. **Backend vivo** (Render): verificar
    ```bash
-   curl -i https://URL-BACKEND/api/v1/health   # -> 200 JSON {"success":true,...}
+   curl -i https://educore-api-1va5.onrender.com/api/v1/health   # -> 200 JSON {"success":true,...}
    ```
+   Si duerme (Free), el primer request tarda ~50s. Si no responde, revisar el servicio en Render.
 2. **Secret**: en GitHub, `NEXT_PUBLIC_API_URL` = `https://URL-BACKEND`.
 3. **Frontend**: push a `master` tocando `frontend/**`, o ejecutar el workflow manual
    `Deploy Frontend to Hostinger`. Esto compila y sube estáticos a `public_html/educore/`.
@@ -27,8 +34,8 @@ para revertir ver [ROLLBACK.md](ROLLBACK.md).
 
 - **Frontend**: es estático; para "apagarlo" basta con retirar/renombrar `public_html/educore/`
   o poner una página de mantenimiento ahí. **No** toca otros dominios.
-- **Backend**: pausar/parar el servicio en Railway (no consume si está detenido).
-  Detener el backend deja el frontend visible pero el login mostrará "servicio no disponible".
+- **Backend**: suspender el servicio `educore-api` en Render (Settings → Suspend).
+  Detener el backend deja el frontend visible pero el login mostrará "no se pudo conectar".
 - **NO** borres archivos fuera de `public_html/educore/`. **NO** pares servicios de otros sitios.
 
 ## Verificar consumo de recursos
@@ -52,6 +59,7 @@ para revertir ver [ROLLBACK.md](ROLLBACK.md).
 
 ## Contactos de configuración (dónde viven los secretos)
 
-- GitHub → Settings → Secrets and variables → Actions
-- Railway → servicio backend → Variables
-- Hostinger → hPanel (FTP, DB, DNS, phpMyAdmin)
+- GitHub → Settings → Secrets and variables → Actions (`NEXT_PUBLIC_API_URL`, `HOSTINGER_FTP_*`)
+- Render → servicio `educore-api` → Environment (`DATABASE_URL`, `JWT_SECRET`, `EDUCORE_OWNER_ADMIN_*`)
+- Neon → proyecto `educore` → Connection string / SQL Editor
+- Hostinger → hPanel (FTP, DNS para subdominios)
