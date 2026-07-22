@@ -175,7 +175,7 @@ Problemas:
 
 - El frontend actual ya sirve; **no se toca producción** hasta tener backend vivo + build probado.
 - Cualquier cambio se hace primero local, se verifica, y se despliega por FTP a
-  `/domains/onlineu.mx/public_html/educore/` **sin `--delete`** hasta confirmar la ruta exacta.
+  `/public_html/educore/` (ruta visible por la cuenta FTP) **sin `--delete`**.
 - Se conserva inventario del directorio remoto antes de subir.
 
 ---
@@ -256,7 +256,7 @@ out/  → 6.2 MB, con index.html, login/, escuela/, super-admin/dashboard/
 2. Guardar esa URL como **GitHub Secret `NEXT_PUBLIC_API_URL`** (p. ej. la URL nueva de Railway
    o, a futuro, `https://api.onlineu.mx`).
 3. Rehornear el frontend con esa variable y desplegar por **un solo** flujo a
-   `/domains/onlineu.mx/public_html/educore/`.
+   `/public_html/educore/` por FTP.
 4. Pruebas de aceptación (health, preflight CORS, login válido, 401 JSON, dashboard, refresh, logout).
 
 > Nota cross-site: el `refresh_token` usa cookie `SameSite=Lax`. Si el backend queda en otro
@@ -284,7 +284,8 @@ también offline. En vez de pagar Railway, se **migró el backend a hosting grat
   warmup del backend al abrir el login (mitiga el cold start del plan Free de Render).
 
 **Pendiente:** merge del PR `recovery/production-login` → master, que dispara el deploy
-automático del frontend a `/domains/onlineu.mx/public_html/educore/` vía GitHub Actions.
+automático del frontend a `/public_html/educore/` vía GitHub Actions (equivalente a
+`/domains/onlineu.mx/public_html/educore/` en File Manager).
 
 > La cookie `refresh_token` es cross-site (frontend `onlineu.mx` ↔ backend `onrender.com`)
 > con `SameSite=Lax` → no viaja. El login funciona (access_token en el body); el refresh

@@ -1,6 +1,6 @@
 # EduCore — Inventario del Hosting Remoto (Hostinger)
 
-**Estado:** ✅ Ruta de despliegue **confirmada** por el dueño (hPanel File Manager).
+**Estado:** ✅ Rutas de despliegue **confirmadas** en hPanel.
 **Última actualización:** 21-07-2026
 
 > No incluir aquí contraseñas, usuarios FTP completos ni tokens.
@@ -11,15 +11,17 @@
 
 | Dato | Valor |
 |---|---|
-| **Ruta remota del frontend** | `/domains/onlineu.mx/public_html/educore/` ✅ confirmada |
+| **Ruta en File Manager** | `/domains/onlineu.mx/public_html/educore/` ✅ confirmada |
+| **Ruta visible por la cuenta FTP** | `/public_html/educore/` ✅ confirmada |
 | Estado inicial de la carpeta | Vacía (el dueño eliminó el contenido al desactivar el proyecto) |
 | Dominio servido | `https://onlineu.mx/educore/` |
 | Acceso | Cuenta general de **Business Web Hosting** (NO el File Manager del sitio `educore.onlineu.mx`) |
 
-Esta ruta **coincide** con el default del workflow
+La ruta visible por FTP **coincide** con el default del workflow
 `deploy-frontend-hostinger.yml` (`HOSTINGER_FTP_TARGET_DIR` por defecto
-`/domains/onlineu.mx/public_html/educore/`), por lo que no es obligatorio
-definir ese secret; si se define, debe usar exactamente esa ruta.
+`/public_html/educore/`), por lo que no es obligatorio definir ese secret.
+La ruta con `/domains/onlineu.mx/` corresponde al File Manager y no debe
+usarse como `cd` con esta cuenta FTP aislada.
 
 Como la carpeta estaba **vacía**, el primer despliegue simplemente crea/rellena
 su contenido. No se requiere backup previo (no había archivos). El workflow
