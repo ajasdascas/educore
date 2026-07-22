@@ -35,7 +35,8 @@ Flujo único: [`.github/workflows/deploy-frontend-hostinger.yml`](../.github/wor
 | Install | `npm ci` |
 | Build | `npm run build` (con `NEXT_PUBLIC_API_URL` horneada) |
 | Output local | `frontend/out` |
-| Destino remoto | `/domains/onlineu.mx/public_html/educore/` *(confirmar por FTP; overridable por secret)* |
+| Destino visible por FTP | `/public_html/educore/` *(overridable por secret)* |
+| Ruta equivalente en File Manager | `/domains/onlineu.mx/public_html/educore/` |
 | Trigger | push a `master` con cambios en `frontend/**` (o manual) |
 | Concurrency | `educore-frontend-production`, `cancel-in-progress: true` |
 | Borrado remoto | **NO** (`mirror` sin `--delete`) |
@@ -46,6 +47,9 @@ Flujo único: [`.github/workflows/deploy-frontend-hostinger.yml`](../.github/wor
 ### ⚠️ Importante sobre la carpeta `out`
 Se sube el **contenido** de `frontend/out/` directamente a `public_html/educore/`.
 Correcto: `public_html/educore/index.html`. Incorrecto: `public_html/educore/out/index.html`.
+
+> hPanel muestra la ruta absoluta bajo `domains/`, pero la cuenta FTP de
+> `onlineu.mx` está aislada en la raíz del hosting y expone `public_html/`.
 
 ---
 

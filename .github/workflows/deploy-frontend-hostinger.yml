@@ -105,8 +105,10 @@ jobs:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_SERVER }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          # Ruta remota confirmada por FTP. Default explícito; overridable por secret.
-          FTP_TARGET_DIR: ${{ secrets.HOSTINGER_FTP_TARGET_DIR || '/domains/onlineu.mx/public_html/educore/' }}
+          # La cuenta FTP de onlineu.mx está aislada en la raíz del hosting y
+          # expone public_html/. En File Manager la misma carpeta se muestra
+          # como /domains/onlineu.mx/public_html/educore/.
+          FTP_TARGET_DIR: ${{ secrets.HOSTINGER_FTP_TARGET_DIR || '/public_html/educore/' }}
         run: |
           if [ -z "${FTP_HOST}" ] || [ -z "${FTP_USER}" ] || [ -z "${FTP_PASS}" ]; then
             echo "::error::Faltan secrets FTP de Hostinger (HOSTINGER_FTP_SERVER/USERNAME/PASSWORD)."
